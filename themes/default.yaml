@@ -1,0 +1,99 @@
+# The default theme: the tokens of the reference pages, verbatim.
+# A theme is data. Every key becomes a CSS custom property (--key) for its mode.
+name: default
+
+light:
+  bg: "#f5f4ef"
+  surface: "#ffffff"
+  ink: "#1c1c1f"
+  muted: "#66666d"
+  line: "#dcd8ce"
+  code-bg: "#f0eee7"
+  on: "#ffffff"            # text on a coloured step number or badge
+  # lightness of each block face; hue and saturation come from the node's role
+  l-top: 80%
+  l-left: 64%
+  l-right: 52%
+  l-edge: 30%
+  slab-top: "#e3dfd4"
+  slab-l: "#c9c3b4"
+  slab-r: "#b3ac9c"
+  pad-top: "#dfe3ea"
+  fence-text: "hsl(38 85% 32%)"
+  tunnel-text: "hsl(205 80% 32%)"
+  # flow kinds
+  send: "#2a64d6"
+  reply: "#14946a"
+  user: "#8446d0"
+  token: "#c9820a"
+  blocked: "#c8433a"
+  control: "#55565e"
+  event: "#c2317f"
+
+dark:
+  bg: "#131316"
+  surface: "#1c1c20"
+  ink: "#ececf0"
+  muted: "#9d9da6"
+  line: "#33333a"
+  code-bg: "#24242a"
+  on: "#111111"
+  l-top: 44%
+  l-left: 32%
+  l-right: 24%
+  l-edge: 62%
+  slab-top: "#26262c"
+  slab-l: "#1d1d22"
+  slab-r: "#17171b"
+  pad-top: "#22252c"
+  fence-text: "hsl(38 90% 62%)"
+  tunnel-text: "hsl(205 80% 72%)"
+  send: "#6e9bff"
+  reply: "#3fcf98"
+  user: "#b58bff"
+  token: "#f2b33d"
+  blocked: "#ff7a6e"
+  control: "#b5b6bf"
+  event: "#ff86c8"
+
+# Flow kinds: colour token, line style, legend text. Files may add more with `kinds:`.
+kinds:
+  send:    { color: send,    dash: solid,  legend: Message sent }
+  reply:   { color: reply,   dash: solid,  legend: Reply or answer }
+  user:    { color: user,    dash: solid,  legend: The human }
+  token:   { color: token,   dash: dashed, legend: Token, placeholder or swap }
+  blocked: { color: blocked, dash: dotted, legend: Blocked or refused }
+  control: { color: control, dash: solid,  legend: Setup or control }
+  event:   { color: event,   dash: solid,  legend: Wake or event }
+  planned: { color: token,   dash: dashed, legend: Not built }
+
+# Colour roles for nodes and regions: hue and saturation; lightness comes from the face.
+# `top` replaces the top face colour; `tint` mixes the role colour into pad-top for the top face.
+roles:
+  slab:    { h: 40,  s: 10 }
+  pad:     { h: 220, s: 12 }
+  lead:    { h: 218, s: 62 }
+  work:    { h: 150, s: 45 }
+  doz:     { h: 228, s: 8 }
+  chat:    { h: 170, s: 48 }
+  mail:    { h: 170, s: 48 }
+  file:    { h: 40,  s: 28 }
+  folder:  { h: 38,  s: 35 }
+  key:     { h: 46,  s: 78 }
+  gate:    { h: 28,  s: 85 }
+  cloud:   { h: 200, s: 50 }
+  event:   { h: 325, s: 58 }
+  placeholder: { h: 38, s: 70 }
+  term:    { h: 275, s: 35 }
+  socket:  { h: 205, s: 35 }
+  fence:   { h: 38,  s: 80 }
+  sandbox: { h: 170, s: 30, tint: 18 }
+  server:  { h: 205, s: 22, tint: 13 }
+  belt:    { h: 38,  s: 55, tint: 20 }
+  bot:     { h: 328, s: 55 }
+  cursor:  { h: 228, s: 8 }
+  grey:    { h: 228, s: 8 }
+  violet:  { h: 250, s: 52 }
+  blue:    { h: 218, s: 62 }
+  green:   { h: 150, s: 45 }
+  person:  { h: 275, s: 35 }

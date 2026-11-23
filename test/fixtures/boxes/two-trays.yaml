@@ -1,0 +1,11 @@
+format: boxes/1
+title: Two trays
+boxes:
+  shelf: { kind: tray, label: Shelf }
+  a: { in: shelf, label: A }
+  b: { in: shelf, label: B }
+  floor: { kind: zone, label: Floor }
+  c: { in: floor, label: C }
+links:
+  - { from: a, to: b }
+  - { from: b, to: c }

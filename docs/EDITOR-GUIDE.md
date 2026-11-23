@@ -1,0 +1,317 @@
+# Write your own editor on @johnoscott/isometric-engine
+
+This guide is for someone who has only the published package. You describe your file format to the engine (an
+**adapter**) and how a file is drawn (a **view**). The editor around them comes from the package: the tree, the
+properties panel, the canvas in 3D and 2D, the palette, menus, keys, problems, undo and save.
+
+The running example is **boxes/1**, a small format of boxes, trays and links. A larger case on the same contract is a
+cloud architecture editor: two kinds (groups and resources), 31 resource types, nested groups, and connections with
+labels. Everything below scales to it unchanged.
+
+```yaml
+format: boxes/1
+title: Two trays
+boxes:
+  shelf: { kind: tray, label: Shelf }    # a tray or a zone holds boxes
+  a: { in: shelf, label: A }
+  b: { in: shelf, label: B }
+  floor: { kind: zone, label: Floor }
+  c: { in: floor, label: C }
+links:
+  - { from: a, to: b }
+  - { from: b, to: c }
+```
+
+## 1. What the editor gives you
+
+All of this comes from `@johnoscott/isometric-engine/editor`, namespace `editor`:
+
+- **The document model and undo.** The text is the truth. Every edit, from the tree, the canvas, the properties or
+  a command, is a splice of the text, so comments and formatting survive and undo is one step per action.
+- **Commands** (`editor.commandsFor(adapter)`): set, insert, rename (every reference follows), delete (optionally with
+  every reference), duplicate, paste, and pins.
+- **The canvas**: your drawing in 3D, with selection, a marquee, pan and zoom, and pins (a dragged object is pinned in
+  the file). It also has a **2D view** that you opt into: the same drawing laid out flat, with a 3D | 2D switch.
+- **The outline (tree)**, **properties** (from your JSON Schema), **problems**, **palette**, **menus** and **keys**.
+- **`editor.mountEditor(element, options, setup)`**, which puts it all on a page, where `setup = editor.setupFor(adapter,
+  view)`.
+
+The other namespaces in the same import are the layers underneath: `core` (parsing, themes, the SVG kernel),
+`objects` (object kinds, layout, routing and `compileRaw`, which turns a drawing into SVG) and `viewer` (pan and zoom,
+overlays, CSS scoping, the 2D view and the morph).
+
+## 2. The adapter and the view
+
+The adapter is plain data and functions, with no DOM. Field by field:
+
+- `id`: the format's name. `role(text)` says whether a text is a `'main'` file (or a `'base'` that others extend).
+- `schema(role)`: a JSON Schema. The properties panel and completion are built from it, and `enum`s become choices.
+- `read(text)`: your reader. It returns `diags`, each with a JSON-pointer `path` (the editor places it from the text),
+  and `read`, your own reading, which your view draws.
+- `kinds`: the things a file holds, each in a map of its own (`section`), with a `template()` for a new one. Names are
+  unique across all kinds.
+- `objectOf(pointer)` and `describe(path)`: which object a pointer is inside, and a path in words ("box a").
+- `refs(data)` and `slotAt(pointer)`: every place whose value names another object (`in:`, `from:`, `to:`), with the
+  slot it is in. Renaming and deleting are built on them.
+- `renameRef(ref, to)`: a reference's new text when its target is renamed.
+- `refDeletePath(path)`: what deleting a reference removes along with its target. That's the reference itself, or
+  the entry that holds it (a link without its `to` is no link: remove `/links/3`, not `/links/3/to`).
+- `topOrder`, `outline`, `pins`, `snippets`, `copyValue`, `entryGroups`, `keyMessage`, `noun`: the details, shown in
+  the example.
+
+The view (`editor.DomainView`) says how a reading is drawn:
+
+- `draw(read, data, theme)`: build the engine's drawing (`objects.compileRaw` with your catalogue) and return its
+  `scene` and `svg`. Also return `pathOf`, a map from each drawn element's `data-id` to the JSON pointer it shows (a
+  click on the canvas selects that path), and `pinId`, the element a pin moves.
+- `catalog`: your object kinds (`objects.KindCatalog`): region kinds by shape, and node kinds that draw themselves.
+- `icons`: your kinds' icons, as 24 × 24 SVG bodies by name. `icon(kind)` chooses one for each kind.
+- `flat`: the 2D view. Give `load` (it returns `editor.flatCanvas`) and each link kind's style. Leave it out and the
+  canvas is 3D only. The switch morphs between the views; `motion: 'always'` morphs even under reduced motion,
+  `'never'` swaps at once (the default, `'auto'`, honours the reader's setting).
+
+```ts
+// file: boxes.ts
+import { core, objects, editor } from '@johnoscott/isometric-engine/editor';
+
+type Raw = Record<string, unknown>;
+const isMap = (v: unknown): v is Raw => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** a tray (a block that holds boxes), a zone (a tint on the floor that holds boxes), a box */
+export const CATALOG: objects.KindCatalog = {
+  regions: {
+    tray: { shape: 'block', pad: 0.6, z: [0, 0.3], floor: true, role: 'server', labelStyle: 'floor' },
+    zone: { shape: 'zone', pad: 0.5, z: [0, 0.005], floor: false, role: 'grey', labelStyle: 'floor' },
+  },
+  nodes: { box: objects.boxAsset('box', 'A box', [2, 2, 1], 'lead') },
+  defaultNode: 'box',
+};
+const HOLDERS = ['tray', 'zone'];
+
+export interface Box { name: string; kind: string; in?: string; label?: string; path: string }
+export interface Boxes { data: Raw; boxes: Box[]; links: { from: string; to: string; path: string }[] }
+
+/** read a text: the boxes, the links, and what is wrong (each at its JSON pointer) */
+export function readBoxes(text: string): { diags: core.Diag[]; read?: Boxes } {
+  const p = core.parse(text);
+  const diags: core.Diag[] = [...p.diags];
+  const bad = (path: string, message: string) => diags.push({ severity: 'error', message, line: 0, col: 0, path });
+  if (!isMap(p.data)) return { diags };
+  const data = p.data, boxes: Box[] = [];
+  if (data.format !== 'boxes/1') bad('/format', 'format: must be boxes/1');
+  for (const [name, v] of Object.entries(isMap(data.boxes) ? data.boxes : {})) {
+    const b = isMap(v) ? v : {}, path = editor.toPointer(['boxes', name]);
+    const kind = typeof b.kind === 'string' ? b.kind : 'box';
+    if (kind !== 'box' && !HOLDERS.includes(kind)) bad(`${path}/kind`, `unknown kind "${kind}": box, tray or zone`);
+    boxes.push({ name, kind, in: typeof b.in === 'string' ? b.in : undefined, label: typeof b.label === 'string' ? b.label : undefined, path });
+  }
+  const byName = new Map(boxes.map(b => [b.name, b]));
+  for (const b of boxes) if (b.in !== undefined && !HOLDERS.includes(byName.get(b.in)?.kind ?? '')) bad(`${b.path}/in`, `no tray or zone "${b.in}"`);
+  const links: Boxes['links'] = [];
+  (Array.isArray(data.links) ? data.links : []).forEach((l, i) => {
+    const x = isMap(l) ? l : {}, path = editor.toPointer(['links', i]);
+    for (const k of ['from', 'to']) if (!byName.has(String(x[k]))) bad(`${path}/${k}`, `no box "${String(x[k] ?? '')}"`);
+    links.push({ from: String(x.from), to: String(x.to), path });
+  });
+  return { diags, read: { data, boxes, links } };
+}
+
+// ---- references: every value that names another box ----
+const SLOTS: editor.RefSlot[] = [
+  { at: ['boxes', '*', 'in'], targets: ['boxes'], what: 'the tray or zone it is in' },
+  { at: ['links', '#', 'from'], targets: ['boxes'], what: "a link's start" },
+  { at: ['links', '#', 'to'], targets: ['boxes'], what: "a link's end" },
+];
+function refs(data: unknown): editor.Ref[] {
+  const out: editor.Ref[] = [], d = isMap(data) ? data : {};
+  for (const [name, v] of Object.entries(isMap(d.boxes) ? d.boxes : {}))
+    if (isMap(v) && typeof v.in === 'string') out.push({ path: editor.toPointer(['boxes', name, 'in']), slot: SLOTS[0], value: v.in, name: v.in });
+  (Array.isArray(d.links) ? d.links : []).forEach((l, i) => {
+    for (const [j, k] of [[1, 'from'], [2, 'to']] as const)
+      if (isMap(l) && typeof l[k] === 'string') out.push({ path: editor.toPointer(['links', i, k]), slot: SLOTS[j], value: l[k] as string, name: l[k] as string });
+  });
+  return out;
+}
+const slotAt = (ptr: string) => {
+  const parts = ptr.split('/').slice(1);
+  return SLOTS.find(s => s.at.length === parts.length && s.at.every((seg, i) => seg === '*' || (seg === '#' ? /^\d+$/.test(parts[i]) : seg === parts[i])));
+};
+
+export const boxesAdapter: editor.DomainAdapter = {
+  id: 'boxes/1',
+  role: () => 'main',
+  schema: () => ({
+    type: 'object', properties: {
+      format: { const: 'boxes/1' }, title: { type: 'string', description: "The drawing's title." },
+      boxes: { type: 'object', additionalProperties: { type: 'object', properties: {
+        kind: { enum: ['box', 'tray', 'zone'], description: 'A box, or a tray or zone that holds boxes.' },
+        in: { type: 'string', description: 'The tray or zone it is in.' }, label: { type: 'string' } } } },
+      links: { type: 'array', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } } } },
+    },
+  }),
+  read(text) { const r = readBoxes(text); return { diags: r.diags, read: r.read }; },
+  keyMessage: /^unknown kind/,
+  kinds: [{ kind: 'boxes', section: ['boxes'], singular: 'box', group: 'Boxes', template: () => ({ label: 'New box' }) }],
+  noun: 'box',
+  objectOf(ptr) { const m = /^\/boxes\/([^/]+)/.exec(ptr); return m ? { kind: 'boxes', name: m[1], path: `/boxes/${m[1]}` } : undefined; },
+  describe(p) { return p.length === 2 && p[0] === 'boxes' ? `box ${p[1]}` : p.join('.') || 'the file'; },
+  entryGroups: [],
+  refs, slotAt,
+  renameRef: (_ref, to) => to,
+  // a link loses its from or to: the link goes, not just the key
+  refDeletePath: p => (p[0] === 'links' ? p.slice(0, 2) : p),
+  copyValue: (_kind, v) => v,
+  topOrder: ['format', 'title', 'boxes', 'links', 'x-editor'],
+  pins: { key: 'x-editor', legacyOnly: () => false },
+  snippets: {},
+  outline: { kinds: ['boxes'], first: ['format', 'title'], groups: [{ key: 'links', label: 'Links' }], rootLabel: d => String(d.title ?? 'boxes') },
+};
+
+/** the drawing: trays and zones as regions, boxes as nodes, links as routes; pins from x-editor.layout */
+export function drawBoxes(r: Boxes, data: unknown, theme: string): editor.CanvasDrawing {
+  const pins = isMap(data) && isMap(data['x-editor']) && isMap(data['x-editor'].layout) ? data['x-editor'].layout : {};
+  const at = (name: string) => { const v = pins[name]; return isMap(v) && Array.isArray(v.at) ? { at: v.at as [number, number] } : {}; };
+  const kids = (name?: string) => r.boxes.filter(b => b.in === name);
+  const region = (b: Box): objects.RawRegion => ({ id: b.name, kind: b.kind, label: b.label ?? b.name, ...at(b.name),
+    regions: kids(b.name).filter(c => c.kind !== 'box').map(region), nodes: kids(b.name).filter(c => c.kind === 'box').map(node) });
+  const node = (b: Box): objects.RawNode => ({ id: b.name, asset: 'box', label: b.label ?? b.name, ...at(b.name) });
+  const title = String(r.data.title ?? 'boxes');
+  const doc: objects.RawDiagram = { isodiag: 1, title, scenes: [{ id: 'boxes', title,
+    regions: kids(undefined).filter(b => b.kind !== 'box').map(region), nodes: kids(undefined).filter(b => b.kind === 'box').map(node),
+    routes: r.links.map((l, i) => ({ id: `link-${i}`, from: l.from, to: l.to, kind: 'send' })) }] };
+  const compiled = objects.compileRaw(doc, theme, CATALOG), scene = compiled.scenes[0];
+  return {
+    scene, svg: scene.rendered.svg,
+    // every drawn element's data-id → the JSON pointer it shows: a click on the canvas selects that
+    pathOf: new Map([...r.boxes.map(b => [b.name, b.path] as [string, string]), ...r.links.map((l, i) => [`link-${i}`, l.path] as [string, string])]),
+    pinId: new Map(r.boxes.map(b => [b.name, b.name])), pinNotes: [],
+    diags: compiled.diags.filter(d => d.severity === 'error').map(d => d.message),
+  };
+}
+
+/** the view: the drawing, the catalogue, the theme, and the 2D view */
+export const boxesView = (theme: string): editor.DomainView<Boxes, editor.CanvasDrawing> => ({
+  draw: drawBoxes, catalog: CATALOG, theme, fileName: 'boxes.yaml', words: { brand: 'boxes' },
+  flat: { load: async () => editor.flatCanvas, title: 'boxes, flat', styles: { send: { color: 'send' } } },
+});
+```
+
+## 3. A page
+
+The package is private, on GitHub Packages. In your project's `.npmrc`, with a token that may read packages in your
+user `~/.npmrc` (never in a repo):
+
+```
+@johnoscott:registry=https://npm.pkg.github.com
+```
+
+```
+npm i @johnoscott/isometric-engine
+npm i -D esbuild
+```
+
+The page mounts the editor with the plain skin. Its CSS and the theme are files in the package, which a bundler loads
+as text:
+
+```ts
+// file: page.ts
+import { core, objects, viewer, editor } from '@johnoscott/isometric-engine/editor';
+import { boxesAdapter, boxesView, CATALOG } from './boxes.ts';
+// @ts-ignore text (esbuild: loader { '.css': 'text', '.yaml': 'text' })
+import SKIN from '@johnoscott/isometric-engine/assets/skin.css';
+// @ts-ignore text
+import APP from '@johnoscott/isometric-engine/assets/app.css';
+// @ts-ignore text
+import THEME from '@johnoscott/isometric-engine/assets/default-theme.yaml';
+
+const theme = String(THEME), root = editor.PLAIN_WORDS.rootClass, canvas = '.iso-canvas';
+const style = document.createElement('style');
+style.textContent = [
+  '@layer tokens, base, components, views;',
+  editor.scopeCss(String(SKIN) + String(APP), root),                                     // the shell
+  viewer.scope(viewer.isoVars(core.themeCss(core.loadTheme(theme))), canvas, root),      // the theme's tokens
+  viewer.scope(viewer.isoVars(objects.drawingCss(CATALOG) + objects.MARKS_CSS), canvas, root), // the drawing
+  viewer.scope(viewer.isoVars(viewer.flatCss({ send: { color: 'send' } })), canvas, root),     // its 2D view
+].join('\n');
+document.head.append(style);
+
+const text = 'format: boxes/1\ntitle: Two trays\nboxes:\n  shelf: { kind: tray }\n  a: { in: shelf }\n  b: { in: shelf }\nlinks:\n  - { from: a, to: b }\n';
+const el = document.getElementById('app')!;
+const ed = editor.mountEditor(el, { text, onSave: async t => { localStorage.setItem('boxes', t); return { ok: true }; } },
+  editor.setupFor(boxesAdapter, boxesView(theme)));
+(window as unknown as { editorHandle: unknown }).editorHandle = ed;
+document.title = 'ready';
+```
+
+`assets/app.css` carries the canvas's marks too (selection, hover, the marquee, the drag's grid, problem badges), in
+the skin's accent; a host that writes its own shell CSS takes `assets/marks.css` instead, and may set `--iso-sel` on
+`.iso-canvas` for another colour. Without either, the marks still draw no fill and never take the pointer.
+
+```
+npx esbuild page.ts --bundle --format=esm --outfile=dist/page.js --loader:.css=text --loader:.yaml=text
+```
+
+Its `index.html` gives the editor a sized element: `<div id="app" style="height:100vh"></div>`, then
+`<script type="module" src="page.js"></script>`.
+
+- **CSP.** The editor runs under `script-src 'self'` (no `unsafe-eval`). Styles go in through a `<style>` element, so
+  allow `style-src 'self' 'unsafe-inline'`.
+- **Inline-safe.** No bundle holds `<!--`, `<script` or `</script`. Your page may inline its bundle in
+  `<script type="module">…</script>` (a page opened from disk), and a bundler printing the package again keeps it so.
+- **Theme.** `assets/default-theme.yaml` is a theme. Your own adds roles (colours by name) and link kinds. The page
+  follows `prefers-color-scheme`, or `data-theme="light" | "dark"` on the root.
+
+## 4. What needs what
+
+| You want | You need |
+|---|---|
+| to draw or render only (`/render`, `/systems`) | the package alone: it has no dependencies |
+| the editor (`/editor`) | the package; its code needs nothing else |
+| to type-check against `/editor` | `yaml` and `monaco-editor` installed, for their types (or `skipLibCheck`) |
+| a text pane beside the tree and canvas | your own pane on the `TextPane` interface (`editor.PaneOpts`), given as `setupFor`'s third argument, and Monaco in your bundle. The package ships none (Monaco is large); without one, the tree, canvas and properties make a complete editor |
+| the 2D view | `view.flat` with `load: async () => editor.flatCanvas`, and `viewer.flatCss(styles)` in your canvas CSS |
+| isodiag/1 YAML drawings | `/systems`: `systems.compile(yaml, theme)` (see the README) |
+
+## 5. Testing your adapter
+
+What we test on every adapter. Each is a few lines with the commands and the splice they make:
+
+```ts
+// file: boxes.test.ts
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { editor } from '@johnoscott/isometric-engine/editor';
+import { boxesAdapter, readBoxes } from './boxes.ts';
+
+const TEXT = 'format: boxes/1\nboxes:\n  shelf: { kind: tray }\n  a: { in: shelf }\n  b: { in: shelf }\nlinks:\n  - { from: a, to: b }\n  - { from: b, to: a }\n';
+const C = editor.commandsFor(boxesAdapter);
+const run = (text: string, cmd: { build(t: string): { steps: Parameters<typeof editor.applyStep>[1][] } }) =>
+  cmd.build(text).steps.reduce((t, s) => editor.applyStep(t, s), text);
+
+test('every reference is found', () => {
+  const r = readBoxes(TEXT).read!;
+  assert.deepEqual(boxesAdapter.refs(r.data).map(x => x.path), ['/boxes/a/in', '/boxes/b/in', '/links/0/from', '/links/0/to', '/links/1/from', '/links/1/to']);
+});
+
+test('a rename follows every reference, and the result reads cleanly', () => {
+  const out = run(TEXT, C.renameCmd(['boxes', 'shelf'], 'rack'));
+  assert.match(out, /a: \{ in: rack \}/);
+  assert.deepEqual(readBoxes(out).diags, []);
+});
+
+test('a delete with its references leaves none dangling', () => {
+  const out = run(TEXT, C.deleteCmd(['boxes', 'a'], { withRefs: true }));
+  assert.doesNotMatch(out, /\ba:|from: a|to: a/);
+  assert.deepEqual(readBoxes(out).diags, []);
+});
+```
+
+In a browser, a smoke test mounts the page and checks the following:
+- the drawing has every object (`[data-id="a"]` in the canvas's SVG);
+- a click on one selects it in the tree (`.trow[aria-selected="true"]`);
+- F2 renames it with its references, and ⌘Z undoes that in one step;
+- every icon resolves (each `<use href>` finds its `<symbol>`);
+- there are no console errors and no CSP violations (listen for `securitypolicyviolation`).
+
+Drive Chrome headless over the DevTools protocol. Use `--headless=new` with a throwaway `--user-data-dir`, and serve
+the page from a free port or through `Fetch.fulfillRequest`, so test runs never collide.

@@ -1,0 +1,200 @@
+isodiag: 1
+title: Package scheduler
+lede: >-
+  The inbox reads the queue into the cache. The package stores an event once a minute. The snapshot closes the result for the client. The ticket merges its token. The runner opens a record on the next step. The upload waits for the result when it is ready. The batch closes the index when it is ready.
+pills: [ "Shipping inbox ledger", "Client feed main standby", "Index sync queue" ]
+kinds:
+  send: { legend: Notifier small large vault }
+  reply: { legend: Balancer queue reader }
+  event: { legend: Remote index }
+  user: { legend: "Vault job records" }
+  control: { legend: Nightly · gateway · ticket }
+  planned: { legend: Main hub }
+scenes:
+  - id: scene1
+    title: Records nightly scheduler
+    aria: >-
+      The proxy picks up a reply. The catalog waits for the order on the next step. The router signs a reply when it is ready. The batch closes its config. The balancer copies the order for the client. The backup rotates the release on the next step. The vault renews the archive from the store. The reader checks a record. The shipping sends the result and waits. The mirror copies the queue when it is ready. The snapshot builds the backup on the next step. The ticket collects the next batch on the next step.
+    dim: all
+    loop: false
+    badges: true
+    legend: [ send, reply, event, user, control, planned, tunnel ]
+
+    regions:
+      - id: api-area
+        kind: slab
+        label: large · exporter
+        at: [ 6.4, -10.4 ]
+        size: [ 25.2, 16 ]
+        regions:
+          - id: web-area
+            kind: platform
+            label: TRACER METRICS
+            at: [ 6.2, 1.8 ]
+            size: [ 6.8, 13.4 ]
+            height: 0.7
+            nodes:
+              - { id: api, asset: mailbox, at: [ 2.2, 9.6 ], label: "runner batch", sub: importer · feed · report · replica · bucket · feed }
+              - { id: web, asset: mailbox, at: [ 2.2, 5.2 ], size: [ 2.4, 2.4, 1.2 ], label: local mirror, sub: api alerts }
+              - { id: queue, asset: block, role: grey, at: [ 2.2, 0.8 ], size: [ 2.4, 2.0, 0.6 ], deco: [ { terminal: 1 } ], label: writer, sub: registry · remote · writer · parser }
+              - { id: cache, asset: block, role: event, at: [ 5.0, 1.0 ], size: [ 1.5, 1.6, 0.5 ], label: shipping, sub: exporter }
+          - id: queue-area
+            kind: vm
+            role: belt
+            label-style: none
+            at: [ 19.6, 0.6 ]
+            size: [ 4.6, 4.4 ]
+            height: 0.25
+            nodes:
+              - { id: store, asset: session, role: violet, at: [ 1.2, 1.0 ], size: [ 2.4, 2.4, 1.6 ], deco: [ { terminal: 3 } ], label: Old invoices, sub: service · cold · cold · hub }
+        nodes:
+          - { id: worker, asset: session, role: violet, at: [ 20.8, 11.4 ], size: [ 2.4, 2.4, 2.0 ], label: Old invoices, sub: "relay · report · planner · main · scheduler" }
+          - { id: gateway, asset: session, role: violet, ghost: true, at: [ 20.8, 7.0 ], size: [ 2.4, 2.4, 1.5 ], deco: [ { terminal: 3 } ], label: Old invoices, sub: notifier }
+      - id: cache-area
+        kind: pad
+        at: [ -2.2, -0.6 ]
+        size: [ 7.8, 5.0 ]
+        nodes:
+          - { id: client, asset: orb, at: [ 1.45, 1.85 ], label: Metrics, sub: Router · job · checker · runner · policy · snapshot }
+          - { id: index, asset: block, role: event, at: [ 5.6, 0.6 ], size: [ 1.6, 1.6, 0.8 ], label: records, sub: ingest writer }
+      - id: store-area
+        kind: pad
+        at: [ 11.4, 8.8 ]
+        size: [ 8.6, 6.0 ]
+        nodes:
+          - { id: ledger, asset: person, at: [ 3.45, 3.65 ], label: Report, sub: shared · volume · large · hub }
+          - { id: report, asset: screen, face: chat, facing: -6, at: [ 3.066, 1.266 ], label: backup, sub: "mirror store" }
+          - { id: builder, asset: screen, face: desktop, facing: -52, at: [ 1.016, 2.403 ], label: policy ingest, sub: alerts }
+      - id: worker-area
+        kind: slab
+        label: payments
+        at: [ 16, -24 ]
+        size: [ 14, 7.4 ]
+        nodes:
+          - { id: router, asset: block, role: grey, at: [ 1.4, 2.4 ], size: [ 2.4, 2.4, 1.1 ], deco: [ { terminal: 2 } ], label: alerts, sub: nightly · index · new · service }
+          - { id: mirror, asset: session, role: violet, at: [ 9.0, 2.4 ], size: [ 2.4, 2.4, 1.7 ], deco: [ { terminal: 3 } ], label: bucket primary, sub: remote parser }
+      - { id: gateway-area, kind: tunnel, around: [ r1, r2, r9 ], label: REMOTE INDEX, at: [ 1.7, 2.25 ], size: [ 10.9, 1.8 ], height: 0.8, z: 0.2 }
+      - { id: client-area, kind: tunnel, around: [ r7, r8 ], label: LISTENER, at: [ 15.25, 4.8 ], size: [ 1.5, 4.0 ], height: 0.8, z: 0.2 }
+      - { id: index-area, kind: tunnel, around: [ r13 ], label: LISTENER, at: [ 17.6, -16.6 ], size: [ 0.8, 6.2 ], height: 0.8 }
+
+    notes:
+      - { floor: READER · STORE · PROXY, at: [ 28.3, -5.75, 0.6 ], kind: planned, anchor: middle }
+
+    routes:
+      - { id: r1, from: client.e, to: api.w, kind: send, label: remote cluster new standby }
+      - { id: r2, from: api.w, to: client.e, kind: reply, label: client · internal · checker }
+      - { id: r3, from: api.e, to: worker.w, kind: send, label: queue large stream queue }
+      - { id: r4, from: worker.w, to: api.e, kind: reply, label: bucket read-only bucket inbox }
+      - { id: r5, from: api.w, to: index.e, kind: event, label: { text: Console · cold · second · builder, at: [ 6.8, 0.45, 0.36 ] } }
+      - { id: r6, from: index.w, to: client.e, kind: event }
+      - { id: r7, from: report.n, to: api.s, kind: user }
+      - { id: r8, from: api.s, to: report.n, kind: user }
+      - { id: r9, from: client.e, to: queue.w, kind: control, label: payments · monitor · alerts · runner }
+      - { id: r10, from: cache.e, to: worker.n, kind: control, label: alerts shared database }
+      - { id: r11, from: web.e, to: gateway.w, kind: planned, label: metrics console }
+      - { id: r12, from: store.w, to: web.e, kind: planned, label: listener · new · report }
+      - { id: r13, from: router.s, to: cache.n, kind: control }
+      - { id: r14, from: router.e, to: mirror.w, kind: send }
+
+    steps:
+      - number: 1
+        kind: control
+        heading: "Cold local second alerts orders worker"
+        caption: The backup answers the archive and moves on. The registry signs the index and moves on. The scheduler closes its config and moves on.
+        pulse: [ api, web, queue, cache ]
+        badge: [ 13.6, -2.2, 1.05 ]
+      - number: 2
+        kind: send
+        heading: Archive volume
+        caption: The alerts renews the next batch. The snapshot merges a reply and waits.
+        animate: [ r1 ]
+        pulse: [ api ]
+        badge: [ 10.6, 2.9, 1.0 ]
+      - number: 2
+        kind: reply
+        heading: Inbox cold api cluster remote portal
+        caption: The vault stores the order from the store. The archive answers a record and waits.
+        animate: [ r2 ]
+        pulse: [ client ]
+        badge: false
+      - number: 3
+        kind: send
+        heading: Scheduler nightly logs upload archive
+        caption: The stream compares the invoice into the cache. The logs forwards the order into the cache.
+        animate: [ [ r3, r8 ] ]
+        pulse: [ worker, ledger ]
+        badge: [ 22.0, 2.2, 0.35 ]
+      - number: 4
+        kind: reply
+        heading: Runner spare notifier package mailer
+        caption: The metrics sends an event when it is ready. The renderer writes a report for the client.
+        animate: [ r4 ]
+        pulse: [ api ]
+        badge: [ 24.8, 1.4, 0.35 ]
+      - number: 5
+        kind: event
+        heading: Release small spare planner
+        caption: The invoices compares a snapshot and moves on. The bucket rotates the order once a minute.
+        animate: [ r5, r6 ]
+        pulse: [ index, client ]
+        badge: [ 9.0, 0.8, 0.35 ]
+      - number: 6
+        kind: user
+        heading: Records notifier public shared builder
+        caption: The replica tags the result and waits. The catalog collects the result once a minute.
+        animate: [ [ r7, r8 ] ]
+        pulse: [ api, web, ledger ]
+        badge: [ 16.0, 6.8, 1.0 ]
+      - number: 7
+        kind: control
+        heading: Invoices balancer report web
+        caption: The cluster collects the invoice on the next step. The upload stops the backup from the store.
+        animate: [ r9 ]
+        pulse: [ client, queue, worker ]
+        badge: [ 9.2, 3.75, 1.0 ]
+      - number: 8
+        kind: control
+        heading: Read-only small metrics payments
+        caption: The audit stops the log and waits. The invoices builds its token. The api answers a report on the next step.
+        animate: [ r1, r3 ]
+        pulse: [ client, worker ]
+        badge: [ 18.4, 0.2, 1.05 ]
+      - number: 9
+        kind: reply
+        heading: Renderer
+        caption: The logs closes an event for the client. The store opens a snapshot for the client. The metrics copies the next batch from the store.
+        animate: [ r1, r10, r2 ]
+        pulse: [ cache, worker ]
+        badge: [ 20.2, -4.9, 0.35 ]
+      - number: 10
+        kind: control
+        heading: Cluster policy importer policy
+        caption: The console waits for the invoice for the client. The ingest opens the release before it answers. The inbox tags the archive from the store.
+        animate: [ r5, r6 ]
+        pulse: [ api, index ]
+        badge: [ 18.6, -3.4, 1.05 ]
+      - number: 11
+        kind: planned
+        heading: Remote store ticket proxy ingest ingest
+        caption: "The audit picks up a snapshot once a minute. The vault merges a snapshot into the cache."
+        animate: [ r11 ]
+        pulse: [ gateway ]
+        badge: [ 21.6, -1.6, 0.35 ]
+      - number: 12
+        kind: planned
+        heading: Index read-only checker old feed
+        caption: "The job tags the log when it is ready. The orders picks up the index and moves on."
+        animate: [ r12 ]
+        pulse: [ store ]
+        badge: [ 21.4, -5.4, 0.35 ]
+      - number: 13
+        kind: control
+        heading: "Read-only main large dashboard"
+        caption: "The volume tags its config. The catalog answers a report from the store."
+        animate: [ r13, r14 ]
+        pulse: [ router, mirror ]
+        highlight: [ builder ]
+        badge: [ 18.0, -13.5, 0.8 ]
+
+    after: |-
+      The snapshot compares the index from the store. The snapshot checks a record. The scheduler compares the index. The ledger compares the archive. The gateway stores an event for the client. The tracer retries a record when it is ready. The checker picks up its token and waits. The invoices collects the invoice from the store. The mailer reads the release once a minute. The inbox merges the queue when it is ready. The router starts the invoice from the store. The payments publishes a record and waits. The scheduler copies the result before it answers. The catalog signs the index once a minute. The checker rotates the log when it is ready.

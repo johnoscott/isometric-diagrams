@@ -1,0 +1,72 @@
+# A network drawn in the engine's own format (isodiag/1): a region with two zones, each with a public and a private
+# subnet, and a data tier. The 2D view of it is derived from this 3D layout (boardOf), never drawn by hand.
+isodiag: 1
+title: A web service across two zones
+scenes:
+  - id: net
+    title: A web service across two zones
+    nodes:
+      - { id: users, asset: person, label: Users, sub: the internet, behind: region, gap: 3 }
+      - { id: dns, asset: block, role: violet, label: DNS, sub: weighted records, right-of: users, gap: 3 }
+    regions:
+      - id: region
+        kind: slab
+        label: REGION · west
+        flow: row
+        regions:
+          - id: zone-a
+            kind: pad
+            label: ZONE A
+            flow: column
+            regions:
+              - id: pub-a
+                kind: pad
+                role: green
+                label: public subnet
+                nodes:
+                  - { id: lb-a, asset: block, role: blue, label: Load balancer, sub: zone a }
+                  - { id: nat-a, asset: block, role: blue, label: NAT gateway, sub: zone a, right-of: lb-a, gap: 2 }
+              - id: priv-a
+                kind: pad
+                label: private subnet
+                nodes:
+                  - { id: app-a, asset: server, role: green, label: App server, sub: zone a }
+                  - { id: work-a, asset: server, role: green, label: Queue reader, sub: zone a, right-of: app-a, gap: 2 }
+          - id: zone-b
+            kind: pad
+            label: ZONE B
+            flow: column
+            regions:
+              - id: pub-b
+                kind: pad
+                role: green
+                label: public subnet
+                nodes:
+                  - { id: lb-b, asset: block, role: blue, label: Load balancer, sub: zone b }
+                  - { id: nat-b, asset: block, role: blue, label: NAT gateway, sub: zone b, right-of: lb-b, gap: 2 }
+              - id: priv-b
+                kind: pad
+                label: private subnet
+                nodes:
+                  - { id: app-b, asset: server, role: green, label: App server, sub: zone b }
+                  - { id: work-b, asset: server, role: green, label: Queue reader, sub: zone b, right-of: app-b, gap: 2.1 }
+          - id: data
+            kind: pad
+            label: DATA
+            flow: column
+            nodes:
+              - { id: db, asset: block, role: violet, label: Database, sub: primary }
+              - { id: replica, asset: block, role: violet, label: Database, sub: replica }
+              - { id: queue, asset: block, role: event, label: Queue, sub: jobs }
+    routes:
+      - { id: u-dns, from: users, to: dns, kind: user }
+      - { id: u-a, from: users, to: lb-a, kind: user, label: HTTPS }
+      - { id: u-b, from: users, to: lb-b, kind: user, label: HTTPS }
+      - { id: a-app, from: lb-a, to: app-a, kind: send }
+      - { id: b-app, from: lb-b, to: app-b, kind: send }
+      - { id: a-db, from: app-a, to: db, kind: send, label: SQL }
+      - { id: b-db, from: app-b, to: db, kind: send, label: SQL }
+      - { id: repl, from: db, to: replica, kind: reply, label: replication }
+      - { id: a-q, from: app-a, to: queue, kind: event, label: jobs }
+      - { id: q-w, from: queue, to: work-b, kind: event }
+      - { id: w-nat, from: work-a, to: nat-a, kind: control, label: outbound }

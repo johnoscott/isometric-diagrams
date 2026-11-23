@@ -1,0 +1,70 @@
+# A nested drawing in the engine's own format (isodiag/1): four panel levels, 12 nodes, 9 labelled routes. Neutral copy
+# of a real one (an architecture page made with 0.6.0), names changed, layout and nesting as they were.
+isodiag: 1
+title: A project on one host
+scenes:
+  - id: arch
+    title: A project on one host
+    nodes:
+      - { id: owner, asset: person, label: The owner, sub: works with the leads, behind: host, gap: 3 }
+      - { id: api, asset: block, role: violet, label: Model API, sub: outside the host, right-of: owner, gap: 6 }
+    regions:
+      - id: host
+        kind: slab
+        label: THIS HOST
+        flow: row
+        regions:
+          - id: proj
+            kind: pad
+            label: PROJECT · L0 · create → delete
+            flow: column
+            regions:
+              - id: places
+                kind: pad
+                label: PLACES · L1 · up → down
+                flow: row
+                regions:
+                  - id: vm
+                    kind: pad
+                    role: green
+                    label: isolated VM
+                    nodes:
+                      - { id: builder, asset: server, role: green, label: builder, sub: service identity }
+                      - { id: reviewer, asset: server, role: green, label: reviewer, sub: service identity, right-of: builder, gap: 2 }
+                  - id: contained
+                    kind: pad
+                    role: green
+                    label: contained on the host
+                    nodes:
+                      - { id: helper, asset: server, role: blue, label: helper, sub: service identity }
+                  - id: open
+                    kind: pad
+                    label: uncontained · acts as you
+                    nodes:
+                      - { id: lead, asset: server, role: blue, label: lead, sub: admin process }
+              - id: owned
+                kind: pad
+                label: OWNED BY THE PROJECT
+                flow: row
+                nodes:
+                  - { id: channel, asset: block, role: event, label: Project channel, sub: one per project }
+                  - { id: folder, asset: block, role: violet, label: Project folder, sub: mounted per place, right-of: channel, gap: 2 }
+                  - { id: data, asset: block, role: violet, label: Project data, sub: disks · memory · history, right-of: folder, gap: 2 }
+          - id: svc
+            kind: pad
+            label: THE HOST'S SHARED SERVICES
+            flow: column
+            nodes:
+              - { id: daemon, asset: block, role: blue, label: Daemon, sub: starts · stops sessions }
+              - { id: msg, asset: block, role: event, label: Message server, sub: hosts every channel }
+              - { id: grants, asset: block, role: violet, label: Grants store, sub: the owner grants }
+    routes:
+      - { id: o-l, from: owner, to: lead, kind: user, label: asks }
+      - { id: l-ch, from: lead, to: channel, kind: send, label: delegates }
+      - { id: b-ch, from: builder, to: channel, kind: event, label: joins }
+      - { id: msg-ch, from: msg, to: channel, kind: reply, label: hosts }
+      - { id: d-vm, from: daemon, to: builder, kind: control, label: starts sessions }
+      - { id: d-helper, from: daemon, to: helper, kind: control }
+      - { id: f-b, from: folder, to: builder, kind: send, label: mount }
+      - { id: g-l, from: grants, to: lead, kind: control, label: what it may do }
+      - { id: b-api, from: builder, to: api, kind: send, label: via the proxy }

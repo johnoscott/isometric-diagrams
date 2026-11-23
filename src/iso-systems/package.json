@@ -1,0 +1,6 @@
+{
+  "//": "iso-systems: validate.ts registers the format's words with the schema messages when it loads; nothing else has side effects.",
+  "type": "module",
+  "private": true,
+  "sideEffects": ["./validate.ts"]
+}

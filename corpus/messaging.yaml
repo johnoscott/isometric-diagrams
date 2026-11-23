@@ -1,0 +1,372 @@
+isodiag: 1
+title: Nightly reader config billing api
+lede: >-
+  The archive rotates its config and waits. The job starts the invoice. The dashboard copies the index on the next step. The batch stores the log for the client. The web answers its config once a minute. The console checks a report. The api waits for a snapshot and waits. The vault renews the next batch into the cache.
+kinds:
+  send: { legend: "Warm outbox console database" }
+  reply: { legend: Ingest logs balancer }
+  user: { legend: "Vault scheduler nightly public store" }
+  event: { legend: Shared stream router }
+  control: { legend: "Package spare large main remote web" }
+  blocked: { legend: "Registry audit search" }
+scenes:
+  - id: scene1
+    title: Records nightly scheduler
+    aria: >-
+      The dashboard rotates the result once a minute. The web picks up its token once a minute. The archive signs its token and moves on. The catalog signs the next batch on the next step. The vault renews the invoice into the cache. The package sends the result into the cache. The config checks the backup on the next step. The planner compares a reply and moves on. The balancer builds a report before it answers. The service reads an event. The sync collects the backup and waits. The index builds the order.
+    dim: all
+    loop: false
+    badges: true
+    legend: [ send, reply, user, event, control, blocked ]
+    regions:
+      - id: api-area
+        kind: slab
+        label: console
+        at: [ 4.4, -17.2 ]
+        size: [ 20.8, 24 ]
+        nodes:
+          - { id: api, asset: block, role: grey, at: [ 1.4, 20 ], size: [ 2.4, 2.4, 1.1 ], deco: [ { terminal: 2 } ], label: billing batch, sub: catalog · listener · backup }
+          - { id: web, asset: block, role: event, at: [ 1.4, 7.7 ], size: [ 2.4, 2.4, 0.8 ], label: orders, sub: batch · second · logs · payments · volume }
+        regions:
+          - id: web-area
+            kind: platform
+            role: server
+            label: DASHBOARD
+            at: [ 6.6, 0.3 ]
+            size: [ 13.6, 23.5 ]
+            height: 0.8
+            nodes:
+              - { id: queue, asset: block, role: grey, at: [ 0.4, 5.8 ], size: [ 2.1, 1.2, 0.55 ], deco: [ { terminal: 2 } ], label: relay upload, sub: Scheduler }
+            regions:
+              - id: queue-area
+                kind: vm
+                role: sandbox
+                label-style: none
+                at: [ 0.4, 11.5 ]
+                size: [ 12.4, 11.8 ]
+                height: 0.25
+                nodes:
+                  - { id: cache, asset: mailbox, at: [ 1.4, 8.2 ], size: [ 2.4, 2.4, 1.5 ], deco: [ { terminal: 3 } ], label: warm vault, sub: writer · config · exporter }
+                  - { id: store, asset: block, role: event, at: [ 0.4, 10.85 ], size: [ 1.2, 0.8, 0.22 ], label: upload, sub: spare stream metrics }
+                  - { id: worker, asset: block, role: grey, at: [ 4.6, 10.85 ], size: [ 1.4, 0.8, 0.45 ], deco: [ { terminal: 1 } ], label: main service, sub: nightly · cache · payments }
+                  - { id: gateway, asset: session, role: violet, at: [ 8.3, 8.1 ], size: [ 2.6, 2.6, 2.0 ], deco: [ { terminal: 4 } ], label: planner, sub: scheduler · policy · records · parser }
+                  - { id: client, asset: session, role: violet, at: [ 8.3, 4.65 ], size: [ 2.6, 2.6, 1.7 ], deco: [ { terminal: 3 } ], label: records, sub: reader logs index }
+                  - { id: index, asset: session, role: violet, at: [ 8.3, 1.2 ], size: [ 2.6, 2.6, 1.5 ], deco: [ { terminal: 3 } ], label: balancer, sub: backup nightly alerts }
+              - id: cache-area
+                kind: vm
+                role: sandbox
+                ghost: true
+                label-style: none
+                at: [ 5.6, 6.1 ]
+                size: [ 7.2, 4.2 ]
+                height: 0.25
+                nodes:
+                  - { id: ledger, asset: session, role: violet, ghost: true, at: [ 3.1, 0.8 ], size: [ 2.6, 2.6, 1.5 ], deco: [ { terminal: 3 } ], label: exporter warm balancer api, sub: Main old audit web invoices }
+              - id: store-area
+                kind: vm
+                role: belt
+                label-style: none
+                at: [ 0.4, 0.4 ]
+                size: [ 8.8, 4.1 ]
+                height: 0.25
+                nodes:
+                  - { id: report, asset: mailbox, at: [ 0.2, 0.9 ], size: [ 2.4, 2.4, 1.5 ], deco: [ { terminal: 3 } ], label: mailer service, sub: old · store · shared · payments }
+                  - { id: builder, asset: session, role: violet, at: [ 5.6, 0.9 ], size: [ 2.4, 2.4, 1.8 ], deco: [ { terminal: 3 } ], label: monitor, sub: "read-only · reader · client" }
+      - id: worker-area
+        kind: pad
+        at: [ -1.7, 2.3 ]
+        size: [ 3.4, 3.4 ]
+        nodes:
+          - { id: router, asset: orb, role: blue, at: [ 0.95, 0.95 ], label: Gateway, sub: monitor renderer }
+      - id: gateway-area
+        kind: pad
+        at: [ 26.4, 2.3 ]
+        size: [ 3.4, 3.4 ]
+        nodes:
+          - { id: mirror, asset: block, role: term, at: [ 0.5, 0.5 ], size: [ 2.4, 2.4, 1.8 ], deco: [], label: service, sub: Importer nightly profile }
+      - id: client-area
+        kind: pad
+        at: [ 8.2, 11.9 ]
+        size: [ 9.2, 7.5 ]
+        nodes:
+          - { id: backup, asset: person, at: [ 5.85, 5.35 ], label: Audit, sub: "alerts webhook writer" }
+          - { id: metrics, asset: screen, face: desktop, facing: -70, at: [ 0.894, 4.171 ], label: "Gateway" }
+          - { id: search, asset: screen, face: chat, facing: -50, at: [ 1.797, 2.608 ], label: "Invoices" }
+          - { id: upload, asset: screen, face: desktop, facing: -30, at: [ 3.18, 1.447 ], label: "main replica" }
+          - { id: billing, asset: screen, face: tiles, facing: -10, at: [ 4.877, 0.829 ], label: "profile · sync · outbox" }
+          - { id: profile, asset: screen, face: tiles, facing: 10, at: [ 6.683, 0.829 ], label: "ticket metrics" }
+
+    notes:
+      - { floor: SECOND PLANNER, at: [ 23.3, -1.0, 1.41 ], dir: y, anchor: middle, kind: control }
+      - { floor: CONFIG · SEARCH · SEARCH · MAIN · CATALOG, at: [ 15.6, -12.7, 1.41 ], anchor: middle, kind: planned }
+
+    routes:
+      - { id: r1, from: router.e, to: api.w, kind: send, label: { text: metrics listener, at: [ 1.85, 5.45, 0.36 ] } }
+      - { id: r2, from: api.w, to: router.e, kind: reply, label: queue cluster }
+      - { id: r3, from: api.e, to: cache.w, kind: send, label: { text: spare report, at: [ 8.5, 4.15, 0.36 ] } }
+      - { id: r4, from: cache.w, to: api.e, kind: reply, label: { text: new renderer, at: [ 8.5, 5.07, 0.36 ] } }
+      - { id: r5, from: cache.e, to: gateway.w, kind: send, label: profile router }
+      - { id: r6, from: gateway.w, to: cache.e, kind: reply, label: warm search }
+      - { id: r7, from: cache.n, to: client.w, kind: send }
+      - { id: r8, from: cache.n, to: index.w, kind: send, label: cluster policy }
+      - { id: r9, from: client.w, to: cache.n, kind: event }
+      - { id: r10, from: cache.s, to: store.e, kind: event }
+      - { id: r11, from: store.w, to: api.s, kind: event, label: queue volume }
+      - { id: r12, from: api.w, to: router.s, kind: event, label: { text: public warm importer, at: [ 1.6, 2.6, 0.36 ] } }
+      - { id: r13, from: worker.w, to: store.e, kind: event }
+      - { id: r14, from: index.w, to: web.e, kind: reply, label: metrics hub }
+      - { id: r15, from: api.n, to: web.s, kind: control, label: remote monitor }
+      - { id: r16, from: queue.s, to: cache.n, kind: control, label: worker }
+      - { id: r17, from: api.n, to: report.w, kind: send, label: search cache logs }
+      - { id: r18, from: report.e, to: builder.w, kind: send }
+      - { id: r19, from: builder.w, to: report.e, kind: reply }
+      - { id: r20, from: billing.n, to: gateway.s, kind: user }
+      - { id: r21, from: gateway.s, to: billing.n, kind: user }
+      - { id: r22, from: gateway.e, to: mirror.w, kind: user, label: { text: audit upload, at: [ 22.55, 4.45, 1.41 ] } }
+      - { id: r23, from: client.e, to: mirror.w, kind: user }
+      - { id: r24, from: index.e, to: mirror.w, kind: user }
+      - { id: r25, from: cache.s, to: mirror.s, kind: user }
+      - { id: r26, from: report.n, to: mirror.n, kind: user }
+      - { id: r27, from: builder.e, to: mirror.n, kind: user }
+      - { id: r28, from: mirror.s, to: profile.e, kind: user }
+      - { id: r29, from: metrics.w, to: router.s, kind: user }
+      - { id: r30, from: search.n, to: api.s, kind: user }
+      - { id: r31, from: cache.n, to: ledger.w, kind: blocked, label: router }
+      - id: r32
+        from: api
+        to: gateway
+        kind: control
+        points: [ [ 7.0, 4.0, 1.5 ], [ 7.0, 4.0, 4.6 ], [ 21.0, 4.0, 4.6 ], [ 21.0, 4.0, 3.45 ] ]
+
+    steps:
+      - { number: 1, kind: send, heading: Billing new router gateway, caption: The ticket closes a ticket for the client, animate: [ r1 ], pulse: [ api ], badge: [ 4.05, 3.5, 0.35 ] }
+      - number: 2
+        kind: control
+        heading: Small notifier checker feed mirror
+        caption: The relay copies the queue when it is ready
+        command: tool logs listener mailer alerts payments
+        pulse: [ api, cache, gateway ]
+        badge: [ 8.2, 4.0, 0.9 ]
+      - number: 3
+        kind: control
+        heading: Ledger stream catalog stream tracer invoices
+        caption: The job signs the archive and moves on
+        command: tool invoices --database --mirror --console --writer bucket metrics upload monitor planner --writer
+        pulse: [ cache, gateway, client, index ]
+        highlight: [ queue-area ]
+        badge: [ 12.1, -2.2, 1.4 ]
+      - { number: 4, kind: send, heading: Old payments portal proxy hub package, caption: "The config compares the log for the client. The orders merges a message before it answers.", animate: [ r3 ], pulse: [ cache ], badge: [ 10.3, 3.5, 0.35 ] }
+      - { number: 5, kind: send, heading: Primary database portal job, caption: "The vault sends the invoice for the client", animate: [ r5 ], pulse: [ gateway ], badge: [ 18.6, 3.5, 1.4 ] }
+      - { number: 6, kind: reply, heading: outbox balancer, caption: "The relay picks up a message when it is ready", animate: [ r6 ], pulse: [ cache ], badge: [ 18.9, 4.5, 1.4 ] }
+      - { number: 6, kind: reply, heading: Importer nightly database, caption: "The vault copies an event and waits", animate: [ r4 ], pulse: [ api ], badge: false }
+      - { number: 6, kind: reply, heading: Notifier old snapshot report, caption: The logs renews the queue and waits, animate: [ r2 ], pulse: [ router ], badge: false }
+      - { number: 7, kind: user, heading: Ledger remote spare public ticket, caption: "The ingest reads its config. The policy picks up an event into the cache.", animate: [ [ r20, r21 ] ], pulse: [ gateway ], badge: [ 19.5, 7.25, 1.4 ] }
+      - { number: 8, kind: send, heading: Internal dashboard main invoices job shipping, caption: "The cluster copies a reply once a minute. The tracer signs the queue once a minute.", animate: [ [ r7, r8 ] ], pulse: [ client, index ], badge: [ 16.6, 0.55, 1.4 ] }
+      - number: 9
+        kind: control
+        heading: Remote new read-only report
+        caption: The database stores its token into the cache. The webhook waits for the next batch and moves on.
+        animate: [ r32 ]
+        pulse: [ gateway ]
+        say: [ { at: [ 14.0, 4.0, 4.6 ], text: public shared planner shared cold outbox, kind: control, dy: -14 } ]
+        badge: [ 14.0, 4.0, 4.6 ]
+      - { number: 10, kind: control, heading: Internal runner audit, caption: "The batch collects the release and waits. The queue publishes the log from the store. The outbox picks up the log from the store.", command: "tool --inbox scheduler", pulse: [ cache, gateway, client, index ], highlight: [ queue-area ], badge: [ 23.2, -4.7, 1.4 ] }
+      - { number: 11, kind: blocked, heading: Records vault proxy remote cache, caption: "The index signs the order before it answers. The worker forwards the invoice from the store.", animate: [ r31 ], pulse: [ ledger ], mark: [ { on: r31 } ], badge: [ 15.2, -8.7, 1.2 ] }
+      - { number: 12, kind: user, heading: Primary records gateway, caption: "The payments picks up the request and waits. The worker copies the archive before it answers. The records stores the backup.", animate: [ [ r22, r23, r24, r25, r26, r27, r28 ] ], pulse: [ mirror, gateway, client, index, cache, report, builder ], badge: [ 22.5, 12.9, 1.4 ] }
+      - { number: 13, kind: event, heading: Parser report catalog orders, caption: "The archive stops a record when it is ready. The relay rotates a report into the cache.", animate: [ r9 ], pulse: [ cache ], badge: [ 16.2, 1.35, 1.4 ] }
+      - { number: 13, kind: event, heading: New payments metrics public sync parser, caption: "The sync compares a reply when it is ready. The notifier stops its token when it is ready.", command: tool dashboard stream --profile, animate: [ r10, r11, r12 ], pulse: [ store, api ], badge: [ 9.6, 5.85, 0.35 ] }
+      - { number: 14, kind: event, heading: Package reader large public shipping, caption: "The invoices stores its token before it answers. The archive merges a reply. The upload waits for the result for the client.", animate: [ [ r13, r11 ] ], pulse: [ worker, store ], badge: [ 14.6, 6.0, 1.4 ] }
+      - { number: 15, kind: reply, heading: "Gateway cold cluster main internal exporter", caption: "The exporter waits for the next batch into the cache. The balancer builds the archive before it answers.", command: tool --records, animate: [ [ r14, r15 ] ], pulse: [ web, index, client, gateway ], badge: [ 9.5, -8.3, 0.35 ] }
+      - number: 16
+        kind: blocked
+        heading: Cold runner old sync new checker
+        caption: "The records closes its token when it is ready. The job merges a ticket for the client. The service collects a ticket when it is ready."
+        command: tool --gateway config --upload monitor
+        animate: [ [ r3, r14 ] ]
+        pulse: [ cache, web ]
+        say: [ { at: [ 17.4, -5.0, 1.4 ], text: nightly · importer, kind: blocked } ]
+        badge: [ 6.1, -6.2, 0.35 ]
+      - { number: 17, kind: control, heading: Internal read-only web dashboard, caption: "The inbox collects the release from the store. The proxy tags a message when it is ready. The outbox sends a record and moves on.", command: tool --standby, animate: [ r16 ], pulse: [ queue, gateway, client, index ], badge: [ 14.1, -10.5, 1.15 ] }
+      - { number: 18, kind: send, heading: "Shipping stream api nightly mailer billing", caption: "The upload writes the log and waits. The sync checks a record before it answers. The standby merges the log from the store. The job reads the request on the next step.", command: "tool upload cluster", animate: [ r17, r18, r19 ], pulse: [ report, builder ], highlight: [ store-area ], badge: [ 8.4, -14.9, 0.35 ] }
+      - { number: 19, kind: user, heading: "Read-only listener", caption: "The builder reads the index and waits. The upload answers a reply. The web builds the index before it answers.", animate: [ [ r29, r30, r20, r28 ] ], pulse: [ router, api ], highlight: [ metrics, search, upload, billing, profile, backup ], focus: [ client-area ], badge: [ 4.2, 16.3, 0.2 ] }
+
+  - id: scene2
+    title: Warm cluster warm renderer gateway
+    caption: >-
+      The bucket collects the order once a minute. The shipping opens the log into the cache. The registry retries a record from the store. The mailer compares a snapshot. The outbox rotates its token for the client.
+    aria: >-
+      The tracer records a ticket when it is ready. The snapshot answers the backup when it is ready. The shipping picks up a ticket from the store. The vault opens the release into the cache.
+    gap: 3
+    loop: false
+    legend: [ send, user ]
+    regions:
+      - id: index-area
+        kind: slab
+        label: console
+        padding: 1
+        nodes:
+          - { id: catalog, asset: block, role: grey, size: [ 2.2, 2.2, 1.0 ], deco: [ { terminal: 2 } ], label: feed, sub: "second nightly exporter" }
+        regions:
+          - id: ledger-area
+            kind: platform
+            role: server
+            label-style: none
+            padding: 0.6
+            height: 0.5
+            right-of: catalog
+            gap: 2
+            flow: column
+            regions:
+              - id: report-area
+                kind: vm
+                role: sandbox
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: orders, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: payments, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+                  - { id: invoices, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+                  - { id: shipping, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+              - id: builder-area
+                kind: vm
+                role: belt
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: notifier, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: scheduler, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+      - id: router-area
+        kind: slab
+        label: volume
+        padding: 1
+        behind: index-area
+        gap: 3
+        align: start
+        nodes:
+          - { id: archive, asset: block, role: grey, size: [ 2.2, 2.2, 1.0 ], deco: [ { terminal: 2 } ], label: feed, sub: "policy · orders · feed" }
+        regions:
+          - id: mirror-area
+            kind: platform
+            role: server
+            label-style: none
+            padding: 0.6
+            height: 0.5
+            right-of: archive
+            gap: 2
+            flow: column
+            regions:
+              - id: backup-area
+                kind: vm
+                role: sandbox
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: audit, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: config, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+                  - { id: stream, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+              - id: metrics-area
+                kind: vm
+                role: sandbox
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: batch, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: records, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+              - id: search-area
+                kind: vm
+                role: sandbox
+                ghost: true
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: bucket, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ], ghost: true }
+                  - { id: volume, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ], ghost: true }
+      - id: upload-area
+        kind: slab
+        label: router
+        padding: 1
+        behind: router-area
+        gap: 3
+        align: start
+        nodes:
+          - { id: cluster, asset: block, role: grey, size: [ 2.2, 2.2, 1.0 ], deco: [ { terminal: 2 } ], label: feed, sub: "scheduler · importer · small · ledger" }
+        regions:
+          - id: billing-area
+            kind: platform
+            role: server
+            label-style: none
+            padding: 0.6
+            height: 0.5
+            right-of: cluster
+            gap: 2
+            flow: column
+            regions:
+              - id: profile-area
+                kind: vm
+                role: sandbox
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: service, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: runner, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+                  - { id: job, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+              - id: catalog-area
+                kind: vm
+                role: sandbox
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: checker, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: alerts, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+              - id: orders-area
+                kind: vm
+                role: sandbox
+                ghost: true
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: logs, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ], ghost: true }
+                  - { id: tracer, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ], ghost: true }
+              - id: payments-area
+                kind: vm
+                role: belt
+                label-style: none
+                padding: 0.5
+                height: 0.2
+                nodes:
+                  - { id: sync, asset: mailbox, role: mail, size: [ 1.8, 1.8, 1.2 ], deco: [ { terminal: 2 } ] }
+                  - { id: relay, asset: session, role: violet, size: [ 1.8, 1.8, 1.4 ], deco: [ { terminal: 2 } ] }
+      - id: invoices-area
+        kind: pad
+        left-of: router-area
+        gap: 4
+        nodes:
+          - { id: hub, asset: orb, role: blue, label: Gateway, sub: monitor renderer }
+      - id: shipping-area
+        kind: pad
+        below: index-area
+        gap: 3
+        nodes:
+          - { id: proxy, asset: person, label: Audit, sub: local old checker }
+    routes:
+      - { id: r33, from: hub, to: catalog, kind: send }
+      - { id: r34, from: hub, to: archive, kind: send }
+      - { id: r35, from: hub, to: cluster, kind: send }
+      - { id: r36, from: proxy, to: catalog, kind: user }
+      - { id: r37, from: proxy, to: archive, kind: user }
+      - { id: r38, from: proxy, to: cluster, kind: user }
+    steps:
+      - number: 20
+        kind: control
+        heading: Warm cluster warm renderer gateway
+        caption: "The runner waits for a ticket for the client. The client forwards a ticket and waits. The relay compares a report when it is ready."
+        animate: [ [ r33, r34, r35, r36, r37, r38 ] ]
+        pulse: [ catalog, archive, cluster ]

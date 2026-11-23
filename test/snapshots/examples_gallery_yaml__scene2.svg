@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-282 -34 760 595" role="img" aria-label="Sync writer" data-scene="scene2">
+<defs>
+</defs>
+<g class="g-base">
+<g class="blk k-slab" data-id="cache-area" data-dim="1">
+<polygon points="-111.9,91.8 0,156.4 0,117.3 -111.9,52.7" class="lft"/>
+<polygon points="111.9,91.8 0,156.4 0,117.3 111.9,52.7" class="rgt"/>
+<polygon points="0,-11.9 111.9,52.7 0,117.3 -111.9,52.7" class="top"/>
+<path class="grid" d="M29.4,5L-82.4,69.6M58.9,22L-53,86.6M88.3,39L-23.6,103.6M-29.4,5L82.4,69.6M-58.9,22L53,86.6M-88.3,39L23.6,103.6"/>
+</g>
+<g data-id="cache-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 -94.2236 92.48)" class="slabname">INBOX</text>
+</g>
+<g class="blk k-pad" data-id="store-area" data-dim="1">
+<polygon points="106,170 182.6,214.2 182.6,207.4 106,163.2" class="lft"/>
+<polygon points="259.1,170 182.6,214.2 182.6,207.4 259.1,163.2" class="rgt"/>
+<polygon points="182.6,119 259.1,163.2 182.6,207.4 106,163.2" class="top"/>
+<path class="grid" d="M188.4,122.3L111.9,166.5M217.9,139.3L141.3,183.5M247.3,156.3L170.8,200.5M170.8,125.7L247.3,169.9M141.3,142.7L217.9,186.9M111.9,159.7L188.4,203.9"/>
+</g>
+<g data-id="store-area" data-dim="1">
+<text transform="matrix(0.866 0.5 -0.866 0.5 126.6129 162.86)" class="slabname sm">stream</text>
+</g>
+<g class="blk k-server" data-id="gateway-area" data-dim="1">
+<polygon points="-259.1,170 -182.6,214.2 -182.6,190.4 -259.1,146.2" class="lft"/>
+<polygon points="-106,170 -182.6,214.2 -182.6,190.4 -106,146.2" class="rgt"/>
+<polygon points="-182.6,102 -106,146.2 -182.6,190.4 -259.1,146.2" class="top"/>
+<path class="grid" d="M-170.8,108.7L-247.3,152.9M-141.3,125.7L-217.9,169.9M-111.9,142.7L-188.4,186.9M-188.4,105.3L-111.9,149.5M-217.9,122.3L-141.3,166.5M-247.3,139.3L-170.8,183.5"/>
+</g>
+<g data-id="gateway-area" data-dim="1">
+<text transform="matrix(0.866 -0.5 0 1 -123.6684 175.44)" class="slabname" text-anchor="end">PRIMARY</text>
+</g>
+<g class="blk k-sandbox" data-id="worker-area" data-dim="1">
+<polygon points="270.9,265.2 347.4,309.4 347.4,294.1 270.9,249.9" class="lft"/>
+<polygon points="424,265.2 347.4,309.4 347.4,294.1 424,249.9" class="rgt"/>
+<polygon points="347.4,205.7 424,249.9 347.4,294.1 270.9,249.9" class="top"/>
+<path class="grid" d="M365.1,215.8L288.6,260M394.6,232.8L318,277M335.7,212.4L412.2,256.6M306.2,229.4L382.8,273.6M276.8,246.4L353.3,290.6"/>
+</g>
+<g data-id="worker-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 279.7262 266.9)" class="slabname sm">PRIMARY · BATCH</text>
+</g>
+<g class="blk k-cloud cloud" data-id="router" data-dim="1">
+<g transform="matrix(0.866 0.5 -0.866 0.5 173.7247 307.7)">
+<path d="M13.5,13.5 A25.8,25.8 0 0 1 61.2,13.5 A25.8,25.8 0 0 1 108.8,13.5 A25.8,25.8 0 0 1 156.5,13.5 A19.6,19.6 0 0 1 156.5,49.8 A19.6,19.6 0 0 1 156.5,86.2 A19.6,19.6 0 0 1 156.5,122.5 A25.8,25.8 0 0 1 108.8,122.5 A25.8,25.8 0 0 1 61.2,122.5 A25.8,25.8 0 0 1 13.5,122.5 A19.6,19.6 0 0 1 13.5,86.2 A19.6,19.6 0 0 1 13.5,49.8 A19.6,19.6 0 0 1 13.5,13.5Z" class="lft cloud-side"/>
+</g>
+<g transform="matrix(0.866 0.5 -0.866 0.5 173.7247 300.9)">
+<path d="M13.5,13.5 A25.8,25.8 0 0 1 61.2,13.5 A25.8,25.8 0 0 1 108.8,13.5 A25.8,25.8 0 0 1 156.5,13.5 A19.6,19.6 0 0 1 156.5,49.8 A19.6,19.6 0 0 1 156.5,86.2 A19.6,19.6 0 0 1 156.5,122.5 A25.8,25.8 0 0 1 108.8,122.5 A25.8,25.8 0 0 1 61.2,122.5 A25.8,25.8 0 0 1 13.5,122.5 A19.6,19.6 0 0 1 13.5,86.2 A19.6,19.6 0 0 1 13.5,49.8 A19.6,19.6 0 0 1 13.5,13.5Z" class="top cloud-top"/>
+</g>
+</g>
+<g data-id="router" data-dim="1">
+<text transform="matrix(0.866 0.5 -0.866 0.5 188.4471 377.06)" class="slabname sm" text-anchor="middle">policy upload</text>
+</g>
+<g class="zone k-grey" data-id="index-area" data-dim="1">
+<polygon points="385.7,457.1 456.4,497.9 385.7,538.7 315.1,497.9"/>
+</g>
+<g data-id="index-area" data-dim="1">
+<text transform="matrix(0.866 0.5 -0.866 0.5 335.6714 497.59)" class="slabname sm">portal</text>
+</g>
+</g>
+<g class="g-floor">
+</g>
+<g class="g-flows">
+</g>
+<g class="g-blocks">
+<g class="blk k-grey" data-id="catalog" data-dim="1">
+<polygon points="-41.2,52.7 0,76.5 0,49.3 -41.2,25.5" class="lft"/>
+<polygon points="41.2,52.7 0,76.5 0,49.3 41.2,25.5" class="rgt"/>
+<polygon points="0,1.7 41.2,25.5 0,49.3 -41.2,25.5" class="top"/>
+</g>
+<g class="blk k-grey" data-id="orders" data-dim="1">
+<polygon points="141.3,163.2 182.6,187 182.6,159.8 141.3,136" class="lft"/>
+<polygon points="223.8,163.2 182.6,187 182.6,159.8 223.8,136" class="rgt"/>
+<polygon points="182.6,112.2 223.8,136 182.6,159.8 141.3,136" class="top"/>
+</g>
+<g class="blk k-grey" data-id="invoices" data-dim="1">
+<polygon points="-223.8,146.2 -182.6,170 -182.6,142.8 -223.8,119" class="lft"/>
+<polygon points="-141.3,146.2 -182.6,170 -182.6,142.8 -141.3,119" class="rgt"/>
+<polygon points="-182.6,95.2 -141.3,119 -182.6,142.8 -223.8,119" class="top"/>
+</g>
+<g class="blk k-fence wall" data-id="client-area" data-dim="1">
+<polygon points="-16.5,220.3 66,267.9 66,240.7 -16.5,193.1" class="lft"/>
+<polygon points="70.7,265.2 66,267.9 66,240.7 70.7,238" class="rgt"/>
+<polygon points="-11.8,190.4 70.7,238 66,240.7 -16.5,193.1" class="top"/>
+</g>
+<g class="blk k-fence wall" data-id="client-area" data-dim="1">
+<polygon points="-26.5,226.1 -21.8,228.8 -21.8,201.6 -26.5,198.9" class="lft"/>
+<polygon points="-11.8,223 -21.8,228.8 -21.8,201.6 -11.8,195.8" class="rgt"/>
+<polygon points="-16.5,193.1 -11.8,195.8 -21.8,201.6 -26.5,198.9" class="top"/>
+</g>
+<g class="blk k-gate" data-id="client-area">
+<polygon points="-87.5,258.9 -78.6,264 -78.6,226.6 -87.5,221.5" class="lft"/>
+<polygon points="-19.7,230 -78.6,264 -78.6,226.6 -19.7,192.6" class="rgt"/>
+<polygon points="-28.6,187.5 -19.7,192.6 -78.6,226.6 -87.5,221.5" class="top"/>
+</g>
+<g class="blk k-grey" data-id="shipping" data-dim="1">
+<polygon points="-53,265.2 -11.8,289 -11.8,261.8 -53,238" class="lft"/>
+<polygon points="29.4,265.2 -11.8,289 -11.8,261.8 29.4,238" class="rgt"/>
+<polygon points="-11.8,214.2 29.4,238 -11.8,261.8 -53,238" class="top"/>
+</g>
+<g class="blk k-grey" data-id="payments" data-dim="1">
+<polygon points="306.2,249.9 347.4,273.7 347.4,246.5 306.2,222.7" class="lft"/>
+<polygon points="388.7,249.9 347.4,273.7 347.4,246.5 388.7,222.7" class="rgt"/>
+<polygon points="347.4,198.9 388.7,222.7 347.4,246.5 306.2,222.7" class="top"/>
+</g>
+<g class="blk k-fence wall" data-id="client-area" data-dim="1">
+<polygon points="-95.4,265.9 -90.7,268.6 -90.7,241.4 -95.4,238.7" class="lft"/>
+<polygon points="-80.7,262.8 -90.7,268.6 -90.7,241.4 -80.7,235.6" class="rgt"/>
+<polygon points="-85.4,232.9 -80.7,235.6 -90.7,241.4 -95.4,238.7" class="top"/>
+</g>
+<g class="blk k-fence wall" data-id="client-area" data-dim="1">
+<polygon points="-17.7,310.8 -13,313.5 -13,286.3 -17.7,283.6" class="lft"/>
+<polygon points="66,267.9 -13,313.5 -13,286.3 66,240.7" class="rgt"/>
+<polygon points="61.2,238 66,240.7 -13,286.3 -17.7,283.6" class="top"/>
+</g>
+<g class="blk k-fence wall" data-id="client-area" data-dim="1">
+<polygon points="-100.1,268.6 -17.7,316.2 -17.7,289 -100.1,241.4" class="lft"/>
+<polygon points="-13,313.5 -17.7,316.2 -17.7,289 -13,286.3" class="rgt"/>
+<polygon points="-95.4,238.7 -13,286.3 -17.7,289 -100.1,241.4" class="top"/>
+</g>
+<g class="blk k-grey" data-id="notifier" data-dim="1">
+<polygon points="344.5,498.1 385.7,521.9 385.7,494.7 344.5,470.9" class="lft"/>
+<polygon points="427,498.1 385.7,521.9 385.7,494.7 427,470.9" class="rgt"/>
+<polygon points="385.7,447.1 427,470.9 385.7,494.7 344.5,470.9" class="top"/>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<text transform="matrix(0.866 0.5 0 1 -91.2791 269.28)" class="slabname sm fz" data-id="client-area">STANDBY</text>
+</g>
+<g class="g-marks">
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

@@ -1,0 +1,81 @@
+isodiag: 1
+title: balancer · logs · batch · reader · queue
+lede: "The policy publishes the archive into the cache. The hub copies a report into the cache. The batch reads the next batch on the next step. The audit sends the archive before it answers. The mailer signs the release and waits."
+grid: { snap: 0.5 }
+assemble: true
+scenes:
+  - id: scene1
+    title: Local small archive worker
+    caption: The invoices copies the archive when it is ready. The relay reads a reply from the store.
+    regions:
+      - id: api-area
+        kind: slab
+        label: "Proxy · stream · inbox"
+        nodes:
+          - { id: api, asset: session, role: lead, label: proxy · shipping, sub: nightly store, deco: [ { terminal: 3 } ] }
+          - { id: web, asset: chat, right-of: api, gap: 4.5, label: Invoices billing, sub: "gateway orders" }
+          - { id: queue, asset: key, behind: web, gap: 2.5, label: nightly metrics, sub: relay spare invoices }
+        regions:
+          - id: web-area
+            kind: fence
+            label: LISTENER · LOCAL · REPORT
+            right-of: web
+            gap: 4.5
+            gate: { side: w, at: 0.42, width: 2.6, node: worker }
+            nodes:
+              - { id: cache, asset: session, label: Monitor · proxy, sub: "Large new notifier mirror", at: [ 2.5, 1.0 ] }
+              - { id: store, asset: block, role: event, size: [ 1.6, 1.2, 0.7 ], deco: [ { terminal: 1 } ], below: cache, gap: 2, label: large relay, sub: public main outbox, appears: step3 }
+    nodes:
+      - { id: worker, asset: gate, label: volume, sub: profile snapshot outbox }
+      - { id: gateway, asset: person, label: Report, sub: internal api, below: api-area, gap: 2 }
+    routes:
+      - { id: r1, from: api, to: web, kind: control, label: runner package }
+      - { id: r2, from: cache.w, to: worker, kind: send }
+      - { id: r3, from: worker, to: web.e, kind: send, label: "archive" }
+      - { id: r4, from: queue, to: worker.n, kind: token, label: "registry dashboard" }
+      - { id: r5, from: web.w, to: api.e, kind: send }
+      - { id: r6, from: web.s, to: gateway, kind: user, label: worker router }
+      - { id: r7, from: cache.s, to: store.n, kind: control }
+      - { id: r8, from: store.n, to: cache.s, kind: event }
+    steps:
+      - id: step1
+        kind: control
+        heading: Reader local balancer
+        caption: "The cache writes its token when it is ready. The runner compares a report for the client."
+        command: tool --volume service --profile replica --proxy job archive notifier search balancer
+        animate: [ r1 ]
+        pulse: [ web ]
+      - id: step2
+        kind: token
+        heading: Invoices ticket old release importer mirror
+        caption: The registry copies a reply from the store. The monitor merges a message when it is ready.
+        animate: [ r4 ]
+        pulse: [ queue, worker ]
+      - id: step3
+        kind: control
+        heading: Scheduler shipping inbox
+        caption: "The release sends a snapshot on the next step. The snapshot starts the result once a minute."
+        command: tool backup --mirror ingest web
+        animate: [ r7 ]
+        pulse: [ store ]
+      - id: step4
+        kind: send
+        heading: Internal search webhook
+        caption: The payments checks the index and waits. The cluster closes a report and waits. The ingest stops the archive from the store.
+        command: 'tool portal --cache hub --builder audit'
+        animate: [ r2, { r3: token }, [ r5, { r6: user } ] ]
+        pulse: [ worker ]
+        say: [ { at: cache, text: "webhook small ingest" } ]
+      - id: step5
+        kind: event
+        heading: Upload monitor volume
+        caption: The store merges the invoice when it is ready. The inbox builds an event.
+        animate: [ r8 ]
+        pulse: [ cache ]
+      - id: step6
+        kind: blocked
+        heading: Worker web new scheduler registry
+        caption: The dashboard merges a ticket from the store. The notifier waits for a report once a minute.
+        animate: [ { r7: blocked } ]
+        mark: [ { on: r7 } ]
+        pulse: [ store ]

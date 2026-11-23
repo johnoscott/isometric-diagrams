@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out"></pre><script>
+// Measures per-character advance widths for the fonts isodiag draws with, at 100px, in this browser.
+// Run: node scripts/measure-fonts.mjs  (writes src/iso-core/metrics.json)
+// Measured at the size each is drawn at: system-ui (SF Pro) changes its optical size with the pixel size.
+const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', MONO = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+const FONTS = {
+  sans700_13: [700, 13, SANS], sans800_15: [800, 15, SANS], sans800_10_5: [800, 10.5, SANS], sans600_12: [600, 12, SANS],
+  sans800_12: [800, 12, SANS], sans800_11_5: [800, 11.5, SANS], sans400_13: [400, 13, SANS],
+  mono400_11: [400, 11, MONO], mono600_11: [600, 11, MONO],
+};
+let chars = '';
+for (let c = 32; c < 127; c++) chars += String.fromCharCode(c);
+chars += '·→←↑↓’‘“”…–—✕×≈≤≥~é';
+const cv = document.createElement('canvas').getContext('2d');
+const out = {};
+for (const [k, [wt, px, fam]] of Object.entries(FONTS)) {
+  cv.font = `${wt} ${px}px ${fam}`; const t = {};
+  // em units, 4 decimals; measured over 20 copies so kerning-free advances average out rounding
+  for (const ch of chars) t[ch] = Math.round(cv.measureText(ch.repeat(20)).width / 20 / px * 10000) / 10000;
+  out[k] = t;
+}
+document.getElementById('out').textContent = JSON.stringify(out);
+</script>

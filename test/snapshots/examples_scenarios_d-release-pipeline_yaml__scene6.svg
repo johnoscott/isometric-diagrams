@@ -1,0 +1,248 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-520 -53 1282 889" role="img" aria-label="The exporter retries the release before it answers. The parser merges the next batch into the cache. The registry picks up the queue before it answers. The ticket opens an event from the store. The mailer rotates a record from the store. The store sends a reply. The mirror reads the result and waits. The importer stops the index once a minute." data-scene="scene6">
+<defs>
+<marker id="ah-scene6-user" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--user)"/>
+</marker>
+<marker id="ah-scene6-control" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--control)"/>
+</marker>
+<marker id="ah-scene6-send" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--send)"/>
+</marker>
+<marker id="ah-scene6-blocked" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--blocked)"/>
+</marker>
+</defs>
+<g class="g-base">
+<g class="blk k-slab" data-id="api-area" data-dim="1">
+<polygon points="-497.6,314.5 212,724.2 212,685.1 -497.6,275.4" class="lft"/>
+<polygon points="709.6,436.9 212,724.2 212,685.1 709.6,397.8" class="rgt"/>
+<polygon points="0,-11.9 709.6,397.8 212,685.1 -497.6,275.4" class="top"/>
+<path class="grid" d="M29.4,5L-468.2,292.3M58.9,22L-438.7,309.3M88.3,39L-409.3,326.3M117.8,56L-379.8,343.3M147.2,73L-350.4,360.3M176.7,90L-320.9,377.3M206.1,107L-291.5,394.3M235.6,124L-262.1,411.3M265,141L-232.6,428.3M294.4,158L-203.2,445.3M323.9,175L-173.7,462.3M353.3,192L-144.3,479.3M382.8,209L-114.8,496.3M412.2,226L-85.4,513.3M441.7,243L-55.9,530.3M471.1,260L-26.5,547.3M500.6,277L2.9,564.3M530,294L32.4,581.3M559.5,311L61.8,598.3M588.9,328L91.3,615.3M618.3,345L120.7,632.3M647.8,362L150.2,649.3M677.2,379L179.6,666.3M706.7,396L209.1,683.3M-29.4,5L680.2,414.7M-58.9,22L650.7,431.7M-88.3,39L621.3,448.7M-117.8,56L591.8,465.7M-147.2,73L562.4,482.7M-176.7,90L533,499.7M-206.1,107L503.5,516.7M-235.6,124L474.1,533.7M-265,141L444.6,550.7M-294.4,158L415.2,567.7M-323.9,175L385.7,584.7M-353.3,192L356.3,601.7M-382.8,209L326.8,618.7M-412.2,226L297.4,635.7M-441.7,243L267.9,652.7M-471.1,260L238.5,669.7"/>
+</g>
+<g data-id="api-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 -479.9513 315.18)" class="slabname">Proxy · stream · inbox</text>
+</g>
+<g class="blk k-pad" data-id="cache-area" data-dim="1">
+<polygon points="329.8,765 413.4,813.3 413.4,806.5 329.8,758.2" class="lft"/>
+<polygon points="740.2,624.6 413.4,813.3 413.4,806.5 740.2,617.8" class="rgt"/>
+<polygon points="656.6,569.5 740.2,617.8 413.4,806.5 329.8,758.2" class="top"/>
+<path class="grid" d="M683.1,584.7L356.3,773.4M712.6,601.7L385.7,790.4M650.7,572.8L734.4,621.1M621.3,589.8L704.9,638.1M591.8,606.8L675.5,655.1M562.4,623.8L646,672.1M533,640.8L616.6,689.1M503.5,657.8L587.1,706.1M474.1,674.8L557.7,723.1M444.6,691.8L528.2,740.1M415.2,708.8L498.8,757.1M385.7,725.8L469.4,774.1M356.3,742.8L439.9,791.1"/>
+</g>
+<g class="blk k-server" data-id="store-area" data-dim="1">
+<polygon points="2.9,523.6 212,644.3 212,620.5 2.9,499.8" class="lft"/>
+<polygon points="530,460.7 212,644.3 212,620.5 530,436.9" class="rgt"/>
+<polygon points="320.9,316.2 530,436.9 212,620.5 2.9,499.8" class="top"/>
+<path class="grid" d="M326.8,319.5L8.8,503.1M356.3,336.5L38.3,520.1M385.7,353.5L67.7,537.1M415.2,370.5L97.2,554.1M444.6,387.5L126.6,571.1M474.1,404.5L156.1,588.1M503.5,421.5L185.5,605.1M318,317.8L527.1,438.5M288.6,334.8L497.6,455.5M259.1,351.8L468.2,472.5M229.7,368.8L438.7,489.5M200.2,385.8L409.3,506.5M170.8,402.8L379.8,523.5M141.3,419.8L350.4,540.5M111.9,436.8L320.9,557.5M82.4,453.8L291.5,574.5M53,470.8L262.1,591.5M23.6,487.8L232.6,608.5"/>
+</g>
+<g data-id="store-area" data-dim="1">
+<text transform="matrix(0.866 -0.5 0 1 512.3406 466.14)" class="slabname" text-anchor="end">TRACER METRICS</text>
+</g>
+</g>
+<g class="g-floor">
+<text transform="matrix(0.866 0.5 -0.866 0.5 42.0022 351.45)" class="floor mono t-user" data-hl="r1">spare primary</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 54.6635 586.56)" class="floor mono t-user" data-hl="r26">local proxy</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 -162.8301 236.13)" class="floor mono t-control" data-hl="r4">monitor</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 7.9501 139.23)" class="floor mono t-send" data-hl="r17">policy</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 65.3676 328.78)" class="floor mono t-control" data-hl="r27" data-vis="1">reader</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 14.5752 358.105)" class="floor mono t-blocked" data-hl="r28">standby</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 272.9539 367.03)" class="floor mono t-send" data-hl="r29">batch</text>
+<text transform="matrix(0.866 -0.5 0.866 0.5 81.0218 266.3621)" class="floor mono t-send" data-hl="r23">cache index</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 421.6504 585.48)" class="floor mono t-user" data-hl="r30" data-vis="1">queue invoices</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 -2.3556 367.88)" class="floor mono t-control" data-hl="r31" data-vis="1">mailer</text>
+</g>
+<g class="g-flows">
+<g data-hl="r1" data-id="r1">
+<path d="M644,597.5 L625.7,587 L625.7,593.8 L561.5,556.7 L485,600.9 L431.4,570 L431.4,558.1 L396,537.7 L396,513.9 L187,393.2 L187,417 L49.2,337.4 L41.1,342.1 L33.1,337.5" class="flow f-user" marker-end="url(#ah-scene6-user)"/>
+</g>
+<g data-hl="r24" data-id="r24">
+<path d="M533,659.3 L516.8,649.9 L516.8,656.7 L399,588.7 L399,576.8 L397.5,576 L373.9,589.6 L340.1,570 L340.1,546.2 L191.4,460.4 L235.6,434.9 L229.7,431.5" class="flow f-user" marker-end="url(#ah-scene6-user)"/>
+</g>
+<g data-hl="r25" data-id="r25">
+<path d="M450.5,706.9 L434.3,697.5 L434.3,704.3 L316.5,636.3 L316.5,624.4 L281.2,604 L281.2,580.2 L138.4,497.8 L228.2,445.9 L216.4,439.1" class="flow f-user" marker-end="url(#ah-scene6-user)"/>
+</g>
+<g data-hl="r26" data-id="r26">
+<path d="M368.1,754.5 L351.9,745.1 L351.9,751.9 L234.1,683.9 L234.1,672 L61.8,572.6 L75.1,564.9 L75.1,541.1 L220.8,457 L203.2,446.8" class="flow f-user" marker-end="url(#ah-scene6-user)"/>
+</g>
+<g data-hl="r4" data-id="r4">
+<path d="M-63.3,301.4 L-178.1,235.1" class="flow f-control" marker-end="url(#ah-scene6-control)"/>
+</g>
+<g data-hl="r17" data-id="r17">
+<path d="M7.4,296.3 L136.9,221.5 L-54.5,111 L-45.6,105.9" class="flow f-send" marker-end="url(#ah-scene6-send)"/>
+</g>
+<g data-hl="r27" data-id="r27" data-vis="1">
+<path d="M50.1,327.8 L195.8,411.9 L195.8,388.1 L209.1,395.8 L298.9,343.9 L301.8,345.6" class="flow f-control" marker-end="url(#ah-scene6-control)"/>
+</g>
+<g data-hl="r28" data-id="r28">
+<path d="M-0.7,357.1 L140.6,438.7 L157.5,428.9 L161.9,431.5 L161.9,407.7 L178.1,417" class="flow f-blocked" marker-end="url(#ah-scene6-blocked)"/>
+</g>
+<g data-hl="r29" data-id="r29">
+<path d="M16.2,347.3 L22.1,350.7 L106,302.3 L245.9,383 L245.9,359.2 L454.9,479.9 L454.9,503.7 L490.3,524.1 L490.3,536 L608,604 L608,597.2 L626.3,607.7" class="flow f-send" marker-end="url(#ah-scene6-send)"/>
+</g>
+<g data-hl="r23" data-id="r23">
+<path d="M25,306.5 L160.5,228.3 L151.6,223.2 L160.5,218.1" class="flow f-send" marker-end="url(#ah-scene6-send)"/>
+</g>
+<g data-hl="r30" data-id="r30" data-vis="1">
+<path d="M368.1,754.5 L362.2,751.1 L534.4,651.6 L524.1,645.7 L524.1,652.5 L406.3,584.5 L406.3,572.6 L371,552.2 L371,528.4 L354.8,519" class="flow f-user" marker-end="url(#ah-scene6-user)"/>
+</g>
+<g data-hl="r31" data-id="r31" data-vis="1">
+<path d="M-17.7,366.9 L128.1,451 L128.1,427.2 L206.1,472.3 L240,452.7 L316.5,496.9" class="flow f-control" marker-end="url(#ah-scene6-control)"/>
+</g>
+</g>
+<g class="g-blocks">
+<g class="blk k-chat" data-id="orders" data-dim="1">
+<polygon points="-88.3,79.9 0,130.9 0,93.5 -88.3,42.5" class="lft"/>
+<polygon points="88.3,79.9 0,130.9 0,93.5 88.3,42.5" class="rgt"/>
+<polygon points="0,-8.5 88.3,42.5 0,93.5 -88.3,42.5" class="top"/>
+<polygon points="0,10.2 55.9,42.5 0,74.8 -55.9,42.5" class="det"/>
+<line x1="-9.8" y1="26.1" x2="28.5" y2="48.2" class="det"/>
+<line x1="-28.5" y1="36.8" x2="-4.9" y2="50.4" class="det"/>
+</g>
+<g class="blk k-work" data-id="catalog" data-dim="1">
+<polygon points="123.7,195.5 200.2,239.7 200.2,178.5 123.7,134.3" class="lft"/>
+<polygon points="276.8,195.5 200.2,239.7 200.2,178.5 276.8,134.3" class="rgt"/>
+<polygon points="200.2,90.1 276.8,134.3 200.2,178.5 123.7,134.3" class="top"/>
+<line x1="134" y1="157.4" x2="181.4" y2="184.8" class="det"/>
+<line x1="134" y1="169.6" x2="173.8" y2="192.6" class="det"/>
+<line x1="134" y1="181.9" x2="166.1" y2="200.4" class="det"/>
+<line x1="134" y1="194.1" x2="160.8" y2="209.6" class="det"/>
+</g>
+<g class="blk k-file" data-id="cache" data-dim="1">
+<polygon points="-250.3,221 -203.2,248.2 -203.2,227.8 -250.3,200.6" class="lft"/>
+<polygon points="-156.1,221 -203.2,248.2 -203.2,227.8 -156.1,200.6" class="rgt"/>
+<polygon points="-203.2,173.4 -156.1,200.6 -203.2,227.8 -250.3,200.6" class="top"/>
+<line x1="-212" y1="188.7" x2="-182.6" y2="205.7" class="det"/>
+<line x1="-223.8" y1="195.5" x2="-203.2" y2="207.4" class="det"/>
+</g>
+<g class="blk k-lead" data-id="api" data-dim="1">
+<polygon points="-100.1,324.7 -23.6,368.9 -23.6,307.7 -100.1,263.5" class="lft"/>
+<polygon points="53,324.7 -23.6,368.9 -23.6,307.7 53,263.5" class="rgt"/>
+<polygon points="-23.6,219.3 53,263.5 -23.6,307.7 -100.1,263.5" class="top"/>
+<line x1="-89.8" y1="286.6" x2="-42.3" y2="314" class="det"/>
+<line x1="-89.8" y1="298.8" x2="-50" y2="321.8" class="det"/>
+<line x1="-89.8" y1="311.1" x2="-57.7" y2="329.6" class="det"/>
+<line x1="-89.8" y1="323.3" x2="-63" y2="338.8" class="det"/>
+</g>
+<g class="blk k-socket" data-id="shipping" data-dim="1" data-vis="1">
+<polygon points="285.6,357 320.9,377.4 320.9,360.4 285.6,340" class="lft"/>
+<polygon points="356.3,357 320.9,377.4 320.9,360.4 356.3,340" class="rgt"/>
+<polygon points="320.9,319.6 356.3,340 320.9,360.4 285.6,340" class="top"/>
+<polygon points="330.8,345.5 327.9,346.8 324.6,347.6 320.9,347.9 317.3,347.6 314,346.8 311.1,345.5 308.8,343.9 307.4,341.9 307,339.8 307.4,337.7 308.8,335.8 311.1,334.1 314,332.8 317.3,332 320.9,331.8 324.6,332 327.9,332.8 330.8,334.1 333.1,335.8 334.5,337.7 334.9,339.8 334.5,341.9 333.1,343.9" class="det sock-hole"/>
+</g>
+<g class="blk k-socket" data-id="notifier" data-dim="1">
+<polygon points="161.9,428.4 197.3,448.8 197.3,431.8 161.9,411.4" class="lft"/>
+<polygon points="232.6,428.4 197.3,448.8 197.3,431.8 232.6,411.4" class="rgt"/>
+<polygon points="197.3,391 232.6,411.4 197.3,431.8 161.9,411.4" class="top"/>
+<polygon points="207.2,416.9 204.3,418.2 200.9,419 197.3,419.3 193.7,419 190.3,418.2 187.4,416.9 185.2,415.3 183.8,413.3 183.3,411.2 183.8,409.1 185.2,407.2 187.4,405.5 190.3,404.2 193.7,403.4 197.3,403.2 200.9,403.4 204.3,404.2 207.2,405.5 209.4,407.2 210.8,409.1 211.3,411.2 210.8,413.3 209.4,415.3" class="det sock-hole"/>
+</g>
+<g class="blk k-socket" data-id="scheduler" data-dim="1">
+<polygon points="38.3,499.8 73.6,520.2 73.6,503.2 38.3,482.8" class="lft"/>
+<polygon points="108.9,499.8 73.6,520.2 73.6,503.2 108.9,482.8" class="rgt"/>
+<polygon points="73.6,462.4 108.9,482.8 73.6,503.2 38.3,482.8" class="top"/>
+<polygon points="83.5,488.3 80.6,489.6 77.2,490.4 73.6,490.7 70,490.4 66.6,489.6 63.7,488.3 61.5,486.7 60.1,484.7 59.6,482.6 60.1,480.5 61.5,478.6 63.7,476.9 66.6,475.6 70,474.8 73.6,474.6 77.2,474.8 80.6,475.6 83.5,476.9 85.7,478.6 87.1,480.5 87.6,482.6 87.1,484.7 85.7,486.7" class="det sock-hole"/>
+</g>
+<g class="blk k-socket" data-id="archive" data-dim="1" data-vis="1">
+<polygon points="300.3,508.3 335.7,528.7 335.7,511.7 300.3,491.3" class="lft"/>
+<polygon points="371,508.3 335.7,528.7 335.7,511.7 371,491.3" class="rgt"/>
+<polygon points="335.7,470.9 371,491.3 335.7,511.7 300.3,491.3" class="top"/>
+<polygon points="345.6,496.8 342.7,498.1 339.3,498.9 335.7,499.2 332.1,498.9 328.7,498.1 325.8,496.8 323.6,495.2 322.2,493.2 321.7,491.1 322.2,489 323.6,487.1 325.8,485.4 328.7,484.1 332.1,483.3 335.7,483.1 339.3,483.3 342.7,484.1 345.6,485.4 347.8,487.1 349.2,489 349.7,491.1 349.2,493.2 347.8,495.2" class="det sock-hole"/>
+</g>
+<g class="blk k-person person" data-id="gateway" data-dim="1">
+<polygon points="614.5,616.6 658.7,642.1 658.7,636 614.5,610.5" class="lft"/>
+<polygon points="702.8,616.6 658.7,642.1 658.7,636 702.8,610.5" class="rgt"/>
+<polygon points="658.7,585 702.8,610.5 658.7,636 614.5,610.5" class="top"/>
+<path class="body" d="M645.7,606.5 C645.7,576.5 671.7,576.5 671.7,606.5 Q658.7,614.5 645.7,606.5z"/>
+<circle class="head" cx="658.7" cy="570.5" r="10"/>
+</g>
+<g class="blk k-term" data-id="audit" data-dim="1">
+<polygon points="582.7,688.3 586.8,686 586.8,626.5 582.7,628.8" class="rgt"/>
+<polygon points="534.4,601 582.7,628.8 586.8,626.5 538.5,598.6" class="top"/>
+<polygon points="534.4,660.5 582.7,688.3 582.7,628.8 534.4,601" class="lft"/>
+<g class="scr" transform="matrix(0.866 0.5 0 1 534.4243 600.95)">
+<rect class="glass" x="3" y="3" width="49.8" height="53.5" rx="3"/>
+<rect class="w" x="7" y="8" width="25.9" height="6.4" rx="3"/>
+<rect class="m" x="24.5" y="18.4" width="24.2" height="6.4" rx="3"/>
+<rect class="w" x="7" y="28.8" width="19.2" height="6.4" rx="3"/>
+<rect class="m" x="27.9" y="39.1" width="20.9" height="6.4" rx="3"/>
+</g>
+</g>
+<g class="blk k-term" data-id="config" data-dim="1">
+<polygon points="500.3,735.9 504.4,733.6 504.4,674.1 500.3,676.4" class="rgt"/>
+<polygon points="452,648.6 500.3,676.4 504.4,674.1 456.1,646.2" class="top"/>
+<polygon points="452,708.1 500.3,735.9 500.3,676.4 452,648.6" class="lft"/>
+<g class="scr" transform="matrix(0.866 0.5 0 1 451.9787 648.55)">
+<rect class="glass" x="3" y="3" width="49.8" height="53.5" rx="3"/>
+<line class="ln" x1="8" y1="10" x2="34.4" y2="10"/>
+<line class="ln" x1="8" y1="19" x2="25" y2="19"/>
+<line class="ln" x1="8" y1="28" x2="30.7" y2="28"/>
+<line class="ln" x1="8" y1="37" x2="19.3" y2="37"/>
+<line class="ln" x1="8" y1="46" x2="28.8" y2="46"/>
+</g>
+</g>
+<g class="blk k-term" data-id="mirror" data-dim="1">
+<polygon points="417.8,783.5 421.9,781.2 421.9,721.7 417.8,724" class="rgt"/>
+<polygon points="369.5,696.2 417.8,724 421.9,721.7 373.7,693.8" class="top"/>
+<polygon points="369.5,755.7 417.8,783.5 417.8,724 369.5,696.2" class="lft"/>
+<g class="scr" transform="matrix(0.866 0.5 0 1 369.533 696.15)">
+<rect class="glass" x="3" y="3" width="49.8" height="53.5" rx="3"/>
+<rect class="wall" x="5" y="5" width="45.8" height="49.5" rx="2"/>
+<rect class="bar" x="5" y="5" width="45.8" height="6"/>
+<rect class="win" x="27.9" y="13" width="21.2" height="25" rx="2"/>
+</g>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<g data-id="orders" data-dim="1">
+<text x="0" y="-18.5" class="lbl" text-anchor="middle">metrics</text>
+</g>
+<g data-id="api" data-dim="1">
+<text x="-23.6" y="183.3" class="lbl" text-anchor="middle">primary</text>
+<text x="-23.6" y="197.3" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
+</g>
+<g data-id="catalog" data-dim="1">
+<text x="200.2" y="80.1" class="lbl" text-anchor="middle">payments console web</text>
+</g>
+<g data-id="cache" data-dim="1">
+<text x="-203.2" y="163.4" class="lbl" text-anchor="middle">router alerts</text>
+</g>
+<g data-id="gateway" data-dim="1">
+<text x="658.7" y="526.7" class="lbl" text-anchor="middle">Report</text>
+</g>
+<g data-id="shipping" data-dim="1" data-vis="1">
+<text x="320.9" y="295.6" class="lbl" text-anchor="middle">client</text>
+<text x="320.9" y="309.6" class="sub mono" text-anchor="middle">dashboard</text>
+</g>
+<g data-id="notifier" data-dim="1">
+<text x="197.3" y="367" class="lbl" text-anchor="middle">policy</text>
+<text x="197.3" y="381" class="sub mono" text-anchor="middle">shipping</text>
+</g>
+<g data-id="scheduler" data-dim="1">
+<text x="73.6" y="438.4" class="lbl" text-anchor="middle">billing</text>
+<text x="73.6" y="452.4" class="sub mono" text-anchor="middle">orders exporter</text>
+</g>
+<g data-id="archive" data-dim="1" data-vis="1">
+<text x="335.7" y="460.9" class="lbl" text-anchor="middle">backup hub</text>
+</g>
+<g data-id="audit" data-dim="1">
+<text x="558.6" y="588.4" class="lbl" text-anchor="middle">Mirror inbox</text>
+</g>
+<g data-id="config" data-dim="1">
+<text x="476.1" y="636" class="lbl" text-anchor="middle">second builder</text>
+</g>
+<g data-id="mirror" data-dim="1">
+<text x="393.7" y="683.6" class="lbl" text-anchor="middle">orders</text>
+</g>
+</g>
+<g class="g-marks">
+<g class="xm" data-step="4" data-hl="r28">
+<circle cx="178.1" cy="396.6" r="10"/>
+<path d="M173.6,392.1 L182.6,401.1 M182.6,392.1 L173.6,401.1"/>
+</g>
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

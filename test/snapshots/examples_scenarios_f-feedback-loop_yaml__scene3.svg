@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-638 -42 1196 659" role="img" aria-label="The webhook merges the invoice before it answers. The package records the order for the client. The web publishes the request and moves on. The catalog publishes a report when it is ready." data-scene="scene3">
+<defs>
+<marker id="ah-scene3-user" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--user)"/>
+</marker>
+<marker id="ah-scene3-control" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--control)"/>
+</marker>
+<marker id="ah-scene3-send" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--send)"/>
+</marker>
+<marker id="ah-scene3-blocked" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--blocked)"/>
+</marker>
+</defs>
+<g class="g-base">
+<g class="blk k-slab" data-id="api-area" data-dim="1">
+<polygon points="-447.6,285.6 88.3,595 88.3,555.9 -447.6,246.5" class="lft"/>
+<polygon points="535.9,336.6 88.3,595 88.3,555.9 535.9,297.5" class="rgt"/>
+<polygon points="0,-11.9 535.9,297.5 88.3,555.9 -447.6,246.5" class="top"/>
+<path class="grid" d="M29.4,5L-418.1,263.4M58.9,22L-388.7,280.4M88.3,39L-359.2,297.4M117.8,56L-329.8,314.4M147.2,73L-300.3,331.4M176.7,90L-270.9,348.4M206.1,107L-241.4,365.4M235.6,124L-212,382.4M265,141L-182.6,399.4M294.4,158L-153.1,416.4M323.9,175L-123.7,433.4M353.3,192L-94.2,450.4M382.8,209L-64.8,467.4M412.2,226L-35.3,484.4M441.7,243L-5.9,501.4M471.1,260L23.6,518.4M500.6,277L53,535.4M530,294L82.4,552.4M-29.4,5L506.5,314.4M-58.9,22L477,331.4M-88.3,39L447.6,348.4M-117.8,56L418.1,365.4M-147.2,73L388.7,382.4M-176.7,90L359.2,399.4M-206.1,107L329.8,416.4M-235.6,124L300.3,433.4M-265,141L270.9,450.4M-294.4,158L241.4,467.4M-323.9,175L212,484.4M-353.3,192L182.6,501.4M-382.8,209L153.1,518.4M-412.2,226L123.7,535.4M-441.7,243L94.2,552.4"/>
+</g>
+<g data-id="api-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 -429.895 286.28)" class="slabname">Proxy · stream · inbox</text>
+</g>
+<g class="blk k-pad" data-id="web-area" data-dim="1">
+<polygon points="-615.4,355.3 -535.9,401.2 -535.9,394.4 -615.4,348.5" class="lft"/>
+<polygon points="-456.4,355.3 -535.9,401.2 -535.9,394.4 -456.4,348.5" class="rgt"/>
+<polygon points="-535.9,302.6 -456.4,348.5 -535.9,394.4 -615.4,348.5" class="top"/>
+<path class="grid" d="M-506.5,319.5L-586,365.4M-477,336.5L-556.5,382.4M-559.5,316.1L-480,362M-588.9,333.1L-509.4,379"/>
+</g>
+</g>
+<g class="g-floor">
+<text transform="matrix(0.866 -0.5 0.866 0.5 -351.586 215.2283)" class="floor mono t-user" data-hl="r1">hub cold backup</text>
+<text transform="matrix(0.866 -0.5 0.866 0.5 -90.6005 143.2083)" class="floor mono t-control" data-hl="r11">ingest exporter</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 -124.5518 200.43)" class="floor mono t-send" data-hl="r12">volume</text>
+<text transform="matrix(0.866 -0.5 0.866 0.5 148.4553 445.0293)" class="floor mono t-blocked" data-hl="r14">upload</text>
+</g>
+<g class="g-flows">
+<g data-hl="r1" data-id="r1">
+<path d="M-512.3,334.6 L-496.1,325.2 L-496.1,332 L-407.8,281 L-407.8,269.1 L-365.1,244.5 L-376.9,237.7 L-225.3,150.1 L-219.4,153.5" class="flow f-user" marker-end="url(#ah-scene3-user)"/>
+</g>
+<g data-hl="r11" data-id="r11">
+<path d="M-139.9,153.5 L-10.3,78.7" class="flow f-control" marker-end="url(#ah-scene3-control)"/>
+</g>
+<g data-hl="r12" data-id="r12">
+<path d="M-139.9,199.4 L4.4,282.7" class="flow f-send" marker-end="url(#ah-scene3-send)"/>
+</g>
+<g data-hl="r13" data-id="r13">
+<path d="M83.9,328.6 L198.8,394.9" class="flow f-control" marker-end="url(#ah-scene3-control)"/>
+</g>
+<g data-hl="r14" data-id="r14">
+<path d="M113.4,473.1 L198.8,423.8" class="flow f-blocked" marker-end="url(#ah-scene3-blocked)"/>
+</g>
+</g>
+<g class="g-blocks">
+<g class="blk k-file" data-id="ledger" data-dim="1">
+<polygon points="-32.4,64.6 14.7,91.8 14.7,71.4 -32.4,44.2" class="lft"/>
+<polygon points="61.8,64.6 14.7,91.8 14.7,71.4 61.8,44.2" class="rgt"/>
+<polygon points="14.7,17 61.8,44.2 14.7,71.4 -32.4,44.2" class="top"/>
+<line x1="5.9" y1="32.3" x2="35.3" y2="49.3" class="det"/>
+<line x1="-5.9" y1="39.1" x2="14.7" y2="51" class="det"/>
+</g>
+<g class="blk k-lead" data-id="api" data-dim="1">
+<polygon points="-256.2,176.8 -179.6,221 -179.6,159.8 -256.2,115.6" class="lft"/>
+<polygon points="-103.1,176.8 -179.6,221 -179.6,159.8 -103.1,115.6" class="rgt"/>
+<polygon points="-179.6,71.4 -103.1,115.6 -179.6,159.8 -256.2,115.6" class="top"/>
+<line x1="-245.9" y1="138.7" x2="-198.4" y2="166.1" class="det"/>
+<line x1="-245.9" y1="150.9" x2="-206.1" y2="173.9" class="det"/>
+<line x1="-245.9" y1="163.2" x2="-213.7" y2="181.7" class="det"/>
+<line x1="-245.9" y1="175.4" x2="-219.1" y2="190.9" class="det"/>
+</g>
+<g class="blk k-work" data-id="report" data-dim="1">
+<polygon points="-32.4,306 44.2,350.2 44.2,289 -32.4,244.8" class="lft"/>
+<polygon points="120.7,306 44.2,350.2 44.2,289 120.7,244.8" class="rgt"/>
+<polygon points="44.2,200.6 120.7,244.8 44.2,289 -32.4,244.8" class="top"/>
+<line x1="-22.1" y1="267.9" x2="25.4" y2="295.3" class="det"/>
+<line x1="-22.1" y1="280.1" x2="17.7" y2="303.1" class="det"/>
+<line x1="-22.1" y1="292.4" x2="10.1" y2="310.9" class="det"/>
+<line x1="-22.1" y1="304.6" x2="4.7" y2="320.1" class="det"/>
+</g>
+<g class="blk k-person person" data-id="cache" data-dim="1">
+<polygon points="-580.1,348.5 -535.9,374 -535.9,367.9 -580.1,342.4" class="lft"/>
+<polygon points="-491.7,348.5 -535.9,374 -535.9,367.9 -491.7,342.4" class="rgt"/>
+<polygon points="-535.9,316.9 -491.7,342.4 -535.9,367.9 -580.1,342.4" class="top"/>
+<path class="body" d="M-548.9,338.4 C-548.9,308.4 -522.9,308.4 -522.9,338.4 Q-535.9,346.4 -548.9,338.4z"/>
+<circle class="head" cx="-535.9" cy="302.4" r="10"/>
+</g>
+<g class="blk k-file" data-id="builder" data-dim="1">
+<polygon points="176.7,409.7 223.8,436.9 223.8,416.5 176.7,389.3" class="lft"/>
+<polygon points="270.9,409.7 223.8,436.9 223.8,416.5 270.9,389.3" class="rgt"/>
+<polygon points="223.8,362.1 270.9,389.3 223.8,416.5 176.7,389.3" class="top"/>
+<line x1="214.9" y1="377.4" x2="244.4" y2="394.4" class="det"/>
+<line x1="203.2" y1="384.2" x2="223.8" y2="396.1" class="det"/>
+</g>
+<g class="blk k-file ghost" data-id="router" data-dim="1">
+<polygon points="41.2,487.9 88.3,515.1 88.3,494.7 41.2,467.5" class="lft"/>
+<polygon points="135.4,487.9 88.3,515.1 88.3,494.7 135.4,467.5" class="rgt"/>
+<polygon points="88.3,440.3 135.4,467.5 88.3,494.7 41.2,467.5" class="top"/>
+<line x1="79.5" y1="455.6" x2="108.9" y2="472.6" class="det"/>
+<line x1="67.7" y1="462.4" x2="88.3" y2="474.3" class="det"/>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<g data-id="api" data-dim="1">
+<text x="-179.6" y="47.4" class="lbl" text-anchor="middle">primary</text>
+<text x="-179.6" y="61.4" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
+</g>
+<g data-id="report" data-dim="1">
+<text x="44.2" y="176.6" class="lbl" text-anchor="middle">inbox</text>
+<text x="44.2" y="190.6" class="sub mono" text-anchor="middle">registry importer queue</text>
+</g>
+<g data-id="ledger" data-dim="1">
+<text x="14.7" y="-7" class="lbl" text-anchor="middle">ledger</text>
+<text x="14.7" y="7" class="sub mono" text-anchor="middle">gateway</text>
+</g>
+<g data-id="builder" data-dim="1">
+<text x="223.8" y="352.1" class="lbl" text-anchor="middle">mailer</text>
+</g>
+<g data-id="router" data-dim="1">
+<text x="88.3" y="430.3" class="lbl" text-anchor="middle">second package</text>
+</g>
+<g data-id="cache" data-dim="1">
+<text x="-535.9" y="258.6" class="lbl" text-anchor="middle">Report</text>
+</g>
+</g>
+<g class="g-marks">
+<g class="say" data-step="3">
+<rect x="1.8" y="121.3" width="84.7" height="24" rx="12" style="stroke:var(--send)"/>
+<text x="44.2" y="137.3" text-anchor="middle" style="fill:var(--send)">small inbox</text>
+</g>
+<g class="xm" data-step="4" data-hl="r14">
+<circle cx="198.8" cy="403.4" r="10"/>
+<path d="M194.3,398.9 L203.3,407.9 M203.3,398.9 L194.3,407.9"/>
+</g>
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

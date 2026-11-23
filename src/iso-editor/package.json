@@ -1,0 +1,6 @@
+{
+  "//": "iso-editor (L3): only the Monaco pane and the Monaco bundle's entry have side effects (they set Monaco up when they load); bundles drop the modules they do not use. LAYERS.md S6, S7.",
+  "type": "module",
+  "private": true,
+  "sideEffects": ["./ui/text.ts", "./ui/monaco-entry.ts"]
+}

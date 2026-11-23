@@ -1,0 +1,76 @@
+isodiag: 1
+title: billing alerts
+lede: The search collects the order into the cache. The outbox forwards the invoice on the next step.
+scenes:
+  - id: scene1
+    title: Small runner
+    gap: 2.6
+    regions:
+      - id: api-area
+        kind: pad
+        padding: 1
+        nodes:
+          - { id: api, asset: block, label: service }
+          - { id: web, asset: session, label: notifier }
+          - { id: queue, asset: terminal, label: cluster }
+          - { id: cache, asset: server, label: index }
+          - { id: store, asset: chat, label: builder }
+          - { id: worker, asset: mailbox, label: importer }
+      - id: web-area
+        kind: pad
+        padding: 1
+        below: api-area
+        nodes:
+          - { id: gateway, asset: file, label: hub }
+          - { id: client, asset: folder, label: standby }
+          - { id: index, asset: key, label: ledger }
+          - { id: ledger, asset: socket, label: release }
+          - { id: report, asset: gate, label: billing }
+          - { id: builder, asset: placeholder, label: listener }
+          - { id: router, asset: cloud, label: reader }
+      - id: queue-area
+        kind: pad
+        padding: 1
+        below: web-area
+        nodes:
+          - { id: mirror, asset: orb, label: web }
+          - { id: backup, asset: person, label: console }
+          - { id: metrics, asset: screen, face: terminal, label: worker }
+          - { id: search, asset: screen, face: chat, label: "monitor" }
+          - { id: upload, asset: screen, face: desktop, label: "feed store" }
+          - { id: billing, asset: monitor, face: desktop, label: package }
+          - { id: profile, asset: session, ghost: true, label: report, sub: "standby backup" }
+  - id: scene2
+    title: Sync writer
+    gap: 3
+    regions:
+      - id: cache-area
+        kind: slab
+        label: INBOX
+        nodes: [ { id: catalog, size: [ 1.4, 1.4, 0.8 ] } ]
+      - id: store-area
+        kind: pad
+        label: stream
+        nodes: [ { id: orders, size: [ 1.4, 1.4, 0.8 ] } ]
+      - id: worker-area
+        kind: vm
+        label: PRIMARY · BATCH
+        nodes: [ { id: payments, size: [ 1.4, 1.4, 0.8 ] } ]
+      - id: gateway-area
+        kind: platform
+        label: PRIMARY
+        below: cache-area
+        nodes: [ { id: invoices, size: [ 1.4, 1.4, 0.8 ] } ]
+      - id: client-area
+        kind: fence
+        label: STANDBY
+        gate: { side: w }
+        nodes: [ { id: shipping, size: [ 1.4, 1.4, 0.8 ] } ]
+      - id: router
+        kind: cloud
+        label: policy upload
+        size: [ 5, 4 ]
+      - id: index-area
+        kind: zone
+        label: portal
+        nodes: [ { id: notifier, size: [ 1.4, 1.4, 0.8 ] } ]

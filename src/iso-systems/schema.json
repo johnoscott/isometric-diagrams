@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://isodiag.local/schema/isodiag-1.json",
+  "title": "isodiag diagram",
+  "description": "A page of isometric, animated diagrams. See docs/FORMAT.md.",
+  "type": "object",
+  "required": ["isodiag", "scenes"],
+  "additionalProperties": false,
+  "properties": {
+    "isodiag": { "const": 1, "description": "Format version. Always 1." },
+    "title": { "type": "string" },
+    "lede": { "type": "string" },
+    "pills": { "type": "array", "items": { "type": "string" } },
+    "theme": { "type": "string", "description": "'default' or a path to a theme file" },
+    "roles": {
+      "type": "object",
+      "description": "Extra or changed colour roles for nodes and regions",
+      "additionalProperties": { "$ref": "#/$defs/role" }
+    },
+    "kinds": {
+      "type": "object",
+      "description": "Extra flow kinds, or new legend text for the standard ones",
+      "additionalProperties": { "$ref": "#/$defs/kindDef" }
+    },
+    "after": { "type": "string", "description": "Markdown shown after all scenes" },
+    "grid": { "$ref": "#/$defs/grid" },
+    "assemble": { "type": "boolean", "description": "draw each scene by flying its parts in from the nearest edge, then play" },
+    "footer": { "type": "string" },
+    "scenes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/scene" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "snap": { "type": "number", "exclusiveMinimum": 0, "description": "round every placed edge and route waypoint to this step, in grid units" },
+        "show": { "type": "boolean", "description": "draw the floor grid when the page opens (the Grid button toggles it)" },
+        "step": { "type": "number", "exclusiveMinimum": 0, "description": "spacing of the drawn grid lines; default the snap step, or 1" }
+      }
+    },
+    "num": { "type": "number" },
+    "point2": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "size2or3": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 3 },
+    "stepRef": { "anyOf": [{ "type": "string" }, { "type": "integer", "minimum": 1 }] },
+    "side": { "enum": ["n", "e", "s", "w"] },
+    "align": { "enum": ["start", "center", "end"] },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["h", "s"],
+      "properties": {
+        "h": { "type": "number", "minimum": 0, "maximum": 360, "description": "hue" },
+        "s": { "type": "number", "minimum": 0, "maximum": 100, "description": "saturation, percent" },
+        "top": { "type": "string", "description": "CSS colour for the top face, overriding the computed one" },
+        "tint": { "type": "number", "minimum": 0, "maximum": 100, "description": "percent of the role colour mixed into the pad colour for the top face" }
+      }
+    },
+    "kindDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "legend": { "type": "string" },
+        "like": { "type": "string", "description": "a standard kind whose colour and line style this one uses" },
+        "color": { "type": "string" },
+        "dash": { "enum": ["solid", "dashed", "dotted"] }
+      }
+    },
+    "placement": {
+      "properties": {
+        "in": { "$ref": "#/$defs/id" },
+        "at": { "$ref": "#/$defs/point2" },
+        "right-of": { "$ref": "#/$defs/id" },
+        "left-of": { "$ref": "#/$defs/id" },
+        "below": { "$ref": "#/$defs/id" },
+        "behind": { "$ref": "#/$defs/id" },
+        "gap": { "type": "number" },
+        "align": { "$ref": "#/$defs/align" },
+        "shift": { "$ref": "#/$defs/point2", "description": "nudge after placement, grid units [dx, dy]" },
+        "appears": { "$ref": "#/$defs/stepRef" },
+        "disappears": { "$ref": "#/$defs/stepRef" }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "caption": { "type": "string" },
+        "aria": { "type": "string" },
+        "gap": { "type": "number", "exclusiveMinimum": 0 },
+        "flow": { "enum": ["row", "column"] },
+        "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+        "notes": { "type": "array", "items": { "$ref": "#/$defs/note" } },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "legend": {
+          "anyOf": [
+            { "enum": ["auto"] },
+            { "const": false },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "badges": { "type": "boolean" },
+        "grid": { "$ref": "#/$defs/grid" },
+        "assemble": { "type": "boolean", "description": "draw the scene by flying its parts in from the nearest edge, then play" },
+        "loop": { "type": "boolean", "description": "the player wraps from the last step to the first (default true)" },
+        "dim": { "enum": ["flows", "all"], "description": "what a step dims: only flows, their labels and marks (default), or nodes too" },
+        "after": { "type": "string" }
+      }
+    },
+    "region": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "unevaluatedProperties": false,
+      "allOf": [{ "$ref": "#/$defs/placement" }],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["slab", "pad", "fence", "vm", "cloud", "zone", "platform", "tunnel"] },
+        "label": { "type": "string" },
+        "label-style": { "enum": ["face", "face-right", "floor", "none"] },
+        "ghost": { "type": "boolean", "description": "drawn as a dashed outline: not there yet, out of reach, or stopped" },
+        "role": { "type": "string" },
+        "size": { "$ref": "#/$defs/size2or3" },
+        "padding": { "type": "number", "minimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "z": { "type": "number", "description": "lift above the floor it stands on (tunnels)" },
+        "flow": { "enum": ["row", "column"] },
+        "gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["side"],
+          "properties": {
+            "side": { "$ref": "#/$defs/side" },
+            "at": { "type": "number", "minimum": 0, "maximum": 1, "description": "centre of the gate along the wall, 0..1" },
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 },
+            "node": { "$ref": "#/$defs/id" }
+          }
+        },
+        "around": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "tunnel: routes it wraps" },
+        "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } }
+      }
+    },
+    "deco": {
+      "anyOf": [
+        { "enum": ["envelope", "bubble", "file-lines", "ghost", "terminal"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "terminal": { "type": "integer", "minimum": 1, "maximum": 8 },
+            "icon": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "an icon the host registers (none by default); one nothing registers is drawn as a placeholder, with a warning" },
+            "screen": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "terminal, chat, desktop, tiles, or a face the host registers" }
+          }
+        }
+      ]
+    },
+    "node": {
+      "type": "object",
+      "required": ["id"],
+      "unevaluatedProperties": false,
+      "allOf": [{ "$ref": "#/$defs/placement" }],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "asset": { "type": "string", "description": "asset name from the library; default 'block'" },
+        "role": { "type": "string", "description": "colour role" },
+        "label": { "type": "string" },
+        "sub": { "type": "string" },
+        "size": { "$ref": "#/$defs/size2or3" },
+        "z": { "type": "number", "description": "lift above the floor it stands on" },
+        "deco": { "type": "array", "items": { "$ref": "#/$defs/deco" } },
+        "ghost": { "type": "boolean" },
+        "face": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "screen asset: what the screen shows: terminal, chat, desktop, tiles, or a face the host registers" },
+        "facing": { "type": "number", "description": "screen asset: rotation in degrees" },
+        "label-at": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "side": { "enum": ["above", "right", "left", "below"] },
+            "dx": { "type": "number" },
+            "dy": { "type": "number" }
+          }
+        },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" }, "description": "nodes standing on top of this one" }
+      }
+    },
+    "endpoint": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*(\\.(n|e|s|w|top))?$" },
+    "route": {
+      "type": "object",
+      "required": ["id", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/endpoint" },
+        "to": { "$ref": "#/$defs/endpoint" },
+        "kind": { "type": "string" },
+        "via": { "type": "array", "items": { "anyOf": [{ "$ref": "#/$defs/point2" }, { "$ref": "#/$defs/endpoint" }] } },
+        "points": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 }, "description": "exact polyline in grid units; skips the router" },
+        "lane": { "type": "number" },
+        "arrow": { "type": "boolean" },
+        "cross": { "type": "boolean", "description": "the route may pass through fence walls (it crosses a boundary)" },
+        "label": {
+          "anyOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["text"],
+              "properties": {
+                "text": { "type": "string" },
+                "along": { "type": "integer", "minimum": 1 },
+                "side": { "enum": ["left", "right"] },
+                "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3, "description": "exact place [x, y] or [x, y, z]; skips placement" },
+                "dir": { "enum": ["x", "y"] },
+                "anchor": { "enum": ["start", "middle", "end"] }
+              }
+            }
+          ]
+        },
+        "appears": { "$ref": "#/$defs/stepRef" },
+        "disappears": { "$ref": "#/$defs/stepRef" }
+      }
+    },
+    "note": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "floor": { "type": "string" },
+        "face": { "type": "string" },
+        "label": { "type": "string" },
+        "sub": { "type": "string" },
+        "at": { "anyOf": [{ "$ref": "#/$defs/point2" }, { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }] },
+        "on": { "$ref": "#/$defs/id", "description": "a node, region or route; a note on a route dims and lights with it" },
+        "kind": { "type": "string" },
+        "dir": { "enum": ["x", "y"] },
+        "anchor": { "enum": ["start", "middle", "end"] },
+        "dx": { "type": "number" },
+        "dy": { "type": "number" },
+        "appears": { "$ref": "#/$defs/stepRef" },
+        "disappears": { "$ref": "#/$defs/stepRef" }
+      }
+    },
+    "routeRef": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "object", "minProperties": 1, "maxProperties": 1, "additionalProperties": { "type": "string" } }
+      ]
+    },
+    "phase": {
+      "anyOf": [
+        { "$ref": "#/$defs/routeRef" },
+        { "type": "array", "items": { "$ref": "#/$defs/routeRef" } }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "required": ["heading"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "number": { "type": "integer", "minimum": 1, "description": "the number shown; defaults to the position" },
+        "kind": { "type": "string" },
+        "heading": { "type": "string" },
+        "caption": { "type": "string" },
+        "command": { "type": "string" },
+        "animate": { "type": "array", "items": { "$ref": "#/$defs/phase" } },
+        "pulse": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "highlight": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "focus": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "nodes or regions to zoom to for this step; the view eases back on steps without focus" },
+        "show": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "hide": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "say": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["at", "text"],
+            "properties": {
+              "at": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 }], "description": "a node (the callout sits above it) or a grid point [x, y, z]" },
+              "text": { "type": "string" },
+              "kind": { "type": "string" },
+              "dx": { "type": "number" },
+              "dy": { "type": "number" },
+              "anchor": { "enum": ["start", "middle", "end"] }
+            }
+          }
+        },
+        "mark": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "on": { "$ref": "#/$defs/id" },
+              "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 }
+            }
+          }
+        },
+        "badge": { "anyOf": [{ "type": "boolean" }, { "$ref": "#/$defs/id" }, { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 }], "description": "false, a route or node id, or a grid point [x, y, z]" },
+        "duration": { "anyOf": [{ "const": "auto" }, { "type": "integer", "minimum": 500 }] }
+      }
+    }
+  }
+}

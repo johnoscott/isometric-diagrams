@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-426 -117 1093 648" role="img" aria-label="The archive stops the result once a minute. The console retries a record into the cache. The orders picks up the queue when it is ready. The queue stores a report. The gateway reads a message before it answers." data-scene="scene4">
+<defs>
+<marker id="ah-scene4-send" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--send)"/>
+</marker>
+<marker id="ah-scene4-control" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--control)"/>
+</marker>
+<marker id="ah-scene4-reply" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--reply)"/>
+</marker>
+</defs>
+<g class="g-base">
+<g class="blk k-slab" data-id="api-area" data-dim="1">
+<polygon points="-235.6,163.2 285.6,464.1 285.6,425 -235.6,124.1" class="lft"/>
+<polygon points="521.2,328.1 285.6,464.1 285.6,425 521.2,289" class="rgt"/>
+<polygon points="0,-11.9 521.2,289 285.6,425 -235.6,124.1" class="top"/>
+<path class="grid" d="M29.4,5L-206.1,141M58.9,22L-176.7,158M88.3,39L-147.2,175M117.8,56L-117.8,192M147.2,73L-88.3,209M176.7,90L-58.9,226M206.1,107L-29.4,243M235.6,124L0,260M265,141L29.4,277M294.4,158L58.9,294M323.9,175L88.3,311M353.3,192L117.8,328M382.8,209L147.2,345M412.2,226L176.7,362M441.7,243L206.1,379M471.1,260L235.6,396M500.6,277L265,413M-29.4,5L491.7,305.9M-58.9,22L462.3,322.9M-88.3,39L432.8,339.9M-117.8,56L403.4,356.9M-147.2,73L373.9,373.9M-176.7,90L344.5,390.9M-206.1,107L315.1,407.9"/>
+</g>
+<g data-id="api-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 -217.892 163.88)" class="slabname">Proxy · stream · inbox</text>
+</g>
+<g class="blk k-pad" data-id="web-area" data-dim="1">
+<polygon points="-403.4,232.9 -323.9,278.8 -323.9,272 -403.4,226.1" class="lft"/>
+<polygon points="-244.4,232.9 -323.9,278.8 -323.9,272 -244.4,226.1" class="rgt"/>
+<polygon points="-323.9,180.2 -244.4,226.1 -323.9,272 -403.4,226.1" class="top"/>
+<path class="grid" d="M-294.4,197.1L-373.9,243M-265,214.1L-344.5,260M-353.3,197.1L-273.8,243M-382.8,214.1L-303.3,260"/>
+</g>
+</g>
+<g class="g-floor">
+<text transform="matrix(0.866 0.5 -0.866 0.5 0.1905 128.41)" class="floor mono t-send" data-hl="r14">second scheduler</text>
+<text transform="matrix(0.866 -0.5 0.866 0.5 199.6362 357.68)" class="floor mono t-control" data-hl="r15">registry · scheduler</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 -268.8316 256.53)" class="floor mono t-reply" data-hl="r11">payments</text>
+</g>
+<g class="g-flows">
+<g data-hl="r14" data-id="r14">
+<path d="M7.4,114.4 L151.6,197.7" class="flow f-send" marker-end="url(#ah-scene4-send)"/>
+</g>
+<g data-hl="r15" data-id="r15">
+<path d="M231.1,197.7 L360.7,272.5 L318,297.2 L412.2,351.6 L412.2,363.5 L528.5,430.6" class="flow f-control" marker-end="url(#ah-scene4-control)"/>
+</g>
+<g data-hl="r16" data-id="r16">
+<path d="M510.9,440.8 L399,376.2 L348.9,405.1 L344.5,402.6 L344.5,390.7 L310.6,371.1" class="flow f-reply" marker-end="url(#ah-scene4-reply)"/>
+</g>
+<g data-hl="r11" data-id="r11">
+<path d="M151.6,243.6 L61.8,295.5 L61.8,307.4 L-66.3,381.3 L-284.1,255.5 L-284.1,248.7 L-300.3,239.4" class="flow f-reply" marker-end="url(#ah-scene4-reply)"/>
+</g>
+</g>
+<g class="g-blocks">
+<g class="blk k-work" data-id="web" data-dim="1">
+<polygon points="-108.9,91.8 -32.4,136 -32.4,74.8 -108.9,30.6" class="lft"/>
+<polygon points="44.2,91.8 -32.4,136 -32.4,74.8 44.2,30.6" class="rgt"/>
+<polygon points="-32.4,-13.6 44.2,30.6 -32.4,74.8 -108.9,30.6" class="top"/>
+<line x1="-98.6" y1="53.7" x2="-51.2" y2="81.1" class="det"/>
+<line x1="-98.6" y1="65.9" x2="-58.8" y2="88.9" class="det"/>
+<line x1="-98.6" y1="78.2" x2="-66.5" y2="96.7" class="det"/>
+<line x1="-98.6" y1="90.4" x2="-71.8" y2="105.9" class="det"/>
+</g>
+<g class="blk k-lead" data-id="api" data-dim="1">
+<polygon points="114.8,221 191.4,265.2 191.4,204 114.8,159.8" class="lft"/>
+<polygon points="267.9,221 191.4,265.2 191.4,204 267.9,159.8" class="rgt"/>
+<polygon points="191.4,115.6 267.9,159.8 191.4,204 114.8,159.8" class="top"/>
+<line x1="125.1" y1="182.9" x2="172.6" y2="210.3" class="det"/>
+<line x1="125.1" y1="195.1" x2="165" y2="218.1" class="det"/>
+<line x1="125.1" y1="207.4" x2="157.3" y2="225.9" class="det"/>
+<line x1="125.1" y1="219.6" x2="151.9" y2="235.1" class="det"/>
+</g>
+<g class="blk k-person person" data-id="worker" data-dim="1">
+<polygon points="-368.1,226.1 -323.9,251.6 -323.9,245.5 -368.1,220" class="lft"/>
+<polygon points="-279.7,226.1 -323.9,251.6 -323.9,245.5 -279.7,220" class="rgt"/>
+<polygon points="-323.9,194.5 -279.7,220 -323.9,245.5 -368.1,220" class="top"/>
+<path class="body" d="M-336.9,216.0 C-336.9,186.0 -310.9,186.0 -310.9,216.0 Q-323.9,224.0 -336.9,216.0z"/>
+<circle class="head" cx="-323.9" cy="180" r="10"/>
+</g>
+<g class="blk k-file" data-id="router" data-dim="1">
+<polygon points="356.3,289 403.4,316.2 403.4,295.8 356.3,268.6" class="lft"/>
+<polygon points="450.5,289 403.4,316.2 403.4,295.8 450.5,268.6" class="rgt"/>
+<polygon points="403.4,241.4 450.5,268.6 403.4,295.8 356.3,268.6" class="top"/>
+<line x1="394.6" y1="256.7" x2="424" y2="273.7" class="det"/>
+<line x1="382.8" y1="263.5" x2="403.4" y2="275.4" class="det"/>
+</g>
+<g class="blk k-file" data-id="mirror" data-dim="1">
+<polygon points="238.5,357 285.6,384.2 285.6,363.8 238.5,336.6" class="lft"/>
+<polygon points="332.7,357 285.6,384.2 285.6,363.8 332.7,336.6" class="rgt"/>
+<polygon points="285.6,309.4 332.7,336.6 285.6,363.8 238.5,336.6" class="top"/>
+<line x1="276.8" y1="324.7" x2="306.2" y2="341.7" class="det"/>
+<line x1="265" y1="331.5" x2="285.6" y2="343.4" class="det"/>
+</g>
+<g class="blk k-cloud" data-id="gateway" data-dim="1">
+<g transform="matrix(0.866 0.5 -0.866 0.5 556.5079 416.5)">
+<path d="M8.1,8.1 A15.5,15.5 0 0 1 36.7,8.1 A15.5,15.5 0 0 1 65.3,8.1 A15.5,15.5 0 0 1 93.9,8.1 A11.8,11.8 0 0 1 93.9,29.9 A11.8,11.8 0 0 1 93.9,51.7 A11.8,11.8 0 0 1 93.9,73.5 A15.5,15.5 0 0 1 65.3,73.5 A15.5,15.5 0 0 1 36.7,73.5 A15.5,15.5 0 0 1 8.1,73.5 A11.8,11.8 0 0 1 8.1,51.7 A11.8,11.8 0 0 1 8.1,29.9 A11.8,11.8 0 0 1 8.1,8.1Z" class="lft cloud-side"/>
+</g>
+<g transform="matrix(0.866 0.5 -0.866 0.5 556.5079 406.3)">
+<path d="M8.1,8.1 A15.5,15.5 0 0 1 36.7,8.1 A15.5,15.5 0 0 1 65.3,8.1 A15.5,15.5 0 0 1 93.9,8.1 A11.8,11.8 0 0 1 93.9,29.9 A11.8,11.8 0 0 1 93.9,51.7 A11.8,11.8 0 0 1 93.9,73.5 A15.5,15.5 0 0 1 65.3,73.5 A15.5,15.5 0 0 1 36.7,73.5 A15.5,15.5 0 0 1 8.1,73.5 A11.8,11.8 0 0 1 8.1,51.7 A11.8,11.8 0 0 1 8.1,29.9 A11.8,11.8 0 0 1 8.1,8.1Z" class="top cloud-top"/>
+</g>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<g data-id="gateway" data-dim="1">
+<text x="565.3" y="382.3" class="lbl" text-anchor="middle">Reader</text>
+<text x="565.3" y="396.3" class="sub mono" text-anchor="middle">policy tracer bucket</text>
+</g>
+<g data-id="web" data-dim="1">
+<text x="-32.4" y="-37.6" class="lbl" text-anchor="middle">inbox</text>
+<text x="-32.4" y="-23.6" class="sub mono" text-anchor="middle">registry importer queue</text>
+</g>
+<g data-id="api" data-dim="1">
+<text x="191.4" y="91.6" class="lbl" text-anchor="middle">primary</text>
+<text x="191.4" y="105.6" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
+</g>
+<g data-id="router" data-dim="1">
+<text x="403.4" y="231.4" class="lbl" text-anchor="middle">profile job</text>
+</g>
+<g data-id="mirror" data-dim="1">
+<text x="285.6" y="285.4" class="lbl" text-anchor="middle">payments</text>
+<text x="285.6" y="299.4" class="sub mono" text-anchor="middle">proxy</text>
+</g>
+<g data-id="worker" data-dim="1">
+<text x="-323.9" y="136.2" class="lbl" text-anchor="middle">Report</text>
+</g>
+</g>
+<g class="g-marks">
+<g class="say" data-step="1">
+<rect x="-77.1" y="-92.9" width="89.4" height="24" rx="12" style="stroke:var(--send)"/>
+<text x="-32.4" y="-76.9" text-anchor="middle" style="fill:var(--send)">local replica</text>
+</g>
+<g class="say" data-step="3">
+<rect x="254.9" y="237.1" width="61.5" height="24" rx="12" style="stroke:var(--reply)"/>
+<text x="285.6" y="253.1" text-anchor="middle" style="fill:var(--reply)">backup</text>
+</g>
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

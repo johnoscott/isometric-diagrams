@@ -1,0 +1,18 @@
+isodiag: 1
+title: Hello
+scenes:
+  - id: s
+    title: A request and its answer
+    regions:
+      - id: host
+        kind: slab
+        label: "APP HOST"
+        nodes:
+          - { id: web, asset: server, role: lead, label: web, sub: the front end }
+          - { id: api, asset: chat, right-of: web, gap: 4, label: api server }
+    routes:
+      - { id: w-a, from: web, to: api, kind: send, label: request }
+      - { id: a-w, from: api, to: web, kind: reply }
+    steps:
+      - { heading: The web asks the api, kind: send, animate: [w-a], pulse: [api] }
+      - { heading: The api answers, kind: reply, animate: [a-w], pulse: [web] }

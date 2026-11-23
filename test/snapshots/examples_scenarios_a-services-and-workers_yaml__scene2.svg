@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-422 -40 980 587" role="img" aria-label="The inbox answers the index and waits. The feed builds the archive. The ledger reads the backup when it is ready. The renderer copies the invoice. The catalog merges its token into the cache." data-scene="scene2">
+<defs>
+<marker id="ah-scene2-user" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--user)"/>
+</marker>
+<marker id="ah-scene2-control" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--control)"/>
+</marker>
+</defs>
+<g class="g-base">
+<g class="blk k-slab" data-id="api-area" data-dim="1">
+<polygon points="-326.8,215.9 209.1,525.3 209.1,486.2 -326.8,176.8" class="lft"/>
+<polygon points="535.9,336.6 209.1,525.3 209.1,486.2 535.9,297.5" class="rgt"/>
+<polygon points="0,-11.9 535.9,297.5 209.1,486.2 -326.8,176.8" class="top"/>
+<path class="grid" d="M29.4,5L-297.4,193.7M58.9,22L-267.9,210.7M88.3,39L-238.5,227.7M117.8,56L-209.1,244.7M147.2,73L-179.6,261.7M176.7,90L-150.2,278.7M206.1,107L-120.7,295.7M235.6,124L-91.3,312.7M265,141L-61.8,329.7M294.4,158L-32.4,346.7M323.9,175L-2.9,363.7M353.3,192L26.5,380.7M382.8,209L55.9,397.7M412.2,226L85.4,414.7M441.7,243L114.8,431.7M471.1,260L144.3,448.7M500.6,277L173.7,465.7M530,294L203.2,482.7M-29.4,5L506.5,314.4M-58.9,22L477,331.4M-88.3,39L447.6,348.4M-117.8,56L418.1,365.4M-147.2,73L388.7,382.4M-176.7,90L359.2,399.4M-206.1,107L329.8,416.4M-235.6,124L300.3,433.4M-265,141L270.9,450.4M-294.4,158L241.4,467.4M-323.9,175L212,484.4"/>
+</g>
+<g data-id="api-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 -309.1711 216.58)" class="slabname">Proxy · stream · inbox</text>
+</g>
+<g class="blk k-pad" data-id="web-area" data-dim="1">
+<polygon points="-266.5,417.4 -187,463.3 -187,456.5 -266.5,410.6" class="lft"/>
+<polygon points="-107.5,417.4 -187,463.3 -187,456.5 -107.5,410.6" class="rgt"/>
+<polygon points="-187,364.7 -107.5,410.6 -187,456.5 -266.5,410.6" class="top"/>
+<path class="grid" d="M-179.6,368.8L-259.1,414.7M-150.2,385.8L-229.7,431.7M-120.7,402.8L-200.2,448.7M-213.5,379.9L-134,425.8M-242.9,396.9L-163.4,442.8"/>
+</g>
+</g>
+<g class="g-floor">
+<text transform="matrix(0.866 0.5 -0.866 0.5 -201.1084 198.73)" class="floor mono t-user" data-hl="r1">backup</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 -24.4392 142.63)" class="floor mono t-control" data-hl="r5">index ingest</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 249.398 208.93)" class="floor mono t-control" data-hl="r6">dashboard</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 69.7843 312.63)" class="floor mono t-control" data-hl="r8">dashboard</text>
+</g>
+<g class="g-flows">
+<g data-hl="r1" data-id="r1">
+<path d="M-163.4,396.6 L-147.2,387.3 L-147.2,394.1 L-58.9,343.1 L-58.9,331.2 L-22.1,309.9 L-216.4,197.7 L-128.1,146.7" class="flow f-user" marker-end="url(#ah-scene2-user)"/>
+</g>
+<g data-hl="r5" data-id="r5">
+<path d="M-39.8,141.6 L101.6,223.2 L181.1,177.3 L184,179" class="flow f-control" marker-end="url(#ah-scene2-control)"/>
+</g>
+<g data-hl="r6" data-id="r6">
+<path d="M234.1,207.9 L348.9,274.2" class="flow f-control" marker-end="url(#ah-scene2-control)"/>
+</g>
+<g data-hl="r7" data-id="r7">
+<path d="M-57.4,151.8 L83.9,233.4 L1.5,281 L4.4,282.7" class="flow f-control" marker-end="url(#ah-scene2-control)"/>
+</g>
+<g data-hl="r8" data-id="r8">
+<path d="M54.5,311.6 L169.3,377.9" class="flow f-control" marker-end="url(#ah-scene2-control)"/>
+</g>
+</g>
+<g class="g-blocks">
+<g class="blk k-lead" data-id="api" data-dim="1">
+<polygon points="-164.9,124.1 -88.3,168.3 -88.3,107.1 -164.9,62.9" class="lft"/>
+<polygon points="-11.8,124.1 -88.3,168.3 -88.3,107.1 -11.8,62.9" class="rgt"/>
+<polygon points="-88.3,18.7 -11.8,62.9 -88.3,107.1 -164.9,62.9" class="top"/>
+<line x1="-154.6" y1="86" x2="-107.1" y2="113.4" class="det"/>
+<line x1="-154.6" y1="98.2" x2="-114.8" y2="121.2" class="det"/>
+<line x1="-154.6" y1="110.5" x2="-122.4" y2="129" class="det"/>
+<line x1="-154.6" y1="122.7" x2="-127.8" y2="138.2" class="det"/>
+</g>
+<g class="blk k-folder" data-id="client" data-dim="1">
+<polygon points="161.9,193.8 209.1,221 209.1,204 161.9,176.8" class="lft"/>
+<polygon points="256.2,193.8 209.1,221 209.1,204 256.2,176.8" class="rgt"/>
+<polygon points="209.1,149.6 256.2,176.8 209.1,204 161.9,176.8" class="top"/>
+</g>
+<g class="blk k-work" data-id="web" data-dim="1">
+<polygon points="312.1,297.5 388.7,341.7 388.7,280.5 312.1,236.3" class="lft"/>
+<polygon points="465.2,297.5 388.7,341.7 388.7,280.5 465.2,236.3" class="rgt"/>
+<polygon points="388.7,192.1 465.2,236.3 388.7,280.5 312.1,236.3" class="top"/>
+<line x1="322.4" y1="259.4" x2="369.9" y2="286.8" class="det"/>
+<line x1="322.4" y1="271.6" x2="362.2" y2="294.6" class="det"/>
+<line x1="322.4" y1="283.9" x2="354.6" y2="302.4" class="det"/>
+<line x1="322.4" y1="296.1" x2="349.2" y2="311.6" class="det"/>
+</g>
+<g class="blk k-folder" data-id="index" data-dim="1">
+<polygon points="-17.7,297.5 29.4,324.7 29.4,307.7 -17.7,280.5" class="lft"/>
+<polygon points="76.6,297.5 29.4,324.7 29.4,307.7 76.6,280.5" class="rgt"/>
+<polygon points="29.4,253.3 76.6,280.5 29.4,307.7 -17.7,280.5" class="top"/>
+</g>
+<g class="blk k-work" data-id="ledger" data-dim="1">
+<polygon points="132.5,401.2 209.1,445.4 209.1,384.2 132.5,340" class="lft"/>
+<polygon points="285.6,401.2 209.1,445.4 209.1,384.2 285.6,340" class="rgt"/>
+<polygon points="209.1,295.8 285.6,340 209.1,384.2 132.5,340" class="top"/>
+<line x1="142.8" y1="363.1" x2="190.3" y2="390.5" class="det"/>
+<line x1="142.8" y1="375.3" x2="182.6" y2="398.3" class="det"/>
+<line x1="142.8" y1="387.6" x2="175" y2="406.1" class="det"/>
+<line x1="142.8" y1="399.8" x2="169.6" y2="415.3" class="det"/>
+</g>
+<g class="blk k-person person" data-id="gateway" data-dim="1">
+<polygon points="-231.1,410.6 -187,436.1 -187,429.9 -231.1,404.4" class="lft"/>
+<polygon points="-142.8,410.6 -187,436.1 -187,429.9 -142.8,404.4" class="rgt"/>
+<polygon points="-187,378.9 -142.8,404.4 -187,429.9 -231.1,404.4" class="top"/>
+<path class="body" d="M-200.0,400.4 C-200.0,370.4 -174.0,370.4 -174.0,400.4 Q-187.0,408.4 -200.0,400.4z"/>
+<circle class="head" cx="-187" cy="364.4" r="10"/>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<g data-id="api" data-dim="1">
+<text x="-88.3" y="-5.3" class="lbl" text-anchor="middle">primary</text>
+<text x="-88.3" y="8.7" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
+</g>
+<g data-id="ledger" data-dim="1">
+<text x="209.1" y="271.8" class="lbl" text-anchor="middle">metrics</text>
+<text x="209.1" y="285.8" class="sub mono" text-anchor="middle">service queue relay bucket</text>
+</g>
+<g data-id="web" data-dim="1">
+<text x="388.7" y="168.1" class="lbl" text-anchor="middle">inbox</text>
+<text x="388.7" y="182.1" class="sub mono" text-anchor="middle">registry importer queue</text>
+</g>
+<g data-id="index" data-dim="1">
+<text x="29.4" y="229.3" class="lbl" text-anchor="middle">exporter registry</text>
+<text x="29.4" y="243.3" class="sub mono" text-anchor="middle">inbox store</text>
+</g>
+<g data-id="client" data-dim="1">
+<text x="209.1" y="125.6" class="lbl" text-anchor="middle">mailer outbox</text>
+<text x="209.1" y="139.6" class="sub mono" text-anchor="middle">inbox store</text>
+</g>
+<g data-id="gateway" data-dim="1">
+<text x="-187" y="320.7" class="lbl" text-anchor="middle">Report</text>
+</g>
+</g>
+<g class="g-marks">
+<g class="say" data-step="1">
+<rect x="-397.4" y="272.7" width="140.8" height="24" rx="12" style="stroke:var(--user)"/>
+<text x="-327" y="288.7" text-anchor="middle" style="fill:var(--user)">feed profile balancer</text>
+</g>
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

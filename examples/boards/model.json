@@ -1,0 +1,49 @@
+{
+  "title": "A data model: entities, stores and references",
+  "cards": [
+    { "id": "project", "label": "Project", "sub": "app://host/P", "role": "orange", "cell": [0, 0] },
+    { "id": "version", "label": "Version", "sub": "text hash · spec hash", "role": "violet", "cell": [1, 0] },
+    { "id": "head", "label": "Head", "sub": "the one mutable thing", "role": "violet", "cell": [2, 0] },
+    { "id": "log", "label": "Version log", "sub": "append-only", "role": "violet", "cell": [3, 0] },
+    { "id": "state", "label": "Project state", "sub": "for every project", "role": "green", "cell": [4, 0] },
+    { "id": "member", "label": "Member", "sub": "owned | external", "role": "tan", "cell": [0, 1] },
+    { "id": "channel", "label": "Channel", "sub": "owned | external", "role": "tan", "cell": [1, 1] },
+    { "id": "folder", "label": "Folder", "sub": "external | scratch", "role": "tan", "cell": [2, 1] },
+    { "id": "machine", "label": "Machine", "sub": "owned VM | external", "role": "tan", "cell": [0, 2] },
+    { "id": "plugin", "label": "Plugin", "sub": "declared, refused", "role": "tan", "ghost": true, "cell": [1, 2] },
+    { "id": "settings", "label": "Top-level fields", "sub": "network · notes · lifetime …", "role": "tan", "cell": [2, 2] },
+    { "id": "phase", "label": "Phase + facts", "sub": "status", "role": "blue", "cell": [3, 1] },
+    { "id": "cycle", "label": "Cycle", "sub": "one start…finish", "role": "blue", "cell": [4, 1] },
+    { "id": "owned", "label": "Owned + lifetime", "sub": "the record's owned list", "role": "blue", "cell": [3, 2] },
+    { "id": "proposal", "label": "Proposal", "sub": "decided by a review", "role": "blue", "cell": [4, 2] },
+    { "id": "accounts", "label": "Account directory", "sub": "{account: NAME}", "role": "yellow", "cell": [0, 3] },
+    { "id": "devices", "label": "Device sessions", "sub": "{device: NAME}", "role": "yellow", "cell": [1, 3] },
+    { "id": "grants", "label": "Grants store", "sub": "the owner grants", "role": "yellow", "cell": [2, 3] },
+    { "id": "templates", "label": "Templates", "sub": "about: + params:", "role": "yellow", "cell": [3, 3] },
+    { "id": "history", "label": "Timeline", "sub": "frames · events", "role": "yellow", "cell": [4, 3] }
+  ],
+  "panels": [
+    { "id": "store", "label": "THE VERSION STORE", "sub": "immutable, content-addressed", "role": "violet", "cells": [1, 0, 3, 0] },
+    { "id": "document", "label": "THE DOCUMENT · spec", "sub": "one per project; only the server writes it", "role": "tan", "cells": [0, 1, 2, 2] },
+    { "id": "record", "label": "THE RECORD · status", "sub": "phase, cycles, facts, proposals", "role": "blue", "cells": [3, 1, 4, 2] },
+    { "id": "stores", "label": "OWN STORES", "sub": "kinds outside the document", "role": "yellow", "cells": [0, 3, 4, 3] }
+  ],
+  "links": [
+    { "a": "project", "b": "member", "bOn": "document", "kind": "own", "label": "1 : 1 document" },
+    { "a": "project", "b": "phase", "bOn": "record", "kind": "own", "label": "1 : 1 record" },
+    { "a": "member", "b": "version", "aOn": "document", "bOn": "store", "kind": "own", "label": "1 → 1..* versions" },
+    { "a": "head", "b": "version", "kind": "ref", "label": "1" },
+    { "a": "log", "b": "version", "kind": "ref", "label": "* lines → 1 blob each" },
+    { "a": "member", "b": "channel", "kind": "ref", "label": "* — *" },
+    { "a": "member", "b": "folder", "kind": "ref", "label": "0..1 folder" },
+    { "a": "member", "b": "machine", "kind": "ref", "label": "0..1 where" },
+    { "a": "member", "b": "accounts", "kind": "ref", "label": "external {account}" },
+    { "a": "member", "b": "devices", "kind": "ref", "label": "external {device}" },
+    { "a": "settings", "b": "grants", "kind": "ref", "label": "requests → the owner grants" },
+    { "a": "templates", "b": "settings", "kind": "ref", "label": "instantiates: origin" },
+    { "a": "owned", "b": "machine", "kind": "ref", "label": "names owned + lifetime" },
+    { "a": "proposal", "b": "version", "kind": "ref", "label": "baseVersion" },
+    { "a": "phase", "b": "state", "kind": "derived", "label": "derived: doc + facts" },
+    { "a": "history", "b": "state", "kind": "ref", "label": "a frame per state hash" }
+  ]
+}

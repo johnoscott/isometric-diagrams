@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-314 -34 943 711" role="img" aria-label="The writer picks up the backup for the client. The balancer closes the backup and moves on. The mirror picks up the release for the client. The ingest closes a ticket and waits. The vault renews the request on the next step. The stream merges the index once a minute." data-scene="scene6">
+<defs>
+<marker id="ah-scene6-control" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--control)"/>
+</marker>
+<marker id="ah-scene6-token" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--token)"/>
+</marker>
+<marker id="ah-scene6-send" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--send)"/>
+</marker>
+<marker id="ah-scene6-blocked" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--blocked)"/>
+</marker>
+<marker id="ah-scene6-user" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill:var(--user)"/>
+</marker>
+</defs>
+<g class="g-base">
+<g class="blk k-slab" data-id="api-area" data-dim="1">
+<polygon points="-291.5,195.5 315.1,545.7 315.1,506.6 -291.5,156.4" class="lft"/>
+<polygon points="606.6,377.4 315.1,545.7 315.1,506.6 606.6,338.3" class="rgt"/>
+<polygon points="0,-11.9 606.6,338.3 315.1,506.6 -291.5,156.4" class="top"/>
+<path class="grid" d="M29.4,5L-262.1,173.3M58.9,22L-232.6,190.3M88.3,39L-203.2,207.3M117.8,56L-173.7,224.3M147.2,73L-144.3,241.3M176.7,90L-114.8,258.3M206.1,107L-85.4,275.3M235.6,124L-55.9,292.3M265,141L-26.5,309.3M294.4,158L2.9,326.3M323.9,175L32.4,343.3M353.3,192L61.8,360.3M382.8,209L91.3,377.3M412.2,226L120.7,394.3M441.7,243L150.2,411.3M471.1,260L179.6,428.3M500.6,277L209.1,445.3M530,294L238.5,462.3M559.5,311L267.9,479.3M588.9,328L297.4,496.3M-29.4,5L577.1,355.2M-58.9,22L547.7,372.2M-88.3,39L518.2,389.2M-117.8,56L488.8,406.2M-147.2,73L459.3,423.2M-176.7,90L429.9,440.2M-206.1,107L400.5,457.2M-235.6,124L371,474.2M-265,141L341.6,491.2"/>
+</g>
+<g data-id="api-area" data-dim="1">
+<text transform="matrix(0.866 0.5 0 1 -273.8372 196.18)" class="slabname">Proxy · stream · inbox</text>
+</g>
+<g class="blk k-pad" data-id="web-area" data-dim="1">
+<polygon points="-10,524.6 147.2,615.4 147.2,608.6 -10,517.8" class="lft"/>
+<polygon points="226.7,569.5 147.2,615.4 147.2,608.6 226.7,562.7" class="rgt"/>
+<polygon points="69.5,471.9 226.7,562.7 147.2,608.6 -10,517.8" class="top"/>
+<path class="grid" d="M91.3,484.4L11.8,530.3M120.7,501.4L41.2,547.3M150.2,518.4L70.7,564.3M179.6,535.4L100.1,581.3M209.1,552.4L129.6,598.3M66.5,473.6L223.8,564.3M37.1,490.6L194.3,581.3M7.7,507.6L164.9,598.3"/>
+</g>
+</g>
+<g class="g-floor">
+<text transform="matrix(0.866 0.5 -0.866 0.5 -89.2179 180.03)" class="floor mono t-control" data-hl="r2">warm · audit</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 30.0338 65.28)" class="floor mono t-token" data-hl="r23">checker report</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 -136.3297 205.53)" class="floor mono t-control" data-hl="r10">listener</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 381.5015 489.66)" class="floor mono t-send" data-hl="r12">Webhook profile</text>
+<text transform="matrix(0.866 0.5 -0.866 0.5 352.455 506.43)" class="floor mono t-blocked" data-hl="r25">logs</text>
+<text transform="matrix(0.866 -0.5 0.866 0.5 395.7921 587.8293)" class="floor mono t-user" data-hl="r26">reader</text>
+</g>
+<g class="g-flows">
+<g data-hl="r2" data-id="r2">
+<path d="M-104.5,179 L39.8,262.3" class="flow f-control" marker-end="url(#ah-scene6-control)"/>
+</g>
+<g data-hl="r22" data-id="r22">
+<path d="M131,315 L275.3,398.3" class="flow f-control" marker-end="url(#ah-scene6-control)"/>
+</g>
+<g data-hl="r23" data-id="r23">
+<path d="M-104.5,133.1 L14.7,64.3 L219.4,182.4" class="flow f-token" marker-end="url(#ah-scene6-token)"/>
+</g>
+<g data-hl="r24" data-id="r24">
+<path d="M269.4,211.3 L474.1,329.5 L354.8,398.3" class="flow f-token" marker-end="url(#ah-scene6-token)"/>
+</g>
+<g data-hl="r10" data-id="r10">
+<path d="M-192.9,173.9 L-198.8,177.3 L269.4,447.6 L275.3,444.2" class="flow f-control" marker-end="url(#ah-scene6-control)"/>
+</g>
+<g data-hl="r12" data-id="r12">
+<path d="M354.8,444.2 L388.7,463.8 L388.7,475.7 L507.9,544.5 L513.8,541.1 L565.3,570.9 L558,575.1" class="flow f-send" marker-end="url(#ah-scene6-send)"/>
+</g>
+<g data-hl="r25" data-id="r25">
+<path d="M-175.2,184.1 L-187,190.9 L337.1,493.5 L337.1,505.4 L484.4,590.4 L543.3,556.4 L549.1,559.8 L540.3,564.9" class="flow f-blocked" marker-end="url(#ah-scene6-blocked)"/>
+</g>
+<g data-hl="r26" data-id="r26">
+<path d="M170.8,576 L187,585.3 L187,592.1 L294.4,654.2 L457.9,559.8 L466.7,564.9" class="flow f-user" marker-end="url(#ah-scene6-user)"/>
+</g>
+</g>
+<g class="g-blocks">
+<g class="blk k-lead" data-id="api" data-dim="1">
+<polygon points="-220.8,156.4 -144.3,200.6 -144.3,139.4 -220.8,95.2" class="lft"/>
+<polygon points="-67.7,156.4 -144.3,200.6 -144.3,139.4 -67.7,95.2" class="rgt"/>
+<polygon points="-144.3,51 -67.7,95.2 -144.3,139.4 -220.8,95.2" class="top"/>
+<line x1="-210.5" y1="118.3" x2="-163.1" y2="145.7" class="det"/>
+<line x1="-210.5" y1="130.5" x2="-170.7" y2="153.5" class="det"/>
+<line x1="-210.5" y1="142.8" x2="-178.4" y2="161.3" class="det"/>
+<line x1="-210.5" y1="155" x2="-183.7" y2="170.5" class="det"/>
+</g>
+<g class="blk k-file" data-id="catalog" data-dim="1">
+<polygon points="197.3,197.2 244.4,224.4 244.4,204 197.3,176.8" class="lft"/>
+<polygon points="291.5,197.2 244.4,224.4 244.4,204 291.5,176.8" class="rgt"/>
+<polygon points="244.4,149.6 291.5,176.8 244.4,204 197.3,176.8" class="top"/>
+<line x1="235.6" y1="164.9" x2="265" y2="181.9" class="det"/>
+<line x1="223.8" y1="171.7" x2="244.4" y2="183.6" class="det"/>
+</g>
+<g class="blk k-grey" data-id="mirror" data-dim="1">
+<polygon points="8.8,282.2 97.2,333.2 97.2,302.6 8.8,251.6" class="lft"/>
+<polygon points="161.9,295.8 97.2,333.2 97.2,302.6 161.9,265.2" class="rgt"/>
+<polygon points="73.6,214.2 161.9,265.2 97.2,302.6 8.8,251.6" class="top"/>
+<line x1="19.1" y1="266.1" x2="73.9" y2="297.7" class="det"/>
+<line x1="19.1" y1="272.2" x2="50.1" y2="290.1" class="det"/>
+</g>
+<g class="blk k-work" data-id="orders" data-dim="1">
+<polygon points="238.5,421.6 315.1,465.8 315.1,404.6 238.5,360.4" class="lft"/>
+<polygon points="391.6,421.6 315.1,465.8 315.1,404.6 391.6,360.4" class="rgt"/>
+<polygon points="315.1,316.2 391.6,360.4 315.1,404.6 238.5,360.4" class="top"/>
+<line x1="248.8" y1="383.5" x2="296.3" y2="410.9" class="det"/>
+<line x1="248.8" y1="395.7" x2="288.6" y2="418.7" class="det"/>
+<line x1="248.8" y1="408" x2="281" y2="426.5" class="det"/>
+<line x1="248.8" y1="420.2" x2="275.6" y2="435.7" class="det"/>
+</g>
+<g class="blk k-person person" data-id="gateway" data-dim="1">
+<polygon points="25.3,517.8 69.5,543.3 69.5,537.2 25.3,511.7" class="lft"/>
+<polygon points="113.7,517.8 69.5,543.3 69.5,537.2 113.7,511.7" class="rgt"/>
+<polygon points="69.5,486.2 113.7,511.7 69.5,537.2 25.3,511.7" class="top"/>
+<path class="body" d="M56.5,507.7 C56.5,477.7 82.5,477.7 82.5,507.7 Q69.5,515.7 56.5,507.7z"/>
+<circle class="head" cx="69.5" cy="471.7" r="10"/>
+</g>
+<g class="blk k-cloud" data-id="router" data-dim="1">
+<g transform="matrix(0.866 0.5 -0.866 0.5 503.5072 545.7)">
+<path d="M8.1,8.1 A15.5,15.5 0 0 1 36.7,8.1 A15.5,15.5 0 0 1 65.3,8.1 A15.5,15.5 0 0 1 93.9,8.1 A11.8,11.8 0 0 1 93.9,29.9 A11.8,11.8 0 0 1 93.9,51.7 A11.8,11.8 0 0 1 93.9,73.5 A15.5,15.5 0 0 1 65.3,73.5 A15.5,15.5 0 0 1 36.7,73.5 A15.5,15.5 0 0 1 8.1,73.5 A11.8,11.8 0 0 1 8.1,51.7 A11.8,11.8 0 0 1 8.1,29.9 A11.8,11.8 0 0 1 8.1,8.1Z" class="lft cloud-side"/>
+</g>
+<g transform="matrix(0.866 0.5 -0.866 0.5 503.5072 535.5)">
+<path d="M8.1,8.1 A15.5,15.5 0 0 1 36.7,8.1 A15.5,15.5 0 0 1 65.3,8.1 A15.5,15.5 0 0 1 93.9,8.1 A11.8,11.8 0 0 1 93.9,29.9 A11.8,11.8 0 0 1 93.9,51.7 A11.8,11.8 0 0 1 93.9,73.5 A15.5,15.5 0 0 1 65.3,73.5 A15.5,15.5 0 0 1 36.7,73.5 A15.5,15.5 0 0 1 8.1,73.5 A11.8,11.8 0 0 1 8.1,51.7 A11.8,11.8 0 0 1 8.1,29.9 A11.8,11.8 0 0 1 8.1,8.1Z" class="top cloud-top"/>
+</g>
+</g>
+<g class="blk k-term" data-id="builder" data-dim="1">
+<polygon points="169.3,575.5 173.4,573.1 173.4,513.6 169.3,516" class="rgt"/>
+<polygon points="121,488.1 169.3,516 173.4,513.6 125.1,485.7" class="top"/>
+<polygon points="121,547.6 169.3,575.5 169.3,516 121,488.1" class="lft"/>
+<g class="scr" transform="matrix(0.866 0.5 0 1 121.0184 488.07)">
+<rect class="glass" x="3" y="3" width="49.8" height="53.5" rx="3"/>
+<rect class="wall" x="5" y="5" width="45.8" height="49.5" rx="2"/>
+<rect class="bar" x="5" y="5" width="45.8" height="6"/>
+<rect class="win" x="27.9" y="13" width="21.2" height="25" rx="2"/>
+</g>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<g data-id="router" data-dim="1">
+<text x="512.3" y="487.5" class="lbl" text-anchor="middle">service</text>
+<text x="512.3" y="501.5" class="sub mono" text-anchor="middle">Cluster · large · bucket</text>
+</g>
+<g data-id="orders" data-dim="1">
+<text x="315.1" y="292.2" class="lbl" text-anchor="middle">nightly writer</text>
+<text x="315.1" y="306.2" class="sub mono" text-anchor="middle">mailer · second · relay</text>
+</g>
+<g data-id="api" data-dim="1">
+<text x="-144.3" y="27" class="lbl" text-anchor="middle">primary</text>
+<text x="-144.3" y="41" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
+</g>
+<g data-id="mirror" data-dim="1">
+<text x="85.4" y="204.2" class="lbl" text-anchor="middle">old index</text>
+</g>
+<g data-id="catalog" data-dim="1">
+<text x="244.4" y="125.6" class="lbl" text-anchor="middle">worker gateway</text>
+<text x="244.4" y="139.6" class="sub mono" text-anchor="middle">logs portal</text>
+</g>
+<g data-id="gateway" data-dim="1">
+<text x="69.5" y="427.9" class="lbl" text-anchor="middle">Report</text>
+</g>
+<g data-id="builder" data-dim="1">
+<text x="145.2" y="475.5" class="lbl" text-anchor="middle">importer</text>
+</g>
+</g>
+<g class="g-marks">
+<g class="say" data-step="3">
+<rect x="128.8" y="73.3" width="231.1" height="24" rx="12" style="stroke:var(--token)"/>
+<text x="244.4" y="89.3" text-anchor="middle" style="fill:var(--token)">cold shipping local api policy search</text>
+</g>
+<g class="xm" data-step="5" data-hl="r25">
+<circle cx="540.3" cy="544.5" r="10"/>
+<path d="M535.8,540 L544.8,549 M544.8,540 L535.8,549"/>
+</g>
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

@@ -1,0 +1,172 @@
+isodiag: 1
+title: Search · exporter · public · nightly · backup · store
+lede: The release picks up the release before it answers. The ticket signs a reply once a minute.
+kinds:
+  control: { legend: Second primary }
+  send: { legend: Shared job job }
+  reply: { legend: "Notifier outbox standby cluster" }
+  user: { legend: Stream · records · report }
+  token: { legend: "Gateway balancer notifier" }
+  blocked: { legend: Primary main bucket }
+  event: { legend: Report }
+scenes:
+  - id: scene1
+    title: "Proxy mailer portal cache spare records"
+    caption: >-
+      The payments answers a ticket when it is ready. The metrics picks up the backup into the cache. The catalog answers the invoice for the client. The logs starts its token and moves on. The database builds a ticket once a minute. The worker reads a reply before it answers. The checker merges the result and waits. The cache forwards the log into the cache.
+    aria: >-
+      The api rotates an event once a minute. The ledger copies its config once a minute. The metrics writes a message and moves on. The planner compares the backup and moves on. The stream starts the result when it is ready. The config opens the next batch and moves on. The dashboard picks up a snapshot on the next step. The mailer opens a message from the store. The policy opens the queue on the next step. The runner collects the result from the store. The planner copies a message on the next step. The parser checks its token and moves on. The feed stops the next batch on the next step. The standby checks the result from the store.
+    legend: [ control, send, reply, token, event, blocked, user, fence ]
+
+    regions:
+      - id: api-area
+        kind: slab
+        label: "Proxy · stream · inbox"
+        at: [ 0, -9 ]
+        size: [ 26, 17 ]
+        nodes:
+          - { id: api, asset: file, at: [ 1.6, 1.4 ], label: importer, sub: backup · hub · balancer }
+          - { id: web, asset: session, role: lead, at: [ 1.4, 10.2 ], size: [ 2.6, 2.6, 1.7 ], deco: [ { terminal: 3 } ], label: proxy · shipping, sub: nightly store }
+          - { id: queue, asset: chat, at: [ 8, 5.4 ], label: Invoices billing, sub: "logs · old · alerts · mailer" }
+          - { id: cache, asset: key, at: [ 12.2, 1.4 ], label: nightly metrics, sub: relay spare invoices }
+        regions:
+          - id: web-area
+            kind: fence
+            label: WEBHOOK WRITER VOLUME CATALOG INBOX
+            at: [ 16, 4.8 ]
+            size: [ 8.8, 8.8 ]
+            height: 0.8
+            gate: { side: w, at: 0.4205, width: 3, height: 1.1, node: ledger }
+            nodes:
+              - { id: store, asset: session, at: [ 3.6, 1.4 ], appears: 3, label: Monitor · proxy, sub: "Large new notifier mirror" }
+              - { id: worker, asset: block, role: event, at: [ 3.8, 6.2 ], size: [ 1.6, 1.2, 0.7 ], deco: [ { terminal: 1 } ], appears: 5, label: large relay, sub: public main outbox }
+              - { id: gateway, asset: placeholder, at: [ 7.0, 0.6 ], appears: 4, label: listener, sub: OUTBOX PACKAGE }
+      - id: queue-area
+        kind: pad
+        at: [ 6.6, 10.6 ]
+        size: [ 7.8, 3.8 ]
+        nodes:
+          - { id: client, asset: person, at: [ 2.65, 1.05 ], label: Report, sub: gateway · upload · outbox }
+          - { id: index, asset: terminal, at: [ 5.0, 0.8 ], size: [ 1.6, 1.2, 0.8 ] }
+    nodes:
+      - { id: ledger, asset: gate, label: volume, sub: profile snapshot outbox }
+
+    routes:
+      - { id: r1, from: web.e, to: queue.w, kind: control }
+      - { id: r2, from: queue.n, to: api.e, kind: token }
+      - { id: r3, from: web.n, to: api.s, kind: token }
+      - { id: r4, from: api.e, to: cache.w, kind: token, label: "registry dashboard" }
+      - { id: r5, from: cache.e, to: ledger.n, kind: token, label: "backup logs new warm ticket" }
+      - id: r6
+        from: web.s
+        to: store.e
+        kind: control
+        via: [ [ 2.7, 6.4 ], [ 23.4, 6.4 ], [ 23.4, -1.5 ] ]
+        cross: true
+        label: "cold search runner mailer planner shipping"
+      - { id: r7, from: store.w, to: ledger.e, kind: send }
+      - { id: r8, from: ledger.w, to: queue.e, kind: send }
+      - { id: r9, from: worker.w, to: ledger.e, kind: control }
+      - { id: r10, from: ledger.w, to: queue.e, kind: control }
+      - { id: r11, from: queue.e, to: ledger.w, kind: send }
+      - { id: r12, from: ledger.e, to: worker.n, kind: send }
+      - { id: r13, from: worker.n, to: store.s, kind: event }
+      - { id: r14, from: store.s, to: worker.n, kind: control }
+      - { id: r15, from: queue.w, to: web.e, kind: send }
+      - { id: r16, from: web.e, to: queue.w, kind: send }
+      - { id: r17, from: queue.s, to: client, kind: user }
+      - { id: r18, from: client, to: queue.s, kind: user }
+
+    steps:
+      - kind: control
+        heading: Planner parser cold runner cluster config
+        caption: >-
+          The gateway stops its token when it is ready. The hub answers an event once a minute. The metrics publishes the backup for the client. The proxy records the request for the client. The bucket picks up the index and moves on. The runner collects the index into the cache.
+        command: tool --volume service --profile replica --proxy job archive notifier search balancer
+        animate: [ r1, [ r3 ] ]
+        pulse: [ queue ]
+        say: [ { at: queue, text: "read-only metrics records", kind: blocked } ]
+      - kind: control
+        heading: Config dashboard
+        caption: >-
+          The metrics records a reply from the store. The queue builds the result and waits. The batch writes a report when it is ready. The renderer sends a reply when it is ready.
+        command: tool client billing writer checker
+        animate: [ r1 ]
+        pulse: [ queue, web, client ]
+      - kind: token
+        heading: Audit audit nightly replica search ledger
+        caption: >-
+          The job signs the order when it is ready. The vault signs the result on the next step. The notifier starts the invoice. The scheduler starts its config once a minute. The upload merges an event. The monitor records the archive and waits.
+        command: |-
+          tool builder --webhook batch web logs mirror standby metrics audit builder sync backup snapshot --vault --database --inbox ingest monitor cluster
+        animate: [ r6, r4 ]
+        pulse: [ cache, store ]
+      - kind: token
+        heading: Database second shared new builder
+        caption: >-
+          The cluster tags the log from the store. The policy picks up a snapshot before it answers. The router publishes the invoice. The records starts the release before it answers. The cache tags the request and waits. The replica retries a reply from the store. The web tags a reply and waits. The batch publishes a snapshot from the store.
+        command: tool queue --ledger stream --tracer --ingest
+        animate: [ r5 ]
+        pulse: [ gateway, ledger ]
+      - kind: control
+        heading: "Hub shipping job mirror client"
+        caption: >-
+          The replica starts the order and moves on. The standby answers its token on the next step. The job closes the backup into the cache. The portal collects the queue and moves on.
+        command: tool backup --mirror ingest web
+        animate: [ r14, [ r9 ], [ r10 ] ]
+        pulse: [ worker ]
+        say: [ { at: [ 11.6, 0.6, 0.35 ], text: "Scheduler · invoices · registry", kind: control, dx: 40, dy: 34 } ]
+      - kind: send
+        heading: Internal search webhook
+        caption: >-
+          The ticket tags the next batch before it answers. The notifier publishes the archive and moves on. The inbox copies the backup. The planner stops the next batch and waits. The api checks the next batch for the client. The audit sends a message when it is ready.
+        command: 'tool portal --cache hub --builder audit'
+        animate: [ r7, [ { r8: token } ], [ r15, { r17: send } ] ]
+        pulse: [ ledger ]
+        say:
+          - { at: store, text: "webhook small ingest", kind: send }
+          - { at: [ 16.0, -0.5, 0.35 ], text: "New cold spare notifier runner upload", kind: token, dx: -150, dy: 44 }
+      - kind: send
+        heading: Orders builder dashboard
+        caption: >-
+          The runner tags the next batch for the client. The queue sends a ticket from the store. The shipping opens the result when it is ready. The feed sends a record when it is ready.
+        command: tool --payments job billing standby --router
+        animate: [ r16, [ r11 ], [ r12 ] ]
+        pulse: [ worker ]
+        say: [ { at: web, text: "exporter mailer main job", kind: send, dx: 30 } ]
+      - kind: event
+        heading: Archive stream importer job billing backup
+        caption: >-
+          The package opens the next batch into the cache. The alerts compares the backup and moves on. The service answers the index and waits. The index writes a report. The bucket collects the release before it answers.
+        command: "tool metrics release mailer relay logs --renderer --payments checker"
+        animate: [ r13 ]
+        pulse: [ store ]
+        say: [ { at: store, text: "checker ingest backup", kind: event } ]
+      - kind: reply
+        heading: Report notifier queue
+        caption: >-
+          The proxy picks up an event and moves on. The outbox merges a reply from the store. The payments writes its token from the store. The proxy compares its token and moves on. The release compares the queue from the store.
+        command: tool --report hub batch metrics checker
+        animate: [ { r7: reply }, [ { r8: reply } ], [ { r15: reply }, { r17: reply } ] ]
+        pulse: [ web, client ]
+        say:
+          - { at: store, text: ticket, kind: reply }
+          - { at: [ 16.0, -0.5, 0.35 ], text: "New cold spare notifier runner upload", kind: token, dx: -150, dy: 44 }
+      - kind: blocked
+        heading: "Internal public search standby second billing"
+        caption: >-
+          The store closes a message once a minute. The service stores a report on the next step. The replica opens the index on the next step. The primary rotates its config from the store. The sync publishes the release on the next step. The queue checks the release when it is ready.
+        command: tool backup --mirror ingest web
+        animate: [ { r14: blocked }, [ r9 ], [ r10 ] ]
+        pulse: [ worker ]
+        say:
+          - { at: [ 20.6, 2.6, 1.25 ], text: tracer api proxy, kind: blocked, dx: 70, dy: 40, anchor: start }
+          - { at: [ 11.6, 0.6, 0.35 ], text: "Scheduler · invoices · registry", kind: control, dx: 40, dy: 34 }
+      - kind: user
+        heading: Remote config
+        caption: >-
+          The planner checks its token when it is ready. The cache answers an event from the store. The database sends the archive before it answers.
+        command: tool checker --ticket feed primary cache --bucket
+        animate: [ r18, [ { r15: user }, { r11: user } ], [ { r12: user } ], [ r13 ], [ { r16: reply }, { r7: reply } ] ]
+        pulse: [ client ]
+        say: [ { at: [ 10, 12.4, 2.6 ], text: invoices spare local exporter, kind: user, dx: -30, dy: -30, anchor: end } ]

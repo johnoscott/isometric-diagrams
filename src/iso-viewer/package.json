@@ -1,0 +1,6 @@
+{
+  "//": "iso-viewer (L2) has no side effects: bundles drop the modules they do not use. LAYERS.md S4.",
+  "type": "module",
+  "private": true,
+  "sideEffects": false
+}

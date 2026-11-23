@@ -1,0 +1,158 @@
+isodiag: 1
+title: "Vault · read-only · ledger · public · balancer"
+lede: >-
+  The scheduler renews a ticket when it is ready. The records signs the index. The report stops the archive on the next step. The mailer starts the request on the next step. The checker sends the request once a minute.
+footer: "The ingest checks a ticket before it answers. The portal picks up the log into the cache."
+kinds:
+  user: { legend: Report }
+  control: { legend: Importer web warm batch }
+
+scenes:
+  - id: scene1
+    title: "Audit notifier catalog cache"
+    caption: >-
+      The balancer builds an event from the store. The relay retries an event for the client. The standby picks up the log for the client. The registry signs its config for the client. The notifier picks up a snapshot and moves on.
+    aria: >-
+      The payments tags the index from the store. The queue compares the index into the cache. The orders copies the next batch. The bucket collects the result for the client. The report writes the backup from the store.
+    regions:
+      - id: api-area
+        kind: slab
+        label: "Proxy · stream · inbox"
+        nodes:
+          - { id: api, asset: chat, size: [ 3, 3, 1.1 ], label: metrics, sub: warm shared router }
+          - { id: web, asset: session, role: lead, right-of: api, gap: 5, label: primary, sub: "Router · orders · store · queue · catalog" }
+          - { id: queue, asset: folder, right-of: web, gap: 4, label: exporter, sub: builder }
+      - id: web-area
+        kind: pad
+        below: api-area
+        gap: 3
+        nodes:
+          - { id: cache, asset: person, label: Report, sub: shared builder }
+    nodes:
+      - { id: store, asset: person, ghost: true, left-of: api-area, gap: 3, label: records, sub: store job mailer }
+      - { id: worker, asset: cloud, right-of: api-area, gap: 4, label: Reader, sub: listener }
+    routes:
+      - { id: r1, from: store, to: api, kind: send }
+      - { id: r2, from: api, to: web, kind: send, label: "records report" }
+      - { id: r3, from: web, to: queue, kind: control, label: upload }
+      - { id: r4, from: queue, to: worker, kind: control, label: listener }
+      - { id: r5, from: cache, to: web, kind: user, label: web }
+    steps:
+      - kind: send
+        heading: Shared large public hub
+        caption: The inbox builds its config. The upload records the request from the store. The shipping copies the invoice and moves on.
+        animate: [ r1, r2 ]
+        pulse: [ web ]
+        say: [ { at: api, text: "Proxy billing public read-only cluster payments", kind: send } ]
+      - heading: Internal nightly checker
+        caption: The search picks up a report before it answers.
+        animate: [ r3 ]
+        pulse: [ queue ]
+      - kind: blocked
+        heading: Internal hub reader
+        caption: The importer tags a reply. The tracer stores a report into the cache. The store merges the order and moves on.
+        animate: [ { r4: blocked } ]
+        mark: [ { on: r4 } ]
+        pulse: [ queue ]
+      - kind: user
+        heading: Config small records batch planner
+        caption: The primary stops its token. The scheduler answers a report from the store. The sync forwards a snapshot before it answers.
+        animate: [ r5, r4 ]
+        pulse: [ web, worker ]
+
+  - id: scene2
+    title: "Backup billing portal worker"
+    caption: >-
+      The api retries the queue and waits. The client builds a record on the next step. The ingest stops the invoice for the client. The snapshot writes a reply for the client.
+    aria: >-
+      The hub collects the archive once a minute. The renderer closes a snapshot when it is ready. The scheduler builds a reply and waits. The config collects a message and moves on. The monitor stops the release on the next step.
+    regions:
+      - id: api-area
+        kind: slab
+        label: "Proxy · stream · inbox"
+        nodes:
+          - { id: web, asset: session, role: lead, label: primary, sub: "Router · orders · store · queue · catalog" }
+          - { id: gateway, asset: folder, size: [ 2.6, 2.6, 0.5 ], right-of: web, gap: 5, label: webhook, sub: Inbox · cold · tracer }
+          - { id: client, asset: file, below: web, gap: 4, label: nightly vault, sub: index outbox }
+      - id: web-area
+        kind: pad
+        below: api-area
+        gap: 3
+        align: start
+        nodes:
+          - { id: cache, asset: person, label: Report }
+    routes:
+      - { id: r5, from: cache, to: web, kind: user, label: orders importer }
+      - { id: r6, from: web, to: gateway, kind: control, label: writer }
+      - { id: r7, from: gateway, to: web, kind: reply }
+      - { id: r8, from: web, to: client, kind: control, label: store }
+      - { id: r9, from: client, to: cache, kind: user, label: index outbox }
+    steps:
+      - kind: user
+        heading: Billing profile standby
+        caption: The mirror opens a reply when it is ready. The ledger copies a message into the cache.
+        animate: [ r5 ]
+        pulse: [ web ]
+      - heading: Webhook store
+        caption: The bucket copies the request before it answers. The proxy reads the release. The ingest builds a record when it is ready.
+        animate: [ r6 ]
+        pulse: [ gateway ]
+      - kind: reply
+        heading: Payments config registry
+        caption: The snapshot stops an event on the next step. The builder renews the invoice from the store. The standby checks the backup and moves on.
+        animate: [ r7 ]
+        pulse: [ gateway ]
+        say:
+          - { at: gateway, text: catalog · report · renderer, kind: reply }
+          - { at: web, text: exporter outbox read-only large hub, kind: blocked }
+      - heading: Upload records
+        caption: The client copies the result. The scheduler answers a message when it is ready.
+        animate: [ r8 ]
+        pulse: [ client ]
+      - kind: user
+        heading: Archive nightly invoices
+        caption: The report rotates a ticket from the store. The console publishes its token on the next step.
+        animate: [ r9 ]
+        pulse: [ cache ]
+
+  - id: scene3
+    title: "Remote cache balancer main primary"
+    caption: >-
+      The tracer sends the backup before it answers. The queue answers the invoice from the store. The importer renews a snapshot when it is ready. The payments renews a record once a minute.
+    aria: >-
+      The feed waits for the request and waits. The search opens a snapshot. The inbox collects a ticket when it is ready. The outbox reads the log once a minute. The index sends a snapshot on the next step. The billing forwards the backup before it answers.
+    regions:
+      - id: api-area
+        kind: slab
+        label: "Proxy · stream · inbox"
+        nodes:
+          - { id: index, asset: file, label: report volume, sub: bucket portal }
+          - { id: web, asset: session, role: lead, right-of: index, gap: 4, label: primary, sub: "Router · orders · store · queue · catalog" }
+          - { id: ledger, asset: session, role: work, right-of: web, gap: 5, label: inbox, sub: spare outbox tracer }
+          - { id: report, asset: folder, below: web, gap: 4, label: Primary runner, sub: orders replica client }
+    routes:
+      - { id: r10, from: index, to: web, kind: reply, label: replica }
+      - { id: r11, from: web, to: ledger, kind: send, label: bucket portal }
+      - { id: r12, from: web, to: report, kind: blocked, label: main console }
+      - { id: r13, from: ledger, to: report, kind: control, label: cluster standby }
+    steps:
+      - kind: reply
+        heading: Read-only new batch outbox
+        caption: The volume publishes the invoice and moves on. The ledger closes a record on the next step.
+        animate: [ r10 ]
+        pulse: [ web ]
+      - kind: send
+        heading: Store billing package
+        caption: The logs retries the index and waits. The reader builds the order into the cache.
+        animate: [ r11 ]
+        pulse: [ ledger ]
+      - kind: blocked
+        heading: Relay warm logs worker
+        caption: The store sends the release once a minute. The registry writes the result for the client.
+        animate: [ r12 ]
+        mark: [ { on: r12 } ]
+        pulse: [ report ]
+      - heading: Remote web feed
+        caption: The checker merges a snapshot once a minute. The relay copies the order before it answers.
+        animate: [ r13 ]
+        pulse: [ ledger, report ]

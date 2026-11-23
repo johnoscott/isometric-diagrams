@@ -1,0 +1,6 @@
+{
+  "//": "iso-core (L0) has no side effects but compile-schema.ts (ajv makes a validator when it loads): bundles drop what they do not use. LAYERS.md S1.",
+  "type": "module",
+  "private": true,
+  "sideEffects": ["./compile-schema.ts"]
+}
