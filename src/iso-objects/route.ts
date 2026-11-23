@@ -74,7 +74,7 @@ export interface RouteResult { routes: Routed[]; diags: Diag[] }
 
 /**
  * The search steps routing may take in one scene. The heaviest diagram in this repo takes about 57,000
- * (the session-messaging reproduction in repro/); a drawing with 40 more nodes took 11 million, and minutes. Past the budget,
+ * (the large drawing in corpus/messaging.yaml); a drawing with 40 more nodes took 11 million, and minutes. Past the budget,
  * the routes left are drawn as plain elbows and the scene says so, so a large diagram draws in about a second.
  */
 export const ROUTE_BUDGET = 500_000;

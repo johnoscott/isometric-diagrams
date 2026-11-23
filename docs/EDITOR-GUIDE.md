@@ -33,6 +33,9 @@ All of this comes from `@johnoscott/isometric-engine/editor`, namespace `editor`
 - **The canvas**: your drawing in 3D, with selection, a marquee, pan and zoom, and pins (a dragged object is pinned in
   the file). It also has a **2D view** that you opt into: the same drawing laid out flat, with a 3D | 2D switch.
 - **The outline (tree)**, **properties** (from your JSON Schema), **problems**, **palette**, **menus** and **keys**.
+- **Optional, when you say how** (0.10.0): palette **presets** (a box, a tray, a database… each starting as itself),
+  **connecting** two objects by dragging from one to the other, and **grouping** the selection into a new container.
+  Each writes the file as your adapter says, as one undo step.
 - **`editor.mountEditor(element, options, setup)`**, which puts it all on a page, where `setup = editor.setupFor(adapter,
   view)`.
 
@@ -196,14 +199,53 @@ export const boxesView = (theme: string): editor.DomainView<Boxes, editor.Canvas
 });
 ```
 
+### Presets, connecting and grouping (0.10.0)
+
+Three optional pieces. Give one and the editor offers it; leave it out and nothing changes.
+
+- **Palette presets**, on the view: `palette: [{ kind, label, icon?, value?, name? }]`. Each entry adds an object of
+  `kind` starting as a copy of `value` (default: the kind's `template()`), named from `name` (default: the kind's
+  singular). Without it, the palette has one entry per kind. **Sections** (0.11.0): give entries a `section` and the
+  palette lists them under a header per section, in the order the sections first appear; each header opens and closes
+  its entries (a button, `aria-expanded`). At the start every section is closed but the one last added from (kept in
+  the host's `storage` as `canvas-palette`; the first section before any). Entries without one are listed as before. **Docked**
+  (0.12.0): `paletteLayout: 'docked'` on the view puts the palette in a pane of its own at the canvas's left, instead of
+  floating over it: a search box at its top filters the entries by label and section (Enter adds the first match, ↓
+  goes into the list, Esc clears it), the sections are its collapsible groups, a grip resizes it and a control
+  collapses it to a strip (both kept in the host's `storage` as `canvas-palette-dock`). Drag and Enter add as before.
+  `'floating'` is the default.
+- **Connect**, on the adapter: `connect(from, to, data)` returns where a connection goes and what it is, `{ at, value }`
+  to add to a list (or with `name`, to a map under a fresh name), or `undefined` when those two don't connect. The
+  canvas then shows a handle on the one selected object: drag it to another (Esc cancels), or use **Connect to…** in
+  its menu and click the other.
+- **Drop into** (0.10.1), on the adapter: `dropInto(target, value, kind, data)` returns the new thing's value inside
+  `target` (and words for it), or `undefined` when `target` doesn't hold it. A palette drop asks what is under it,
+  innermost first, and the first that holds it takes it; with none, the drop is pinned where it lands.
+- **Group**, on the adapter: `group(members, data)` returns the new container (`at`, the base of its `name`, its
+  `value`) and `members(name)`, what changes in each member once it has a name. **Group** in the menu, or ⌘G, writes
+  it all as one step; members' pins are dropped, so the layout places them in their new container.
+
+```ts
+// boxes/1's: a link between two boxes (not twice), and the selection into a new zone in what they were all in
+type Data = { boxes: Record<string, { in?: string }>; links?: { from: string; to: string }[] };
+connect: (from, to, data) =>
+  (data as Data).links?.some(l => l.from === from.name && l.to === to.name) ? undefined
+    : { at: ['links'], value: { from: from.name, to: to.name } },
+group: (members, data) => {
+  const ins = new Set(members.map(m => (data as Data).boxes[m.name]?.in));
+  return {
+    at: ['boxes'], name: 'group', value: { kind: 'zone', label: 'Group', ...(ins.size === 1 && [...ins][0] ? { in: [...ins][0] } : {}) },
+    members: name => members.map(m => ({ path: ['boxes', m.name, 'in'], value: name })),
+  };
+},
+// and on the view
+palette: [
+  { kind: 'boxes', label: 'Box', name: 'box', value: { size: [2, 2, 1] } },
+  { kind: 'boxes', label: 'Tray', icon: 'layers', name: 'tray', value: { kind: 'tray', label: 'Tray' } },
+],
+```
+
 ## 3. A page
-
-The package is private, on GitHub Packages. In your project's `.npmrc`, with a token that may read packages in your
-user `~/.npmrc` (never in a repo):
-
-```
-@johnoscott:registry=https://npm.pkg.github.com
-```
 
 ```
 npm i @johnoscott/isometric-engine
@@ -271,6 +313,12 @@ Its `index.html` gives the editor a sized element: `<div id="app" style="height:
 | a text pane beside the tree and canvas | your own pane on the `TextPane` interface (`editor.PaneOpts`), given as `setupFor`'s third argument, and Monaco in your bundle. The package ships none (Monaco is large); without one, the tree, canvas and properties make a complete editor |
 | the 2D view | `view.flat` with `load: async () => editor.flatCanvas`, and `viewer.flatCss(styles)` in your canvas CSS |
 | isodiag/1 YAML drawings | `/systems`: `systems.compile(yaml, theme)` (see the README) |
+| palette presets (0.10.0) | `view.palette` |
+| connecting by drag, Connect to… (0.10.0) | `adapter.connect` |
+| Group, ⌘G (0.10.0) | `adapter.group` |
+| a palette drop that lands inside a container (0.10.1) | `adapter.dropInto` |
+| palette sections under collapsible headers (0.11.0) | `view.palette[].section` |
+| the palette docked at the canvas's left, searchable (0.12.0) | `view.paletteLayout: 'docked'` |
 
 ## 5. Testing your adapter
 

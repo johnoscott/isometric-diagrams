@@ -36,5 +36,5 @@ export { flatSvg, flatCss, measureIn, rectOf } from './flat-view.ts';
 export type { FlatStyle } from './flat-view.ts';
 export { dualView, storedMode, viewToggle, DUAL_VIEW_CSS } from './dual-view.ts';
 export type { ViewMode, DualViewOptions, DualView } from './dual-view.ts';
-export { morphSvgs, markConnectors } from './morph.ts';
-export type { SvgMorph } from './morph.ts';
+export { morphSvgs, markConnectors, buildLayer, ease, clamp } from './morph.ts';
+export type { SvgMorph, MorphLayer } from './morph.ts';

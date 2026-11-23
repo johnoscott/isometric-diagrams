@@ -364,9 +364,14 @@ export function insertItem(text: string, listPath: Path, value: unknown, index?:
   const prefix = text.slice(dash, first.range![0]);
   if (!/^\s*- $/.test(prefix)) return fallback(text, listPath, d => { const s = d.getIn(listPath) as YAMLSeq; s.items.splice(at, 0, d.createNode(value) as never); }, true);
   const indent = prefix.indexOf('-');
-  const body = ' '.repeat(indent) + '- ' + (isObj(value) && Object.keys(value as object).length
-    ? reindent(yamlText(value), indent + 2).slice(indent + 2)
-    : scalarText(value, { flow: false, indent: indent + 2 })) + '\n';
+  // (0.10.0) a map among maps written inline ({ … }) is written inline too
+  const near = items[Math.min(at, items.length - 1)];
+  const inline = isObj(value) && isMap(near) && (near as { flow?: boolean }).flow;
+  const body = ' '.repeat(indent) + '- ' + (inline
+    ? flowText(value)
+    : isObj(value) && Object.keys(value as object).length
+      ? reindent(yamlText(value), indent + 2).slice(indent + 2)
+      : scalarText(value, { flow: false, indent: indent + 2 })) + '\n';
   if (at < items.length) { const s = lineStart(text, items[at].range![0]); return { steps: [[{ start: s, end: s, text: body }]] }; }
   const e = items[items.length - 1].range![1];
   const end = nextLine(text, text[e - 1] === '\n' ? e - 1 : e);

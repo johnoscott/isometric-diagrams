@@ -54,6 +54,8 @@ body[data-view="text"] #se-canvas, body[data-view="text"] #se-work-grip { displa
 /* the stage (canvas.css styles the drawing in it); focused by a click, a quieter ring than the keyboard's */
 .canvas.has-focus .canvas-stage:not(:focus-visible) { outline: 2px solid color-mix(in srgb, var(--focus) 50%, transparent); outline-offset: -2px; }
 .canvas-tools { position: absolute; right: var(--sp-3); bottom: var(--sp-3); display: flex; gap: var(--sp-0); padding: var(--sp-0); background: var(--surface); border: var(--bw) solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1, none); }
+/* a canvas too narrow for it: the toolbar wraps onto rows inside it, right-aligned (one row, as ever, when it fits) */
+.canvas-tools { max-width: calc(100% - 2 * var(--sp-3)); flex-wrap: wrap; justify-content: flex-end; }
 .canvas-tools .segmented { margin-right: var(--sp-1); }
 .status .hint-mode { color: var(--ink-3); }
 body[data-view="text"] .status .hint-mode { display: none; }
@@ -217,12 +219,41 @@ body { position: relative; height: 100%; min-height: 0; font: var(--fw-regular) 
 }
 /* E11: the palette, on the canvas: click to add, or drag onto the canvas */
 @layer views {
-.palette { position: absolute; left: var(--sp-3); top: var(--sp-3); display: flex; flex-direction: column; gap: 2px; padding: var(--sp-0); background: var(--surface); border: var(--bw) solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1, none); z-index: 2; }
-.pal-item { display: flex; align-items: center; gap: var(--sp-2); height: var(--ctl-sm); padding: 0 var(--sp-2); border: 0; border-radius: var(--r-sm); background: none; color: var(--ink-2); font: inherit; font-size: var(--fs-sm); cursor: grab; text-align: left; touch-action: none; user-select: none; }
+.palette { position: absolute; left: var(--sp-3); top: var(--sp-3); display: flex; flex-direction: column; gap: 2px; padding: var(--sp-0); max-height: calc(100% - 2 * var(--sp-3) - 56px); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border: var(--bw) solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-1, none); z-index: 2; }
+.pal-item { display: flex; flex-shrink: 0; align-items: center; gap: var(--sp-2); height: var(--ctl-sm); padding: 0 var(--sp-2); border: 0; border-radius: var(--r-sm); background: none; color: var(--ink-2); font: inherit; font-size: var(--fs-sm); cursor: grab; text-align: left; touch-action: none; user-select: none; }
 .pal-item:hover { background: var(--state-hover); color: var(--ink); }
 .pal-item:active { cursor: grabbing; }
 .pal-item .icon { width: 14px; height: 14px; }
+.pal-section { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.pal-head { display: flex; flex-shrink: 0; align-items: center; gap: var(--sp-1); height: var(--ctl-sm); padding: 0 var(--sp-2) 0 var(--sp-1); border: 0; border-radius: var(--r-sm); background: none; color: var(--ink-3); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-strong); letter-spacing: .02em; cursor: pointer; text-align: left; }
+.pal-head:hover { background: var(--state-hover); color: var(--ink); }
+.pal-head .pal-chev { width: 12px; height: 12px; transition: transform var(--dur-1, 0ms); }
+.pal-head[aria-expanded="true"] .pal-chev { transform: rotate(90deg); }
+.pal-body { display: flex; flex-direction: column; gap: 2px; }
+.pal-body[hidden] { display: none; }
 body.read-only .palette { display: none; }
+/* 0.12.0: the palette docked, a pane of its own at the canvas's left (search, sections, a grip, collapsible) */
+.canvas.pal-docked { display: flex; --pal-cur: var(--pal-w, 220px); }
+.canvas.pal-docked.pal-collapsed { --pal-cur: 36px; }
+.canvas.pal-docked > .canvas-stage { flex: 1 1 auto; min-width: 0; position: relative; }
+.canvas.pal-docked > .canvas-empty { left: var(--pal-cur, 220px); }
+/* the toolbar stays on the stage, beside the pane */
+.canvas.pal-docked > .canvas-tools { max-width: calc(100% - var(--pal-cur, 220px) - 2 * var(--sp-3)); }
+.pal-dock { flex: 0 0 var(--pal-cur, 220px); width: var(--pal-cur, 220px); min-width: 0; display: flex; flex-direction: column; background: var(--surface); border-right: var(--bw) solid var(--line); overflow: hidden; z-index: 2; }
+.pal-dock-head { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-1); border-bottom: var(--bw) solid var(--line); }
+.pal-search-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-1); height: var(--ctl-sm); padding: 0 var(--sp-2); border: var(--bw) solid var(--line); border-radius: var(--r-sm); background: var(--bg); color: var(--ink-3); }
+.pal-search-wrap:focus-within { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.pal-search-wrap .icon { width: 14px; height: 14px; flex: none; }
+.pal-search { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; font-size: var(--fs-sm); }
+.pal-dock .palette.pal-list { position: static; flex: 1 1 auto; max-height: none; min-height: 0; border: 0; border-radius: 0; box-shadow: none; background: none; padding: var(--sp-1); }
+.pal-dock .pal-item[hidden], .pal-dock .pal-section[hidden] { display: none; }
+.pal-none { margin: 0; padding: var(--sp-2) var(--sp-3); color: var(--ink-3); font-size: var(--fs-sm); }
+.pal-none[hidden] { display: none; }
+.canvas.pal-collapsed .pal-search-wrap, .canvas.pal-collapsed .palette.pal-list, .canvas.pal-collapsed .pal-none, .canvas.pal-collapsed .pal-grip { display: none; }
+.canvas.pal-collapsed .pal-dock-head { border-bottom: 0; justify-content: center; }
+.pal-grip { flex: none; width: 6px; margin: 0 -3px; cursor: col-resize; z-index: 3; position: relative; }
+.pal-grip:hover, .pal-grip:focus-visible { background: color-mix(in srgb, var(--accent) 30%, transparent); outline: 0; }
+body.read-only .pal-dock, body.read-only .pal-grip { display: none; }
 .pal-ghost { position: absolute; z-index: 5; pointer-events: none; display: flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-2); border: var(--bw) solid var(--accent); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font-size: var(--fs-sm); box-shadow: var(--shadow-2, none); }
 .pal-ghost .icon { width: 14px; height: 14px; }
 .pal-ghost.bad { border-color: var(--bad); color: var(--bad); }

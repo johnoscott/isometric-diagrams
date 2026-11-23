@@ -91,8 +91,11 @@ function topFace(g: Element, origin: DOMRect): { pts: [number, number][]; fill: 
   return pts.length === 4 ? { pts, fill: getComputedStyle(poly).fill } : undefined;
 }
 
-/** the layer a morph draws on: `at(t)` paints it t of the way from one view to the other */
-export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVGSVGElement, from: ViewMode): { svg: SVGSVGElement; at(t: number): void } {
+/** a morph's layer: append `svg` to the root; `at(t)` paints it t (0 to 1) of the way, in any order (no clock) */
+export interface MorphLayer { svg: SVGSVGElement; at(t: number): void }
+/** the layer a morph draws on: `at(t)` paints it t of the way from one view to the other. Both views are in the root and
+ *  laid out (hidden is fine, display: none is not): a host seeks it frame by frame (0.12.2: exported). */
+export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVGSVGElement, from: ViewMode): MorphLayer {
   const origin = root.getBoundingClientRect();
   const layer = document.createElementNS(NS, 'svg') as SVGSVGElement;
   layer.setAttribute('class', 'dual-morph');

@@ -183,8 +183,10 @@ function drawFlatRegion(k: Kernel, cat: KindCatalog, r: Placed, vis: Attrs, grid
   const style = R['label-style'] ?? rk?.labelStyle;
   if (R.label && style !== 'none') {
     if (style === 'face') {
-      const big = shape === 'slab';
-      const z = big ? b.z0 + 0.28 : b.z0 + Math.min(0.1, (b.z1 - b.z0) * 0.25);
+      // (0.12.2) a thin slab's face can't hold the large name: it has the small one, in the middle of the face
+      const h = b.z1 - b.z0, cap = (f: { size: number }) => (f.size * 0.73) / S, thin = shape === 'slab' && 0.28 + cap(FONTS.slabname) + 0.08 > h;
+      const big = shape === 'slab' && !thin;
+      const z = big ? b.z0 + 0.28 : thin ? b.z0 + Math.max(0.02, (h - cap(FONTS.sm)) / 2) : b.z0 + Math.min(0.1, h * 0.25);
       s += tag('g', attrs, k.faceText(b.x0 + (big ? 0.6 : 0.3), b.y1, z, R.label, big ? 'slabname' : 'slabname sm', big ? FONTS.slabname : FONTS.sm, 'left', 'start'));
     } else if (style === 'face-right') {
       s += tag('g', attrs, k.faceText(b.x1, b.y0 + 0.6, b.z0 + Math.max(0.14, (b.z1 - b.z0) * 0.2), R.label, 'slabname', FONTS.slabname, 'right', 'end'));

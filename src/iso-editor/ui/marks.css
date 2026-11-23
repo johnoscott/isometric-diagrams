@@ -1,6 +1,6 @@
 /* The canvas's own marks over the drawing (0.7.4), for the plain words (setup.ts: the root .iso-canvas, the pan key's
    class .pan-key): selection, hover, marquee, the drag's grid, drop target and edges,
-   problem badges, and the canvas's cursors. On the skin's tokens: --iso-sel* default to --accent, --iso-bad and
+   problem badges, the connect handle and line (0.10.0), and the canvas's cursors. On the skin's tokens: --iso-sel* default to --accent, --iso-bad and
    --iso-warn to --bad and --warn; a host may set any of them on .iso-canvas. The package's assets/app.css carries
    this file after the layout, and it ships alone as assets/marks.css. (A domain with its own words styles its own.)
    Without any of it the marks are still harmless: the overlay's own attributes give no fill and take no pointer. */
@@ -27,6 +27,10 @@
 .iso-canvas .overlay .drop { fill: var(--iso-sel-fill); stroke: var(--iso-sel); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .iso-canvas .overlay .drop.bad { fill: color-mix(in srgb, var(--iso-bad) 18%, transparent); stroke: var(--iso-bad); }
 .iso-canvas .overlay .edge { fill: none; stroke: var(--iso-sel); stroke-width: 4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.iso-canvas .overlay .connect-handle { fill: var(--surface, #fff); stroke: var(--iso-sel); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: all; cursor: crosshair; }
+.iso-canvas .overlay .connect-handle:hover { fill: var(--iso-sel); }
+.iso-canvas .overlay .connect-line { stroke: var(--iso-sel); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.iso-canvas .overlay .connect-line.ok { stroke-dasharray: none; }
 .iso-canvas .overlay .badge circle { fill: var(--iso-bad); stroke: none; }
 .iso-canvas .overlay .badge.warn circle { fill: var(--iso-warn); }
 .iso-canvas .overlay .badge text { fill: #fff; stroke: none; font-family: system-ui, sans-serif; font-weight: 600; text-anchor: middle; dominant-baseline: central; }

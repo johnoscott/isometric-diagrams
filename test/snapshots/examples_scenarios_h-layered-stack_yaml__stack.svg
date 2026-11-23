@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-170 -301 427 544" role="img" aria-label="Nine layers, each on the one below" data-scene="stack">
+<defs>
+</defs>
+<g class="g-base">
+</g>
+<g class="g-floor">
+</g>
+<g class="g-flows">
+</g>
+<g class="g-blocks">
+<g class="blk k-grey" data-id="hardware" data-dim="1">
+<polygon points="-147.2,85 88.3,221 88.3,200.6 -147.2,64.6" class="lft"/>
+<polygon points="235.6,136 88.3,221 88.3,200.6 235.6,115.6" class="rgt"/>
+<polygon points="0,-20.4 235.6,115.6 88.3,200.6 -147.2,64.6" class="top"/>
+</g>
+<g class="blk k-slab" data-id="firmware" data-dim="1">
+<polygon points="-147.2,52.7 88.3,188.7 88.3,168.3 -147.2,32.3" class="lft"/>
+<polygon points="235.6,103.7 88.3,188.7 88.3,168.3 235.6,83.3" class="rgt"/>
+<polygon points="0,-52.7 235.6,83.3 88.3,168.3 -147.2,32.3" class="top"/>
+</g>
+<g class="blk k-blue" data-id="kernel" data-dim="1">
+<polygon points="-147.2,20.4 88.3,156.4 88.3,136 -147.2,0" class="lft"/>
+<polygon points="235.6,71.4 88.3,156.4 88.3,136 235.6,51" class="rgt"/>
+<polygon points="0,-85 235.6,51 88.3,136 -147.2,0" class="top"/>
+</g>
+<g class="blk k-server" data-id="drivers" data-dim="1">
+<polygon points="-147.2,-11.9 88.3,124.1 88.3,103.7 -147.2,-32.3" class="lft"/>
+<polygon points="235.6,39.1 88.3,124.1 88.3,103.7 235.6,18.7" class="rgt"/>
+<polygon points="0,-117.3 235.6,18.7 88.3,103.7 -147.2,-32.3" class="top"/>
+</g>
+<g class="blk k-green" data-id="runtime" data-dim="1">
+<polygon points="-147.2,-44.2 88.3,91.8 88.3,71.4 -147.2,-64.6" class="lft"/>
+<polygon points="235.6,6.8 88.3,91.8 88.3,71.4 235.6,-13.6" class="rgt"/>
+<polygon points="0,-149.6 235.6,-13.6 88.3,71.4 -147.2,-64.6" class="top"/>
+</g>
+<g class="blk k-mail" data-id="libraries" data-dim="1">
+<polygon points="-147.2,-76.5 88.3,59.5 88.3,39.1 -147.2,-96.9" class="lft"/>
+<polygon points="235.6,-25.5 88.3,59.5 88.3,39.1 235.6,-45.9" class="rgt"/>
+<polygon points="0,-181.9 235.6,-45.9 88.3,39.1 -147.2,-96.9" class="top"/>
+</g>
+<g class="blk k-key" data-id="framework" data-dim="1">
+<polygon points="-147.2,-108.8 88.3,27.2 88.3,6.8 -147.2,-129.2" class="lft"/>
+<polygon points="235.6,-57.8 88.3,27.2 88.3,6.8 235.6,-78.2" class="rgt"/>
+<polygon points="0,-214.2 235.6,-78.2 88.3,6.8 -147.2,-129.2" class="top"/>
+</g>
+<g class="blk k-event" data-id="services" data-dim="1">
+<polygon points="-147.2,-141.1 88.3,-5.1 88.3,-25.5 -147.2,-161.5" class="lft"/>
+<polygon points="235.6,-90.1 88.3,-5.1 88.3,-25.5 235.6,-110.5" class="rgt"/>
+<polygon points="0,-246.5 235.6,-110.5 88.3,-25.5 -147.2,-161.5" class="top"/>
+</g>
+<g class="blk k-violet" data-id="application" data-dim="1">
+<polygon points="-147.2,-173.4 88.3,-37.4 88.3,-57.8 -147.2,-193.8" class="lft"/>
+<polygon points="235.6,-122.4 88.3,-37.4 88.3,-57.8 235.6,-142.8" class="rgt"/>
+<polygon points="0,-278.8 235.6,-142.8 88.3,-57.8 -147.2,-193.8" class="top"/>
+</g>
+</g>
+<g class="g-air">
+</g>
+<g class="g-labels">
+<text transform="matrix(0.866 0.5 0 1 -138.3909 85.68)" class="slabname sm" data-id="stack-note-0" data-dim="1">1 · Hardware</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 53.38)" class="slabname sm" data-id="stack-note-1" data-dim="1">2 · Firmware</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 21.08)" class="slabname sm" data-id="stack-note-2" data-dim="1">3 · Operating system</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 -11.22)" class="slabname sm" data-id="stack-note-3" data-dim="1">4 · Drivers</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 -43.52)" class="slabname sm" data-id="stack-note-4" data-dim="1">5 · Runtime</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 -75.82)" class="slabname sm" data-id="stack-note-5" data-dim="1">6 · Libraries</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 -108.12)" class="slabname sm" data-id="stack-note-6" data-dim="1">7 · Framework</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 -140.42)" class="slabname sm" data-id="stack-note-7" data-dim="1">8 · Services</text>
+<text transform="matrix(0.866 0.5 0 1 -138.3909 -172.72)" class="slabname sm" data-id="stack-note-8" data-dim="1">9 · Application</text>
+</g>
+<g class="g-marks">
+</g>
+<g class="g-badges">
+</g>
+<g class="g-anim">
+</g>
+</svg>

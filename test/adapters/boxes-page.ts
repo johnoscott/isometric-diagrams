@@ -17,6 +17,8 @@ import SKIN from '../../src/iso-editor/ui/skin.css';
 // @ts-ignore text, by the bundler's loader
 import APP from '../../src/iso-editor/ui/app.css';
 // @ts-ignore text, by the bundler's loader
+import MARKS from '../../src/iso-editor/ui/marks.css';
+// @ts-ignore text, by the bundler's loader
 import TEXT from '../fixtures/boxes/two-trays.yaml';
 
 const violations: string[] = [], errors: string[] = [];
@@ -25,7 +27,8 @@ addEventListener('error', e => errors.push(String(e.message)));
 const CANVAS = 'iso-canvas';
 const css = [
   '@layer tokens, base, components, views;',
-  scopeCss(SKIN + '\n' + APP, PLAIN_WORDS.rootClass),
+  // the skin, the shell's layout and the canvas's marks, as the package's assets/app.css carries them
+  scopeCss(SKIN + '\n' + APP + '\n' + MARKS, PLAIN_WORDS.rootClass),
   scope(isoVars(themeCss(loadTheme(THEME))), `.${CANVAS}`, `.${PLAIN_WORDS.rootClass}`),
   scope(isoVars(drawingCss(BOXES_CATALOG) + MARKS_CSS + GRID_CSS), `.${CANVAS}`, `.${PLAIN_WORDS.rootClass}`),
   scope(isoVars(flatCss({ send: { color: 'send' } })), `.${CANVAS}`, `.${PLAIN_WORDS.rootClass}`),
@@ -37,6 +40,20 @@ document.head.append(style);
 
 const el = document.getElementById('app')!;
 const saved: string[] = [];
-const editor = mountEditor(el, { text: String(TEXT), onSave: async t => { saved.push(t); return { ok: true }; } }, setupFor(boxesAdapter, boxesView(String(THEME))));
-(window as unknown as { __boxes: unknown }).__boxes = { editor, saved, css: css.length, violations, errors };
+// <body data-bare>: the format without connect, group or palette presets (0.10.0: what the editor offers without them)
+const bare = document.body.hasAttribute('data-bare');
+const { connect: _c, group: _g, ...plain } = boxesAdapter;
+const { palette: _p, ...plainView } = boxesView(String(THEME));
+// <body data-sections data-stored="JSON">: (0.11.0) the presets under two palette sections, and a host store that starts
+// as data-stored says and records what the editor writes (window.__boxes.stored)
+const sectioned = document.body.hasAttribute('data-sections');
+const stored: Record<string, string> = JSON.parse(document.body.dataset.stored ?? '{}');
+const view = boxesView(String(THEME));
+const SECTION: Record<string, string> = { Box: 'Things', Tray: 'Holders', Zone: 'Holders' };
+// <body data-docked>: (0.12.0) the palette docked, a pane of its own at the canvas's left
+const sectionedView = { ...view, palette: view.palette!.map(e => ({ ...e, section: SECTION[e.label] })), ...(document.body.hasAttribute('data-docked') ? { paletteLayout: 'docked' as const } : {}) };
+const storage = { get: (k: string) => stored[k] ?? null, set: (k: string, v: string | null) => { if (v === null) delete stored[k]; else stored[k] = v; } };
+const editor = mountEditor(el, { text: String(TEXT), onSave: async t => { saved.push(t); return { ok: true }; }, ...(sectioned ? { storage } : {}) },
+  bare ? setupFor(plain, plainView) : setupFor(boxesAdapter, sectioned ? sectionedView : view));
+(window as unknown as { __boxes: unknown }).__boxes = { editor, saved, css: css.length, violations, errors, stored };
 document.title = 'ready';

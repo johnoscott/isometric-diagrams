@@ -53,6 +53,13 @@ export interface Ref {
 /** a thing at a pointer: its kind, its name and its own pointer */
 export interface ObjectRef { kind: string; name: string; path: string }
 
+/** (0.10.0) what a connection drawn on the canvas writes: a value added to a list (`at`), or, with `name` (a base for a
+ *  fresh one), to a map */
+export interface ConnectPlan { at: Path; value: unknown; name?: string; label?: string }
+/** (0.10.0) the selection made into a new container: where it goes (`at`, a map), the base of its fresh name, its
+ *  value, and, given the name it got, what changes in each member (each a set) */
+export interface GroupPlan { at: Path; name: string; value: unknown; members(name: string): { path: Path; value: unknown }[]; label?: string }
+
 /** what the domain's reader says of a text */
 export interface ReadOutcome {
   diags: Diag[];
@@ -107,6 +114,18 @@ export interface DomainAdapter {
   pasteDrops?(target: unknown, pasted: { kind: string; path: Path; value: unknown }): { path: Path; why: string } | undefined;
   /** what a completion list says of an extra word in a slot */
   extraDetail?(word: string, data: unknown): string | undefined;
+
+  /** (0.10.0) a connection drawn from one object to another: what to add, or undefined (these two don't connect). None:
+   *  the canvas offers no connect gesture */
+  connect?(from: ObjectRef, to: ObjectRef, data: unknown): ConnectPlan | undefined;
+  /** (0.10.0) the selected objects grouped into a new container, as one step; undefined: these can't be. None: the
+   *  canvas offers no Group */
+  group?(members: ObjectRef[], data: unknown): GroupPlan | undefined;
+
+  /** (0.10.1) a new object of `kind` (its value as the palette made it) dropped onto `target`: its value put inside the
+   *  target, and the words for it ("in subnet app"), or undefined (the target doesn't hold it). The canvas asks what is
+   *  under the drop, innermost first; none: a drop is pinned where it lands */
+  dropInto?(target: ObjectRef, value: unknown, kind: string, data: unknown): { value: unknown; label?: string } | undefined;
 
   /** the top-level key order: where a new section goes */
   topOrder: readonly string[];

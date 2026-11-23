@@ -5,7 +5,8 @@
 // card above it, and its column one right of every card left of it, asked of the two things that part them (so each
 // container's rows and columns are its own, and near-aligned boxes share them); a card in no region keeps its place
 // across. Two cards in one cell get a column each. A region (or a node
-// holding nodes) is a panel over the cells of what it holds; one holding nothing has no cell and isn't shown. Routes
+// holding nodes) is a panel over the cells of what it holds; one holding nothing has no cell and isn't shown (in a
+// drawing with no nodes at all, the innermost regions are the cards). Routes
 // are links, their ends' sides dropped. What 2D leaves out: sizes (every card is the same size), heights, a route's
 // sides and via points, a region's label style.
 
@@ -22,7 +23,9 @@ import { placeBoard, type Board, type BoardCard, type BoardLink, type BoardPanel
 export function boardOf(scene: CompiledScene, visible: (id: string) => boolean = () => true): Required<Board> {
   const items = scene.layout.items.filter(p => visible(p.id));
   const cat = scene.layout.catalog;
-  const isCard = (p: Placed) => p.type === 'node' && !p.children.some(c => c.type === 'node' && visible(c.id));
+  // (0.12.2) a drawing of regions alone has no nodes to be cards: its innermost regions are (else 2D would be empty)
+  const bare = !scene.layout.items.some(p => p.type === 'node');
+  const isCard = (p: Placed) => (bare ? !p.children.some(c => visible(c.id)) : p.type === 'node' && !p.children.some(c => c.type === 'node' && visible(c.id)));
   const cardsP = items.filter(isCard);
   // rows and columns: a card is a row below every card above it, and a column right of every card left of it, asked of
   // the two things that part them (the children of their nearest common container holding each: their regions, or the
@@ -68,6 +71,7 @@ export function boardOf(scene: CompiledScene, visible: (id: string) => boolean =
     } else taken.set(String(c), p.id);
   }
   const cards: BoardCard[] = cardsP.map(p => {
+    if (p.region) { const r = p.region; return { id: p.id, label: r.label ?? p.id, sub: undefined, role: r.role ?? regionKind(cat, r.kind)?.role ?? 'grey', ghost: r.ghost || undefined, cell: cell.get(p.id)! }; }
     const n = p.node!, a = nodeKindOr(cat, n.asset);
     return { id: p.id, label: n.label ?? p.id, sub: n.sub, role: n.role ?? a.role, ghost: n.ghost || undefined, cell: cell.get(p.id)! };
   });

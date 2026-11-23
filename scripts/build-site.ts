@@ -1,7 +1,10 @@
 // The documentation site: site/, static, for GitHub Pages under any sub-path (relative links only), a strict CSP in a
 // <meta> on every page, no request outside the site. Pages: home (a live drawing, the install), the docs rendered from
 // their markdown, the API reference read from the declarations, the gallery (every neutral example, live in 3D and 2D,
-// its YAML beside it), a playground, the changelog.
+// its YAML beside it), a playground (Monaco, with the gallery's drawings to start from), the changelog.
+// The CSP: everything from 'self'; inline styles (the drawings' and Monaco's); fonts from 'self' (Monaco's icon font,
+// codicon.ttf, the playground's) and workers from 'self' (Monaco's editor thread, editor.worker.js: a file, never a
+// blob:). No eval: Monaco's ESM needs none, and the schema's validator is precompiled.
 //
 //   node --experimental-strip-types scripts/build-site.ts [OUT]       (default: site/)
 import { build } from 'esbuild';
@@ -12,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import { precompiledFor } from './precompile.ts';
 import { buildIso } from './build-iso.ts';
+import { leanMonaco, monacoBeside, noBlobsOrComputedImports } from './monaco-plugins.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const at = (p: string) => join(ROOT, p);
@@ -22,7 +26,7 @@ const read = (p: string) => readFileSync(src(p), 'utf8');
 export const REPO = 'https://github.com/johnoscott/isometric-diagrams';
 export const NPM = 'https://www.npmjs.com/package/@johnoscott/isometric-engine';
 export const CLOUD_EDITOR = 'https://johnoscott.github.io/isometric-cloud-editor/';
-export const CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'";
+export const CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'";
 
 /** the docs, as pages: [file, page, title, what it's about] */
 export const DOCS: [string, string, string, string][] = [
@@ -194,7 +198,11 @@ export function featuresOf(text: string): string[] {
 // ---- the pages ----
 
 const NAV: [string, string][] = [['index.html', 'Home'], ['docs/index.html', 'Docs'], ['api.html', 'API'], ['gallery.html', 'Gallery'], ['playground.html', 'Playground'], ['changelog.html', 'Changelog']];
-function page(o: { path: string; title: string; body: string; description?: string; wide?: boolean }): string {
+/** the theme control: Light, Dark or System, labelled (site.ts paints and keeps the choice) */
+const THEME_PICK = `<div class="theme-pick" role="group" aria-label="Theme"><span class="theme-label" aria-hidden="true">Theme</span>${(['light', 'dark', 'system'] as const).map(t => `<button type="button" data-theme="${t}" aria-pressed="${t === 'system'}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div>`;
+/** the call to the cloud editor: an app built on the engine */
+const CLOUD_CTA = (lead: string) => `<aside class="cta" aria-label="The full editor"><div><strong>${lead}</strong><span>The isometric cloud editor: a full editor built on this engine, with a palette, a canvas in 3D and 2D, a tree and properties.</span></div><a class="btn" href="${CLOUD_EDITOR}" rel="noopener">Open the cloud editor <span aria-hidden="true">→</span></a></aside>`;
+function page(o: { path: string; title: string; body: string; description?: string; wide?: boolean; module?: string }): string {
   const base = '../'.repeat(o.path.split('/').length - 1);
   const here = (p: string) => o.path === p || (p === 'docs/index.html' && o.path.startsWith('docs/'));
   return `<!doctype html>
@@ -213,7 +221,7 @@ function page(o: { path: string; title: string; body: string; description?: stri
 <header class="top">
   <a class="brand" href="${base}index.html"><span class="mark" aria-hidden="true"></span>isometric-diagrams</a>
   <nav aria-label="Site">${NAV.map(([p, t]) => `<a href="${base}${p}"${here(p) ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>
-  <div class="ext"><a href="${REPO}" rel="noopener">GitHub</a><a href="${NPM}" rel="noopener">npm</a><button class="theme" type="button" aria-label="Switch between light and dark">◐</button></div>
+  <div class="ext"><a href="${REPO}" rel="noopener">GitHub</a><a href="${NPM}" rel="noopener">npm</a><a class="nav-cta" href="${CLOUD_EDITOR}" rel="noopener">Cloud editor ↗</a>${THEME_PICK}</div>
 </header>
 <main class="${o.wide ? 'wide' : 'narrow'}">
 ${o.body}
@@ -222,7 +230,7 @@ ${o.body}
   <span>MIT · <a href="${REPO}/blob/main/LICENSE" rel="noopener">LICENSE</a> · third-party notices in <a href="${REPO}/tree/main/LICENSES" rel="noopener">LICENSES/</a></span>
   <span>An app built on it: <a href="${CLOUD_EDITOR}" rel="noopener">the isometric cloud editor</a></span>
 </footer>
-<script src="${base}site.js"></script>
+<script src="${base}site.js"></script>${o.module ? `\n<script type="module" src="${base}${o.module}"></script>` : ''}
 </body>
 </html>
 `;
@@ -262,10 +270,11 @@ export async function buildSite(out = at('site')): Promise<string[]> {
     <h1>Isometric diagrams, from YAML</h1>
     <p class="lede">A generic engine for drawings of systems: regions, nodes, routes and steps, laid out for you, drawn in 3D isometric or as a flat 2D board, with a morph between the two. And the layers to build an editor for a format of your own.</p>
     <div class="code install"><button class="copy" type="button" aria-label="Copy">Copy</button><pre><code>npm i @johnoscott/isometric-engine</code></pre></div>
-    <p class="links"><a class="btn" href="docs/format.html">Read the format</a><a class="btn ghost" href="playground.html">Try it</a><span class="ver">v${version} · MIT</span></p>
+    <p class="links"><a class="btn" href="docs/format.html">Read the format</a><a class="btn ghost" href="playground.html">Try it</a><a class="btn ghost" href="${CLOUD_EDITOR}" rel="noopener">The cloud editor ↗</a><span class="ver">v${version} · MIT</span></p>
   </div>
   ${drawing(demo, { id: 'hero', controls: true })}
 </section>
+${CLOUD_CTA('See it in an app')}
 <section class="cards">
   <a class="card" href="docs/format.html"><h2>The format</h2><p>Things placed next to each other, regions that grow to fit, routes that find their own path, labels that find a clear spot: a file rarely holds a coordinate.</p></a>
   <a class="card" href="docs/flat-view.html"><h2>3D and 2D</h2><p>The same drawing as an isometric scene or a flat board of cards and panels, and an animated morph between them.</p></a>
@@ -331,11 +340,37 @@ ${Object.entries(api).map(([l, es]) => `<section id="${l}"><h2>${LAYER[l]} <smal
 <div class="chips" role="group" aria-label="Filter by feature"><button type="button" class="chip" aria-pressed="true" data-feature="">All</button>${FEATURES.map(x => `<button type="button" class="chip" aria-pressed="false" data-feature="${x}">${x}</button>`).join('')}</div>
 <div class="gallery">${items.map((it, i) => `<article class="item" data-features="${it.features.join(' ')}"><header><h2>${esc(it.f.split('/').pop()!.replace(/\.yaml$/, ''))}</h2><span class="meta">${it.scenes.length} scene${it.scenes.length > 1 ? 's' : ''} · ${it.features.join(', ')}</span>${it.scenes.length > 1 ? `<label class="pick"><span class="vh">Scene of ${esc(it.f)}</span><select class="scene">${it.scenes.map(s => `<option value="${esc(s.id)}">${esc(String(s.title ?? s.id))}</option>`).join('')}</select></label>` : ''}</header>${drawing(it.text, { id: `g${i}` })}<details><summary>YAML <span class="meta">${esc(it.f)}</span></summary><div class="code"><button class="copy" type="button" aria-label="Copy">Copy</button><pre><code>${esc(it.text)}</code></pre></div></details></article>`).join('\n')}</div>` }));
 
-  // playground
+  // playground: its examples are the gallery's drawings; its editor (Monaco) a module of its own, with its thread, its
+  // styles and its icon font as files beside it, and Monaco's licence and notices
+  const examples = items.map(it => ({ id: it.f.split('/').pop()!.replace(/\.yaml$/, ''), label: `${it.f.split('/').pop()!.replace(/\.yaml$/, '')}: ${it.title}`, text: it.text }));
+  await Promise.all([
+    // ours: the playground; Monaco is the module beside it (monaco.js), not bundled in
+    build({
+      absWorkingDir: ROOT, entryPoints: { playground: 'site-src/playground.ts' }, outdir: out, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
+      minify: true, legalComments: 'none', loader: { '.yaml': 'text' }, logLevel: 'silent',
+      plugins: [monacoBeside('./monaco.js'), precompiledFor(['../src/iso-systems/schema.json'])],
+      define: { __SE_EDITOR_THREAD__: '"editor.worker.js"', __SE_MONACO_CSS__: '"monaco.css"' },
+    }),
+    // Monaco alone: the editor, its styles (monaco.css) and its icon font (codicon.ttf); and its thread
+    build({
+      absWorkingDir: ROOT, entryPoints: { monaco: 'src/iso-editor/ui/monaco-entry.ts' }, outdir: out, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
+      minify: true, legalComments: 'none', loader: { '.ttf': 'file' }, assetNames: '[name]', logLevel: 'silent', plugins: [leanMonaco, noBlobsOrComputedImports],
+    }),
+    build({
+      absWorkingDir: ROOT, entryPoints: { 'editor.worker': 'monaco-editor/editor/editor.worker.js' }, outdir: out, bundle: true,
+      format: 'iife', target: 'es2022', minify: true, legalComments: 'none', logLevel: 'silent', plugins: [noBlobsOrComputedImports],
+    }),
+  ]);
+  const monacoDir = at('node_modules/monaco-editor');
+  mkdirSync(join(out, 'licenses'), { recursive: true });
+  writeFileSync(join(out, 'licenses/monaco-editor.txt'), [readFileSync(join(monacoDir, 'LICENSE'), 'utf8'), readFileSync(join(monacoDir, 'ThirdPartyNotices.txt'), 'utf8')].join('\n\n'));
   write('playground.html', page({
     path: 'playground.html', title: 'Playground · isometric-diagrams', wide: true, body: `<h1>Playground</h1>
-<p class="lede">Edit the YAML; the drawing follows. Problems show with their line. Nothing leaves this page.</p>
-<div class="play"><div class="editor"><label for="yaml">YAML</label><textarea id="yaml" spellcheck="false">${esc(hello)}</textarea><ul class="diags" aria-live="polite"></ul></div><div class="out" data-playground><div class="stage"></div></div></div>` }));
+<p class="lede">Edit the YAML; the drawing follows. Completion and hover come from the format's schema (type, or press ⌃Space), and problems are marked on their line. Start from an example. Nothing leaves this page.</p>
+${CLOUD_CTA('Want the whole editor?')}
+<div class="play"><div class="editor"><div class="pg-head"><label for="example">Example</label><select id="example"><option value="hello">Hello: a request and its answer</option>${examples.map(e => `<option value="${esc(e.id)}">${esc(e.label)}</option>`).join('')}</select></div><div id="yaml-editor" class="monaco-host" role="group" aria-label="The YAML" hidden></div><textarea id="yaml" aria-label="The YAML" spellcheck="false">${esc(hello)}</textarea><ul class="diags" aria-live="polite"></ul></div><div class="out" data-playground><div class="stage"></div></div></div>
+<div id="examples" hidden><textarea data-example="hello" hidden aria-hidden="true">${esc(hello)}</textarea>${examples.map(e => `<textarea data-example="${esc(e.id)}" hidden aria-hidden="true">${esc(e.text)}</textarea>`).join('')}</div>
+<p class="fine">The editor is <a href="licenses/monaco-editor.txt">Monaco</a> (MIT, Microsoft), served from this site.</p>`, module: 'playground.js' }));
 
   // changelog
   const cl = markdown(read('CHANGELOG.md'), 'CHANGELOG.md', '');

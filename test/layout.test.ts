@@ -2,6 +2,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { boardOf } from '../src/iso-objects/board.ts';
+import { iso } from '../src/iso-core/kernel.ts';
 import { readFileSync } from 'node:fs';
 import { compile } from '../src/iso-systems/compile.ts';
 import { overlap2 } from '../src/iso-objects/place.ts';
@@ -91,4 +93,25 @@ test('a region can be a ghost; screens can show tiles and a desktop', () => {
   assert.match(svg, /class="blk k-fence wall ghost" data-id="f"/);
   assert.equal((svg.match(/class="t" /g) ?? []).length, 6, 'six terminal tiles');
   assert.equal((svg.match(/class="(wall|bar|win)" /g) ?? []).length, 3, 'a desktop: wallpaper, bar and window');
+});
+
+// 0.12.2: a stack of slabs, as regions in regions: its 2D view and its names
+const STACK = (h: string) => `isodiag: 1\nscenes:\n  - id: s\n    title: T\n    regions:\n      - id: a\n        kind: slab\n        label: Alpha\n        size: [8, 5]\n        padding: 0\n        regions:\n          - id: b\n            kind: slab\n            label: Beta\n            size: [8, 5]\n            ${h}padding: 0\n            at: [0, 0]\n            z: 0.3\n`;
+test('a drawing of regions alone has a 2D view: the innermost regions are the cards, the rest panels; with a node, an empty region still isn\'t shown', () => {
+  const b = boardOf(compile(STACK(''), THEME).scenes[0]);
+  assert.deepEqual(b.cards.map(c => [c.id, c.label]), [['b', 'Beta']]);
+  assert.deepEqual(b.panels.map(p => [p.id, p.label]), [['a', 'Alpha']]);
+  const n = boardOf(compile(STACK('') + `    nodes:\n      - { id: n, at: [20, 0] }\n`, THEME).scenes[0]);
+  assert.deepEqual([n.cards.map(c => c.id), n.panels.map(p => p.id)], [['n'], []]);
+});
+test('a slab\'s name stays on its face: a thin one has the small name, in the middle of it', () => {
+  const name = (svg: string, text: string) => { const m = new RegExp(`<text transform="matrix\\(([^)]*)\\)" class="([^"]*)"[^>]*>${text}<`).exec(svg)!; return { cls: m[2], y: Number(m[1].split(' ')[5]), x: Number(m[1].split(' ')[4]) }; };
+  for (const [h, want] of [['', 'slabname sm'], ['height: 0.6\n            ', 'slabname sm'], ['height: 0.9\n            ', 'slabname']] as const) {
+    const s = compile(STACK(h), THEME).scenes[0], b = s.layout.byId.get('b')!.box, t = name(s.rendered.svg, 'Beta');
+    assert.equal(t.cls, want, h);
+    // at the text's own x, its baseline and its cap height lie between the face's bottom and top edges
+    const x0 = iso(b.x0, b.y1, 0)[0], along = (t.x - x0) / iso(1, 0, 0)[0], size = want === 'slabname' ? 15 : 10.5;
+    const bottom = iso(b.x0 + along, b.y1, b.z0)[1], top = iso(b.x0 + along, b.y1, b.z1)[1];
+    assert.ok(t.y <= bottom && t.y - size * 0.72 >= top, `${h || 'default'}: ${top} ≤ ${t.y - size * 0.72}, ${t.y} ≤ ${bottom}`);
+  }
 });

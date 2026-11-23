@@ -101,7 +101,9 @@ function typesIso(out: string) {
   rmSync(types, { recursive: true, force: true });
   execFileSync(join(ROOT, 'node_modules', '.bin', 'tsc'), ['--ignoreConfig', '--declaration', '--emitDeclarationOnly', '--rootDir', 'src', '--outDir', types,
     '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--strict', '--allowImportingTsExtensions', '--verbatimModuleSyntax',
-    '--erasableSyntaxOnly', '--resolveJsonModule', '--lib', 'ES2022,DOM', '--types', 'node', '--skipLibCheck', ...Object.values(DIRS).map(d => `${d}/index.ts`)],
+    '--erasableSyntaxOnly', '--resolveJsonModule', '--lib', 'ES2022,DOM', '--types', 'node', '--skipLibCheck', ...Object.values(DIRS).map(d => `${d}/index.ts`),
+    // 0.12.2: every public module's declarations (its subpath's types), not only what an index reaches
+    ...SOURCE_LAYERS.flatMap(l => [...publicOf(l)].filter(m => m.endsWith('.ts') && m !== 'index.ts').sort().map(m => `${l.dir}/${m}`))],
   { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? files(join(d, e.name)) : [join(d, e.name)]));
   const DROP = NODE_ONLY.map(r => new RegExp(r.source.replace('\\.ts', '\\.(ts|js)')));
@@ -115,9 +117,9 @@ function typesIso(out: string) {
       copyFileSync(join(ROOT, 'src', rel), join(types, rel));
     }
   }
-  rmSync(join(types, 'iso-viewer', 'bundle.d.ts'), { force: true });
-  // what the systems index doesn't name (the validator) isn't declared either
-  for (const f of ['validate.d.ts']) rmSync(join(types, 'iso-systems', f), { force: true });
+  // Monaco declares its API at editor.api, not at the full editor the code imports
+  const entry = join(types, 'iso-editor', 'ui', 'monaco-entry.d.ts');
+  writeFileSync(entry, readFileSync(entry, 'utf8').replace('monaco-editor/editor/editor.main.js', 'monaco-editor/editor/editor.api.js'));
   for (const [file, b] of Object.entries(BUNDLES)) {
     writeFileSync(join(out, file.replace('.js', '.d.ts')), b.layers.map(l => `export * as ${l} from './types/${DIRS[l].slice(4)}/index.js';`).join('\n') + '\n');
   }
@@ -127,13 +129,14 @@ function typesIso(out: string) {
  *  (`@johnoscott/isometric-engine/modules/iso-editor/ui/canvas`): for a host that bundles per module (code splitting
  *  keeps each chunk to what it uses; a namespace pulls in everything its barrel reaches) */
 export const SOURCE_LAYERS = LAYERS.filter(l => l.generic || l.name === 'iso-systems');
-/** each public module: its types and its bundler source (the TypeScript, under the "source" condition, which a host's
- *  bundler opts into), and JavaScript for Node (Node won't strip the types of a package's .ts) */
+/** each public module: its declarations (0.12.2: a .d.ts; a .ts there is checked as the host's own code, under the host's
+ *  options, and skipLibCheck doesn't pass it over), its bundler source (the TypeScript, under the "source" condition,
+ *  which a host's bundler opts into), and JavaScript (Node won't strip the types of a package's .ts) */
 export function moduleExports(): Record<string, string | Record<string, string>> {
   const out: Record<string, string | Record<string, string>> = {};
   for (const l of SOURCE_LAYERS) for (const m of [...publicOf(l)].sort()) {
     const key = `./modules/${l.dir.slice(4)}/${m.replace(/\.ts$/, '')}`;
-    out[key] = m.endsWith('.ts') ? { types: `./${l.dir}/${m}`, source: `./${l.dir}/${m}`, default: `./js/${l.dir.slice(4)}/${m.replace(/\.ts$/, '.js')}` } : `./${l.dir}/${m}`;
+    out[key] = m.endsWith('.ts') ? { types: `./types/${l.dir.slice(4)}/${m.replace(/\.ts$/, '.d.ts')}`, source: `./${l.dir}/${m}`, default: `./js/${l.dir.slice(4)}/${m.replace(/\.ts$/, '.js')}` } : `./${l.dir}/${m}`;
   }
   return out;
 }
@@ -175,7 +178,10 @@ function packageIso(out: string, registry: Registry) {
     license: 'MIT', type: 'module',
     // the bundles have no side effects; the modules (src/, js/) are bundled by a host as this repo bundles its own sources
     sideEffects: ['./src/**', './js/**'],
-    // no repository or homepage until the public repository exists (0.9.1): this one is private, a dead link on npm
+    // 0.10.0: the public repository and its site
+    repository: { type: 'git', url: 'git+https://github.com/johnoscott/isometric-diagrams.git' },
+    homepage: 'https://johnoscott.github.io/isometric-diagrams/',
+    bugs: { url: 'https://github.com/johnoscott/isometric-diagrams/issues' },
     publishConfig: PUBLISH[registry],
     files: PACKAGE_FILES,
     exports: { './render': exp('iso-render.js'), './editor': exp('iso-editor.js'), './systems': exp('iso-systems.js'), ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },

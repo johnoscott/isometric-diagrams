@@ -37,8 +37,15 @@ test('the two views in Chrome: ids, the switch both ways, selection and focus th
     // the switch: two buttons, aria-pressed, keyboard reachable; to 2D, animated, remembered
     const sw = await ev<{ role: string | null; pressed: (string | null)[]; tab: boolean[] }>(`const s = B.toggle; return { role: s.getAttribute('role'), pressed: [...s.querySelectorAll('button')].map(b => b.getAttribute('aria-pressed')), tab: [...s.querySelectorAll('button')].map(b => b.tabIndex >= 0) };`);
     assert.deepEqual(sw, { role: 'group', pressed: ['true', 'false'], tab: [true, true] });
-    await ev(`B.toggle.querySelector('[data-mode="2d"]').click(); await tick(120);`);
+    // a stepped clock (as scripts/dual-shots.ts): requestAnimationFrame and performance.now are the test's, so a morph
+    // moves only when the test says, by exact times, on any machine (a busy CI runner's late frames can't end it early)
+    await ev(`let now = performance.now(); const q = []; performance.now = () => now;
+      window.requestAnimationFrame = f => { q.push(f); return q.length; }; window.cancelAnimationFrame = () => {};
+      window.__step = ms => { now += ms; for (const f of q.splice(0)) f(now); };
+      window.__settle = async (p, ms = 3000) => { for (let t = 0; t < ms; t += 50) { window.__step(50); await null; } return p; };`);
+    await ev(`B.toggle.querySelector('[data-mode="2d"]').click(); window.__step(0); window.__step(120);`);
     assert.equal(await ev<number>(`return document.querySelectorAll('.dual-morph').length;`), await ev<number>(`return Object.keys(B.views).length;`), 'every drawing morphs, each on its own layer');
+    await ev(`await window.__settle();`);
     await until(`!document.querySelector('.dual-morph') && Object.values(B.views).every(v => v.root.dataset.mode === '2d')`, 'the morph ends in 2D');
     assert.equal(await ev<string>(`return localStorage.getItem('iso-view');`), '2d');
     assert.deepEqual(await ev<(string | null)[]>(`return [...B.toggle.querySelectorAll('button')].map(b => b.getAttribute('aria-pressed'));`), ['false', 'true']);
@@ -52,18 +59,18 @@ test('the two views in Chrome: ids, the switch both ways, selection and focus th
     assert.ok(hot.sel2 && hot.sel3, 'selected in both');
     assert.equal(hot.hot2, MODEL.links!.filter(l => l.a === 'member' || l.b === 'member').length);
     assert.equal(hot.hot2 + hot.dim2, 16);
-    await ev(`await B.views.model.morph('3d');`);
+    await ev(`await window.__settle(B.views.model.morph('3d'));`);
     const after = await ev<{ mode: string; focus: string | undefined; in3d: boolean; sel: boolean }>(`const a = document.activeElement;
       return { mode: B.views.model.mode, focus: a?.dataset?.id, in3d: !!a?.closest('[data-view="3d"]'), sel: B.views.model.svgOf('3d').querySelector('[data-id="member"]').classList.contains('sel') };`);
     assert.deepEqual(after, { mode: '3d', focus: 'member', in3d: true, sel: true }, 'the selection and the focus came through');
 
     // interrupted: a second switch in the middle; the first layer goes, the final view is exact
-    await ev(`B.opts.model.duration = 2000; B.views.model.morph('2d'); await tick(400); await B.views.model.morph('3d');`);
+    await ev(`B.opts.model.duration = 2000; B.views.model.morph('2d'); window.__step(0); window.__step(400); await window.__settle(B.views.model.morph('3d'), 4000);`);
     await until(`!document.querySelector('.dual-morph')`, 'no layer left');
     const exact = await ev<unknown>(`const v = B.views.model, w3 = v.root.querySelector('.dual-3d'), w2 = v.root.querySelector('.dual-2d');
       return { mode: v.mode, data: v.root.dataset.mode, h3: w3.hidden, h2: w2.hidden, s3: w3.style.cssText, s2: w2.style.cssText, height: v.root.style.height, layers: v.root.querySelectorAll('svg').length };`);
     assert.deepEqual(exact, { mode: '3d', data: '3d', h3: false, h2: true, s3: '', s2: '', height: '', layers: 2 });
-    await ev(`B.views.model.morph('2d'); await tick(300); B.views.model.morph('2d'); await tick(50);`);
+    await ev(`B.views.model.morph('2d'); window.__step(0); window.__step(300); B.views.model.morph('2d'); window.__step(50); await null;`);
     assert.equal(await ev<string>(`return B.views.model.root.dataset.mode;`), '2d', 'a switch to the view a morph is going to finishes it');
     await ev(`B.opts.model.duration = 600;`);
 

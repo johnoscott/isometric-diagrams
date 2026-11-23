@@ -2,6 +2,48 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.12.3 — the canvas's toolbar on a narrow canvas
+
+- The toolbar wraps inside a canvas too narrow for it (with the palette docked, or text beside it); it was cut off.
+
+## 0.12.2 — types for every subpath, and fixes
+
+- Every `modules/...` subpath's types are declarations; its TypeScript source is under the `source` condition only, so a
+  strict TypeScript project type-checks with nothing else installed.
+- `viewer.buildLayer`, `viewer.ease` and `viewer.clamp`: the 3D–2D morph, seekable (`at(t)`).
+- Completion inside lists of maps; a 2D view for drawings made of regions alone; a thin slab's name stays on its face.
+
+## 0.12.1 — the docked palette's view fixed
+
+- With the palette docked, the canvas's view is the stage's: the drawing fills it at its own aspect and a drop lands
+  under the pointer (0.12.0 measured the whole canvas area, pane included).
+
+## 0.12.0 — the palette docked and searchable
+
+- **Docked palette**: `paletteLayout: 'docked'` on the view puts the palette in a pane of its own at the canvas's left,
+  with a search box (by label and section), its sections as collapsible groups, a grip to resize it and a control to
+  collapse it (both remembered in the host's storage). Drag and Enter add as before. Floating stays the default.
+
+## 0.11.0 — palette sections
+
+- **Sections** in the palette: give presets a `section` and they are listed under collapsible headers, in order, all
+  collapsed but the one last added from (remembered in the host's storage). Presets without one are listed as before.
+
+## 0.10.1 — drops land inside containers
+
+- **Drop into** on the adapter (`dropInto(target, value, kind, data)`): a palette item dropped onto a container (a
+  subnet, a VPC) is added inside it, the innermost that holds it; elsewhere it is pinned where it lands. One undo step.
+- A long palette scrolls; after a palette add, the focus stays on the canvas, so ⌘Z works at once.
+
+## 0.10.0 — palette presets, connecting, grouping
+
+- **Palette presets** on the view (`palette: [{ kind, label, icon?, value?, name? }]`): each entry adds an object
+  starting as its preset. Without it, one entry per kind, as before.
+- **Connect** on the adapter (`connect(from, to, data)`): drag the handle on a selected object to another, or use
+  **Connect to…** and click it; Esc cancels. The adapter says what a connection writes, or that two don't connect.
+- **Group** on the adapter (`group(members, data)`): **Group** or ⌘G puts the selection into a new container.
+- Each is one undo step. `package.json` names the repository and this site.
+
 ## 0.9.0 — MIT, npm, and only the engine's own marks
 
 The first public release.

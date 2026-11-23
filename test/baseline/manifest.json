@@ -70,6 +70,9 @@
   "scene:examples/scenarios/g-coordinating-workers.yaml#scene4": "d9995356e9bb98a13ceaf29ff3bc9a8ff6b239da79c87c29f30cf61dfbdc0cd1",
   "scene:examples/scenarios/g-coordinating-workers.yaml#scene5": "f09a5b6858dcb2c3474feb9be19335e239c4f84c7ffe1ee6016547af957e3da1",
   "scene:examples/scenarios/g-coordinating-workers.yaml#scene6": "8acfd553e83ab02dbfe4c3acdb3891a781f5e5f67ec8b78806ae68c997a57d27",
+  "build:examples/scenarios/h-layered-stack.yaml": "38021278d3f611ed403f5fe319bbaadada7aa7c24b7a90ba606059e00afad492",
+  "diags:examples/scenarios/h-layered-stack.yaml": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "scene:examples/scenarios/h-layered-stack.yaml#stack": "95e8bd064a13371174e23accec5b0732ed70ea9f225fe344ce05caf4f8a75b41",
   "proof:corpus/messaging.yaml": "93c8ee0e00bbaaf0eb0e0534886c3e64bdcebac08759484d5eb1b3c60b8757a9"
  }
 }

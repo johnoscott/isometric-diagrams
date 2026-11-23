@@ -7,7 +7,7 @@
 // The text pane is given, not imported: Monaco is a big dependency, and a host without it still gets the canvas, the
 // tree and the panel.
 
-import type { DomainAdapter, FileRole } from '../adapter.ts';
+import type { DomainAdapter, FileRole, ObjectRef } from '../adapter.ts';
 import type { Path } from '../path.ts';
 import { toPointer } from '../path.ts';
 import { outline } from '../outline.ts';
@@ -50,6 +50,12 @@ export interface DomainView<R, D extends CanvasDrawing> {
   icons?: Record<string, string>;
   words?: Partial<ShellWords>;
   keymap?: KeyGroup[];
+  /** (0.10.0) the palette's entries: presets of a kind, each with its label, icon, what a new one starts as (a copy of
+   *  `value`; default: the kind's template) and the base of its fresh name. None: one entry per kind, as before */
+  palette?: { kind: string; label: string; icon?: string; value?: unknown; name?: string; section?: string }[];
+  /** (0.12.0) the palette 'floating' over the canvas (the default) or 'docked': a pane of its own at the canvas's left,
+   *  searchable by label and section, resizable and collapsible */
+  paletteLayout?: 'floating' | 'docked';
   /** the canvas's 2D view (0.6.0): a 3D | 2D switch; its link kinds' styles (the host's canvas CSS adds flatCss) */
   flat?: CanvasKit<R, D>['flat'];
   /** a layer over the canvas, and a part beside the views (A: their calls) */
@@ -102,7 +108,10 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
   };
   const canvasUi: CanvasUi = {
     rootClass: 'iso-canvas', panKeyClass: 'pan-key', newOrder: a.kinds.map(k => k.kind),
-    palette: a.kinds.map(k => ({ kind: k.kind, icon: icon(k.kind), label: k.singular[0].toUpperCase() + k.singular.slice(1) })),
+    palette: v.palette
+      ? v.palette.map(e => ({ kind: e.kind, label: e.label, icon: (e.icon ?? icon(e.kind)) as IconName, name: e.name, ...(e.section === undefined ? {} : { section: e.section }), ...(e.value === undefined ? {} : { value: () => structuredClone(e.value) }) }))
+      : a.kinds.map(k => ({ kind: k.kind, icon: icon(k.kind), label: k.singular[0].toUpperCase() + k.singular.slice(1) })),
+    ...(v.paletteLayout === undefined ? {} : { paletteLayout: v.paletteLayout }),
     text: {
       stage: 'The file, drawn: arrow keys and Tab move through what is drawn; + and − zoom, 0 fits', dragGroup: 'A drag on nothing',
       dragSelectTip: 'Drag draws a selection; hold the space key to pan', unreadable: 'The canvas draws a file that reads cleanly; fix the problems listed to see it.',
@@ -111,6 +120,9 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
   };
   const canvas: CanvasKit<R, D> = {
     draw: v.draw, catalog: v.catalog, objectOf: a.objectOf, kinds: a.kinds, commands, actions, objectItems: () => [], pins, ui: canvasUi, flat: v.flat,
+    ...(a.connect ? { connect: (f: ObjectRef, t: ObjectRef, d: unknown) => a.connect!(f, t, d) } : {}),
+    ...(a.group ? { group: (m: ObjectRef[], d: unknown) => a.group!(m, d) } : {}),
+    ...(a.dropInto ? { dropOnto: (t: ObjectRef, v: unknown, k: string, d: unknown) => a.dropInto!(t, v, k, d) } : {}),
     trial: (text, theme) => { const r = read(text); return r.read === undefined || r.diags.some(d => d.severity === 'error') ? undefined : v.draw(r.read as R, (r.read as { data?: unknown }).data, theme); },
   };
   const kit: MountKit<R, undefined> = {
@@ -128,7 +140,8 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
       return undefined;
     },
     extraLabel: () => ({ text: '', cls: '' }),
-    keymap: v.keymap ?? PLAIN_KEYMAP,
+    // (0.10.0) the plain keymap says ⌘G where the domain groups
+    keymap: v.keymap ?? (a.group ? PLAIN_KEYMAP.map(g => (g.where === 'The tree and the canvas' ? { ...g, keys: [...g.keys, ['⌘G', 'Group the selection'] as [string, string]] } : g)) : PLAIN_KEYMAP),
   };
   const features: ShellFeatures & Record<string, unknown> = {
     canvas: { canvasView: (host: HTMLElement, doc: EditorModel, o: never) => canvasView<R, D, object>(host, doc, { ...(o as object), theme: v.theme, kit: canvas, layer: v.layer } as never) },

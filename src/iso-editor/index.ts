@@ -7,7 +7,7 @@
 // The layer's public API. Importers name the module a name comes from (with code splitting, a barrel puts every file
 // it reaches into each bundle that imports it); the Node tests may import this index.
 
-export type { FileRole, ObjectKindInfo, RefSlot, Ref, ObjectRef, ReadOutcome, DomainAdapter } from './adapter.ts';
+export type { FileRole, ObjectKindInfo, RefSlot, Ref, ObjectRef, ReadOutcome, DomainAdapter, ConnectPlan, GroupPlan } from './adapter.ts';
 export { toPointer, fromPointer, parentOf, isPrefix, samePath } from './path.ts';
 export type { Seg, Path } from './path.ts';
 export { EditorDoc, completionContext } from './doc.ts';
@@ -52,7 +52,7 @@ export { propsPanel } from './ui/props.ts';
 export type { PropsUi, PropsKit, PropsOpts } from './ui/props.ts';
 export type { Box as CanvasBox, Outline, CanvasCtx, CanvasLayer } from './ui/canvas-layer.ts';
 export { canvasView } from './ui/canvas.ts';
-export type { CanvasDrawing, DropInto, CanvasUi, CanvasKit, CanvasOpts, FlatCanvas, FlatDrawn } from './ui/canvas.ts';
+export type { CanvasDrawing, DropInto, CanvasUi, CanvasKit, CanvasOpts, FlatCanvas, FlatDrawn, PaletteItem } from './ui/canvas.ts';
 // the canvas's 2D view (0.6.4): a host hands it to the canvas (DomainView.flat.load); the canvas never imports it
 export { flatCanvas } from './ui/flat-canvas.ts';
 export type { PartCtx, Attention, EditorPart } from './ui/part.ts';

@@ -1,0 +1,61 @@
+# A stack of slabs: each node stands on the one before (nodes in nodes), lifted by z for the gap; its name is a note
+# on its left side face. In 2D the same nodes are panels, one inside another, named by id.
+isodiag: 1
+title: A layered stack
+scenes:
+  - id: stack
+    title: Nine layers, each on the one below
+    nodes:
+      - id: hardware
+        role: grey
+        size: [8, 5, 0.6]
+        nodes:
+          - id: firmware
+            role: slab
+            size: [8, 5, 0.6]
+            z: 0.35
+            nodes:
+              - id: kernel
+                role: blue
+                size: [8, 5, 0.6]
+                z: 0.35
+                nodes:
+                  - id: drivers
+                    role: server
+                    size: [8, 5, 0.6]
+                    z: 0.35
+                    nodes:
+                      - id: runtime
+                        role: green
+                        size: [8, 5, 0.6]
+                        z: 0.35
+                        nodes:
+                          - id: libraries
+                            role: mail
+                            size: [8, 5, 0.6]
+                            z: 0.35
+                            nodes:
+                              - id: framework
+                                role: key
+                                size: [8, 5, 0.6]
+                                z: 0.35
+                                nodes:
+                                  - id: services
+                                    role: event
+                                    size: [8, 5, 0.6]
+                                    z: 0.35
+                                    nodes:
+                                      - id: application
+                                        role: violet
+                                        size: [8, 5, 0.6]
+                                        z: 0.35
+    notes:
+      - { face: "1 · Hardware", on: hardware }
+      - { face: "2 · Firmware", on: firmware }
+      - { face: "3 · Operating system", on: kernel }
+      - { face: "4 · Drivers", on: drivers }
+      - { face: "5 · Runtime", on: runtime }
+      - { face: "6 · Libraries", on: libraries }
+      - { face: "7 · Framework", on: framework }
+      - { face: "8 · Services", on: services }
+      - { face: "9 · Application", on: application }

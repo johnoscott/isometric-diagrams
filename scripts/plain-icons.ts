@@ -10,8 +10,8 @@ import { join } from 'node:path';
 import { ROOT } from './layers.ts';
 
 /** every icon L3 asks for by name: the shell's buttons, the tree, the menus, the panel, the palette's default */
-export const PLAIN_ICON_NAMES = ['arrow-up-right', 'box', 'chevron-down', 'chevron-right', 'circle-dot', 'circle-x', 'clipboard', 'clipboard-paste',
-  'code-xml', 'copy', 'layers', 'link', 'list', 'list-tree', 'panel-right', 'pencil', 'plus', 'rotate-ccw', 'trash-2', 'triangle-alert', 'x'] as const;
+export const PLAIN_ICON_NAMES = ['arrow-up-right', 'box', 'chevron-down', 'chevron-left', 'chevron-right', 'circle-dot', 'circle-x', 'clipboard', 'clipboard-paste',
+  'code-xml', 'copy', 'layers', 'link', 'list', 'list-tree', 'panel-right', 'pencil', 'plus', 'rotate-ccw', 'search', 'trash-2', 'triangle-alert', 'x'] as const;
 
 const LUCIDE = join(ROOT, 'vendor/lucide-static');
 export const OUT = join(ROOT, 'src/iso-editor/ui/plain-icons.ts');

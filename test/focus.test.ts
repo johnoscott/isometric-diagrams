@@ -2,15 +2,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { compile } from '../src/iso-systems/compile.ts';
 import { renderPage } from '../src/iso-viewer/page.ts';
 import { playerScript } from '../src/iso-viewer/bundle.ts';
 // @ts-ignore plain JS helper
-import { chromePath, headless } from '../scripts/chrome.mjs';
+import { chromePath } from '../scripts/chrome.mjs';
+import { drivePage } from './adapters/page-driver.ts';
 
 const THEME = readFileSync(new URL('../themes/default.yaml', import.meta.url), 'utf8');
 const SRC = `isodiag: 1\nscenes:\n  - id: s\n    title: T\n    nodes:\n      - { id: a, at: [0, 0] }\n      - { id: b, at: [20, 0] }\n      - { id: c, at: [0, 20] }\n    steps:\n      - { heading: All }\n      - { heading: Just a, focus: [a] }\n      - { heading: All again }\n`;
@@ -32,24 +30,21 @@ test('focus: a step gets the screen box of its parts; an unknown id is an error 
 let chrome: string | undefined;
 try { chrome = chromePath(); } catch { chrome = undefined; }
 
-test('focus in Chrome: the viewBox zooms in at that step, keeping the proportions', { skip: chrome ? false : 'no Chrome' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'isodiag-focus-'));
-  const html = join(dir, 'f.html');
-  writeFileSync(html, renderPage(compile(SRC, THEME), { runtime: playerScript() }).replace('</body>',
-    // wait for the page to settle, not for a fixed time: fonts loaded, then the viewBox unchanged over three readings
-    // 50 ms apart (the player eases it to a step's focus box). Timers, not frames: headless virtual time runs timers
-    // but a page drawing no frames gets no animation-frame callbacks.
-    `<script>addEventListener('load',async()=>{await document.fonts.ready;const s=document.querySelector('svg');let last='',same=0;
-      for(let i=0;i<300&&same<3;i++){await new Promise(r=>setTimeout(r,50));const v=s.getAttribute('viewBox');same=v===last?same+1:0;last=v;}
-      const p=document.createElement('pre');p.id='probe';p.textContent=s.getAttribute('viewBox')+(same<3?' unsettled':'');document.body.appendChild(p)})</script></body>`));
-  const vb = (step: number) => {
-    const dom = execFileSync(chrome!, [...headless(), '--virtual-time-budget=20000', '--dump-dom', `file://${html}#still&step=${step}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    const got = /<pre id="probe">([^<]*)<\/pre>/.exec(dom)?.[1];
-    assert.ok(got && !got.includes('unsettled'), `step ${step}: the page didn't settle (${got ?? 'no probe'})`);
-    return got.split(/\s+/).map(Number);
-  };
-  const full = vb(1), zoomed = vb(2), back = vb(3);
-  assert.ok(zoomed[2] < full[2] * 0.6, `zoomed width ${zoomed[2]} vs full ${full[2]}`);
-  assert.ok(Math.abs(zoomed[2] / zoomed[3] - full[2] / full[3]) < 0.01, 'same proportions');
-  assert.deepEqual(back.map(Math.round), full.map(Math.round), 'a step without focus shows the whole drawing');
+test('focus in Chrome: the viewBox zooms in at that step, keeping the proportions', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  // the page as it is served, its player and all; driven in real time: each step is asked for, then waited for (the
+  // player says which step it shows, and the view has stopped moving), never a fixed time
+  const html = renderPage(compile(SRC, THEME), { runtime: playerScript() });
+  await drivePage(chrome!, new Uint8Array(), '__none', async ({ ev, until, cdp }) => {
+    const base = (await ev<string>(`return location.href;`)).split(/[?#]/)[0];
+    const vb = async (step: number) => {
+      await cdp('Page.navigate', { url: `${base}?step-${step}#still&step=${step}` });
+      await until(`location.search === '?step-${step}' && document.readyState === 'complete' && document.querySelectorAll('.dots .dot')[${step - 1}]?.classList.contains('on')`, `step ${step} is the one shown`);
+      await until(`(() => { const s = document.querySelector('.figure svg'), v = s.getAttribute('viewBox'); if (window.__vb === v) window.__same = (window.__same ?? 0) + 1; else { window.__vb = v; window.__same = 0; } return window.__same >= 3; })()`, `step ${step}: the view has stopped`);
+      return (await ev<string>(`return document.querySelector('.figure svg').getAttribute('viewBox');`)).split(/\s+/).map(Number);
+    };
+    const full = await vb(1), zoomed = await vb(2), back = await vb(3);
+    assert.ok(zoomed[2] < full[2] * 0.6, `zoomed width ${zoomed[2]} vs full ${full[2]}`);
+    assert.ok(Math.abs(zoomed[2] / zoomed[3] - full[2] / full[3]) < 0.01, 'same proportions');
+    assert.deepEqual(back.map(Math.round), full.map(Math.round), 'a step without focus shows the whole drawing');
+  }, '1240,900', { html, csp: null });
 });

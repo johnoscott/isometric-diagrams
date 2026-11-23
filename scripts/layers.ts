@@ -29,7 +29,7 @@ export const LAYERS: Layer[] = [
   { name: 'iso-objects', dir: 'src/iso-objects', rank: 1, generic: true },
   { name: 'iso-viewer', dir: 'src/iso-viewer', rank: 2, generic: true },
   // ui/text.ts loads Monaco and sets up its thread when it loads: an entry of its own (the text feature imports it)
-  { name: 'iso-editor', dir: 'src/iso-editor', rank: 3, generic: true, entries: ['ui/text.ts', 'ui/monaco-entry.ts', 'ui/skin.css', 'ui/app.css'] },
+  { name: 'iso-editor', dir: 'src/iso-editor', rank: 3, generic: true, entries: ['ui/text.ts', 'ui/monaco-entry.ts', 'ui/skin.css', 'ui/app.css', 'ui/marks.css'] },
   // the kind pack sits beside the layers: it may use L0–L1, and only L4 and the apps may use it
   { name: 'iso-systems', dir: 'src/iso-systems', rank: 1.5, generic: false, data: DOMAIN_DATA },
 ];

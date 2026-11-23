@@ -22,7 +22,7 @@ import type { EditorModel, Command } from '../model.ts';
 import type { Problem } from '../validate.ts';
 import { applyStep } from '../splice.ts';
 import { seqCmd, type Commands } from '../commands.ts';
-import type { ObjectKindInfo, ObjectRef } from '../adapter.ts';
+import type { ObjectKindInfo, ObjectRef, ConnectPlan, GroupPlan } from '../adapter.ts';
 import { fromPointer, toPointer, type Path } from '../path.ts';
 import { buildSvg } from '../../iso-core/svg-dom.ts';
 import { viewport, type View } from '../../iso-viewer/viewport.ts';
@@ -74,12 +74,25 @@ export interface CanvasUi {
   rootClass: string; panKeyClass: string;
   /** the kinds the canvas's menu offers, in order */
   newOrder: string[];
-  palette: { kind: string; icon: IconName; label: string }[];
+  /** the palette's entries: a kind, and (0.10.0) a preset: what a new one starts as (default: the kind's template) and
+   *  the base of its fresh name (default: the kind's singular) */
+  palette: PaletteItem[];
+  /** (0.12.0) where the palette is: 'floating' (the default: over the canvas, at its top left) or 'docked' (a pane of
+   *  its own at the canvas's left, with a search box filtering by label and section, resizable and collapsible; its
+   *  width and whether it is collapsed are kept in the host's store as `canvas-palette-dock`) */
+  paletteLayout?: 'floating' | 'docked';
   text: {
     stage: string; dragGroup: string; dragSelectTip: string; unreadable: string; palette: string;
     /** the end of a pin drag's hint */
     pinHint: string; renameWhy: string; duplicateWhy: string;
   };
+}
+export interface PaletteItem {
+  kind: string; icon: IconName; label: string; value?(): unknown; name?: string;
+  /** (0.11.0) the header it is listed under: entries with one are grouped by it, in order of first use, each group under
+   *  a header that collapses (all collapsed but the one last added from, remembered in the host's store as
+   *  `canvas-palette`); entries without one are listed as before, where they are */
+  section?: string;
 }
 /** what the canvas is given of the domain (M: the domain's reading of the file; D: its drawing) */
 export interface CanvasKit<M, D extends CanvasDrawing> {
@@ -89,7 +102,14 @@ export interface CanvasKit<M, D extends CanvasDrawing> {
   catalog: KindCatalog;
   objectOf(ptr: string): ObjectRef | undefined;
   kinds: ObjectKindInfo[];
-  commands: Pick<Commands, 'setCmd' | 'deleteCmd' | 'insertCmd' | 'pinsCmd' | 'withPinsMoved' | 'describe' | 'freshName'>;
+  commands: Pick<Commands, 'setCmd' | 'deleteCmd' | 'insertCmd' | 'insertItemCmd' | 'pinsCmd' | 'withPinsMoved' | 'describe' | 'freshName'>;
+  /** (0.10.0) a connection drawn from one object to another (the adapter's connect): the canvas offers the gesture (a
+   *  handle on a selected object, and "Connect to…") only when it is given */
+  connect?(from: ObjectRef, to: ObjectRef, data: unknown): ConnectPlan | undefined;
+  /** (0.10.1) a palette drop onto an object (the adapter's dropInto): the new thing inside it, asked innermost first */
+  dropOnto?(target: ObjectRef, value: unknown, kind: string, data: unknown): { value: unknown; label?: string } | undefined;
+  /** (0.10.0) the selection made into a new container (the adapter's group): Group, ⌘G, one undo step */
+  group?(members: ObjectRef[], data: unknown): GroupPlan | undefined;
   actions: Actions;
   /** what an object's own menu offers, beyond rename, duplicate and delete */
   objectItems(doc: EditorModel, path: Path, origin: 'canvas' | 'menu', note?: (t: string, tone?: 'bad') => void): MenuItem[];
@@ -130,11 +150,14 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 
 export function canvasView<M, D extends CanvasDrawing, A extends object = object>(host: HTMLElement, doc: EditorModel, opts: CanvasOpts<M, D, A>) {
   const K = opts.kit, ui = K.ui, T = ui.text;
-  const { setCmd, deleteCmd, insertCmd, pinsCmd, withPinsMoved, freshName, describe } = K.commands;
+  const { setCmd, deleteCmd, insertCmd, insertItemCmd, pinsCmd, withPinsMoved, freshName, describe } = K.commands;
   const { deletePaths, renameDialog, duplicate, connected } = K.actions;
   const resourceOf = (ptr: string) => K.objectOf(ptr);
   const kindOf = (k: string) => K.kinds.find(x => x.kind === k)!;
   const PINS_KEY = K.pins.key;
+  /** (0.10.0) a connection being drawn: from what, the pointer (in the drawing's coordinates), what it is over; `pick`:
+   *  started from the menu, so the next click ends it */
+  let linking: { from: ObjectRef; x?: number; y?: number; over?: string; pick?: boolean } | undefined;
   host.classList.add('canvas');
   // the stage holds the drawing, and takes the focus, the keys and the pointer
   const stage = h('div', { class: `${ui.rootClass} canvas-stage`, tabindex: '0', role: 'application', 'aria-label': T.stage });
@@ -313,7 +336,11 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const live = layer?.extent?.() ?? [];
     return union([...ptrs.flatMap(p => elementsFor(p)).filter(e => e.getBBox().width || e.getBBox().height).map(boxOf), ...live]);
   }
-  const V = viewport(host, {
+  // (0.12.1) the view is the stage's: docked, the palette's pane shares the host, so the host is wider than what is
+  // drawn (the scale, the pointer's place, a resize); floating, the stage is the host's whole area
+  const docked = ui.paletteLayout === 'docked';
+  const viewEl = docked ? stage : host;
+  const V = viewport(viewEl, {
     svg: () => svg,
     onApply: k => {
       svg!.classList.toggle('zoom-near', k >= 1);          // a layer's detail shows from 100% up
@@ -438,6 +465,31 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     };
     if (hoverId !== undefined && !doc.selection.some(p => toPointer(p) === hoverId)) draw(hoverId, 'hover');
     for (const p of doc.selection) draw(toPointer(p), 'ring');
+    // (0.10.0) connecting: a handle on the one selected object, and while a connection is drawn, its line and its target
+    const one = connectable();
+    const from = linking?.from ?? one;
+    const fb = from ? boxFor(fromPointer(from.path)) : undefined;
+    if (fb && K.connect) {
+      const k = scale(), hx = fb.x + fb.w + 10 / k, hy = fb.y + fb.h / 2;
+      if (linking && linking.x !== undefined && linking.y !== undefined) {
+        if (linking.over) draw(linking.over, 'hover');
+        const l = d.createElementNS(SVGNS, 'line');
+        l.setAttribute('class', `connect-line${linking.over ? ' ok' : ''}`);
+        l.setAttribute('x1', String(hx)); l.setAttribute('y1', String(hy)); l.setAttribute('x2', String(linking.x)); l.setAttribute('y2', String(linking.y));
+        overlay.append(l);
+      }
+      if (!linking) {
+        const c = d.createElementNS(SVGNS, 'circle');
+        c.setAttribute('class', 'connect-handle');
+        c.setAttribute('cx', String(hx)); c.setAttribute('cy', String(hy)); c.setAttribute('r', String(7 / k));
+        // the one mark that takes the pointer (through the CSSOM: a host's marks CSS may say none for the overlay)
+        c.style.pointerEvents = 'all'; c.style.cursor = 'crosshair';
+        const t = d.createElementNS(SVGNS, 'title');
+        t.textContent = `Drag to what ${from!.name} connects to`;
+        c.append(t);
+        overlay.append(c);
+      }
+    }
     // a badge on each drawn resource with problems
     const counts = new Map<string, { e: number; w: number }>();
     for (const pr of opts.problems()) {
@@ -497,6 +549,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     stage.focus({ preventScroll: true });
     if (layer?.down?.(e)) return;
     const { x, y } = pageXY(e);
+    // (0.10.0) a press on the connect handle starts a connection; a click while one is picked ends it
+    if (e.button === 0 && linking?.pick) { e.preventDefault(); endConnect(pathAtEvent(e.target)); return; }
+    if (e.button === 0 && (e.target as Element | null)?.closest?.('.connect-handle')) {
+      const one = connectable();
+      if (one) { capture(e); e.preventDefault(); const p = toSvg(x, y); linking = { from: one, x: p.x, y: p.y }; paintOverlay(); return; }
+    }
     if (e.button === 0 || e.button === 1) capture(e);
     const pan = () => { drag = { kind: 'pan', x0: x, y0: y, v0: { ...V.view! } }; svg?.classList.add('panning'); e.preventDefault(); };
     if (e.button === 1 || spaceKeyDown) { pan(); return; }
@@ -540,6 +598,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   }
   function move(e: PointerEvent) {
     const { x, y } = pageXY(e);
+    if (linking) {
+      const p = toSvg(x, y), under = pathAtEvent(document.elementFromPoint(x, y));
+      const r = under === undefined ? undefined : resourceOf(under);
+      linking = { ...linking, x: p.x, y: p.y, over: r && r.path !== linking.from.path ? r.path : undefined };
+      paintOverlay();
+      return;
+    }
     if (!drag) {
       const p = pathAtEvent(e.target);
       if (p !== hoverId) { hoverId = p; paintOverlay(); }
@@ -753,6 +818,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   }
 
   function up(e: PointerEvent) {
+    if (linking && !linking.pick) { const { x, y } = pageXY(e); endConnect(pathAtEvent(document.elementFromPoint(x, y))); return; }
     const d0 = drag;
     drag = undefined;
     svg?.classList.remove('panning');
@@ -840,12 +906,75 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       items.push({ label: 'Show in text', icon: 'code-xml', onSelect: () => opts.showInText(one) });
       items.push({ label: 'Show in tree', icon: 'list-tree', onSelect: () => opts.showInTree(one) });
     }
+    // (0.10.0) connect and group, where the domain says how
+    if (K.connect && one && isRes) items.push({ label: 'Connect to…', icon: 'link', desc: 'Then click what it connects to (Esc cancels)', disabled: ro, onSelect: () => startPick() });
+    if (K.group) items.push({ label: sel.length > 1 ? `Group ${sel.length} items` : 'Group', icon: 'box', keys: '⌘G', desc: 'Into a new container, as one step', disabled: ro || !members().length, why: 'Only objects are grouped', onSelect: groupSelection });
     items.push({ label: 'Select parent', icon: 'arrow-up-right', keys: '⌘↑', onSelect: selectParent });
     items.push({ label: 'Select connected', icon: 'link', desc: 'What refers to it, and what it refers to', onSelect: () => doc.select(connected(doc, sel), 'canvas') });
     items.push({ label: 'Zoom to selection', keys: '⇧2', onSelect: zoomToSelection });
     if (opts.clipItems) items.push({ sep: true }, ...opts.clipItems());
     items.push({ sep: true }, { label: sel.length > 1 ? `Delete ${sel.length} items` : 'Delete', icon: 'trash-2', keys: '⌫', danger: true, disabled: ro, onSelect: () => deletePaths(doc, sel, 'canvas', opts.note) });
     return items;
+  }
+  // ---------- (0.10.0) connect and group, by the domain's plans ----------
+  /** the one selected object, if the domain connects and the file reads */
+  function connectable(): ObjectRef | undefined {
+    if (!K.connect || !doc.doc.ok || doc.selection.length !== 1) return undefined;
+    const ptr = toPointer(doc.selection[0]), r = resourceOf(ptr);
+    return r && r.path === ptr ? r : undefined;
+  }
+  function startPick() {
+    const from = connectable();
+    if (!from) return;
+    linking = { from, pick: true };
+    opts.note(`Click what ${from.name} connects to (Esc cancels)`);
+    paintOverlay();
+  }
+  /** end a connection on what is under the pointer: the domain's plan, written as one step */
+  function endConnect(ptr: string | undefined) {
+    const from = linking?.from;
+    linking = undefined;
+    paintOverlay();
+    if (!from || ptr === undefined) return;
+    const to = resourceOf(ptr);
+    if (!to || to.path === from.path) { opts.note('Not connected: drop it on another object', 'warn'); return; }
+    const data = doc.goodDoc.data;
+    const plan = K.connect?.(from, to, data);
+    if (!plan) { opts.note(`${from.name} and ${to.name} can't be connected`, 'warn'); return; }
+    const label = plan.label ?? `Connect ${from.name} to ${to.name}`;
+    let cmd: Command, path: Path;
+    if (plan.name !== undefined) {
+      const name = freshName(doc.text, plan.name);
+      cmd = insertCmd(plan.at, name, plan.value, { label });
+      path = [...plan.at, name];
+    } else {
+      const list = plan.at.reduce<unknown>((x, k) => (x && typeof x === 'object' ? (x as Record<string, unknown>)[k as string] : undefined), data);
+      path = [...plan.at, Array.isArray(list) ? list.length : 0];
+      cmd = insertItemCmd(plan.at, plan.value, undefined, label);
+    }
+    if (run(doc, { ...cmd, select: [path] }, 'canvas', opts.note)) doc.select([path], 'canvas');
+  }
+  /** the selection's objects (a key inside one counts as its object), once each */
+  function members(): ObjectRef[] {
+    const out = new Map<string, ObjectRef>();
+    for (const p of doc.selection) { const r = resourceOf(toPointer(p)); if (r) out.set(r.path, r); }
+    return [...out.values()];
+  }
+  /** the selection into a new container: the container, each member's change and its pin dropped (the layout places it
+   *  in its new frame), as one command, one undo step */
+  function groupSelection() {
+    if (!K.group || !doc.doc.ok) return;
+    const ms = members();
+    if (!ms.length) { opts.note('Only objects are grouped', 'warn'); return; }
+    const plan = K.group(ms, doc.goodDoc.data);
+    if (!plan) { opts.note(ms.length > 1 ? `These ${ms.length} can't be grouped` : `${ms[0].name} can't be grouped`, 'warn'); return; }
+    const name = freshName(doc.text, plan.name);
+    const pins = K.pins.of(doc.goodDoc.data) ?? {};
+    const unpin = ms.filter(m => pins[m.name] !== undefined).map(m => withPinsMoved(deleteCmd([PINS_KEY, 'layout', m.name])));
+    const label = plan.label ?? `Group ${ms.length > 1 ? `${ms.length} items` : ms[0].name} into ${name}`;
+    const p = [...plan.at, name] as Path;
+    const cmd = seqCmd(label, [insertCmd(plan.at, name, plan.value, { label }), ...plan.members(name).map(m => setCmd(m.path, m.value)), ...unpin]);
+    if (run(doc, { ...cmd, select: [p] }, 'canvas', opts.note)) doc.select([p], 'canvas');
   }
   function addResource(s: string) {
     const k = kindOf(s);
@@ -898,40 +1027,186 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     }
     return undefined;
   }
+  /** (0.10.1) the objects whose drawn floor a point is on, innermost first: in 2D the panels under it; in 3D every placed
+   *  thing whose floor holds the point, the deepest (then the smallest) first */
+  function objectsUnder(at: { x: number; y: number }): ObjectRef[] {
+    if (!cd) return [];
+    const p = toSvg(at.x, at.y);
+    const refOf = (id: string) => { const ptr = cd!.pathOf.get(id); const r = ptr === undefined ? undefined : resourceOf(ptr); return r && r.path === ptr ? r : undefined; };
+    if (flat) return flat.panelsAt(p.x, p.y).map(refOf).filter((r): r is ObjectRef => !!r);
+    const inside = (poly: [number, number][]) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > p.y) !== (yj > p.y) && p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi) c = !c; } return c; };
+    const depth = (i: { parent?: unknown }) => { let n = 0; for (let q = i.parent as { parent?: unknown } | undefined; q; q = q.parent as { parent?: unknown } | undefined) n++; return n; };
+    // what is drawn under the point, topmost (innermost) first, as the eye sees it; then any whose floor holds the point
+    const seen = new Map<string, ObjectRef>();
+    for (const e of fdoc().elementsFromPoint(at.x, at.y)) {
+      if (!svg?.contains(e)) continue;
+      for (let el = e.closest('[data-id]'); el; el = el.parentElement?.closest('[data-id]') ?? null) {
+        const r = refOf(el.getAttribute('data-id') ?? '');
+        if (r && !seen.has(r.path)) seen.set(r.path, r);
+      }
+    }
+    const hits: { r: ObjectRef; d: number; a: number }[] = [];
+    for (const [, id] of cd.pinId) {
+      const item = cd.scene.layout.byId.get(id), r = refOf(id);
+      if (item && r && !seen.has(r.path) && inside(floorOf(item.box))) hits.push({ r, d: depth(item), a: (item.box.x1 - item.box.x0) * (item.box.y1 - item.box.y0) });
+    }
+    return [...seen.values(), ...hits.sort((x, y) => y.d - x.d || x.a - y.a).map(h => h.r)];
+  }
   /** Add an object from the palette: dropped at a point, it is pinned there; dropped on a container the kit names, it
    *  is made inside it; else the layout places it. One command (one undo step); then it is selected and named. */
-  function addFromPalette(sec: string, at?: { x: number; y: number }): Path | undefined {
+  function addFromPalette(sec: string, at?: { x: number; y: number }, item?: PaletteItem): Path | undefined {
     if (!doc.doc.ok) { opts.note('Fix the YAML first', 'warn'); return undefined; }
     const k = kindOf(sec);
-    const name = freshName(doc.text, k.singular);
+    // (0.10.0) a palette entry's preset: what it starts as, and the base of its name
+    const preset = item?.value?.() as Record<string, unknown> | undefined;
+    const what = item && preset !== undefined ? item.label.toLowerCase() : k.singular;
+    const name = freshName(doc.text, item?.name ?? k.singular);
     const p = [...k.section, name] as Path;
-    let value = k.template() as Record<string, unknown>;
+    let value = (preset ?? k.template()) as Record<string, unknown>;
     let into: string | undefined;
     const drop = at ? K.dropInto?.(sec) : undefined;
     if (at && drop) {
       const c = containerAt(drop.container, at);
-      if (c) { into = c; value = drop.value(c) as Record<string, unknown>; }
+      // dropped into a container: what puts it there, and the preset's own keys over it
+      if (c) { into = c; value = { ...(drop.value(c) as Record<string, unknown>), ...(preset ?? {}) }; }
     }
-    const label = `Add ${k.singular} ${name}${into ? drop!.label(into) : ''}`;
+    let intoLabel = into ? drop!.label(into) : '';
+    // (0.10.1) the domain's rule: the innermost object under the drop that holds it
+    if (at && !into && K.dropOnto) {
+      for (const t of objectsUnder(at)) {
+        const plan = K.dropOnto(t, value, sec, doc.goodDoc.data);
+        if (plan) { into = t.name; value = plan.value as Record<string, unknown>; intoLabel = plan.label ? ` ${plan.label}` : ` in ${t.name}`; break; }
+      }
+    }
+    const label = `Add ${what} ${name}${intoLabel}`;
     const add = insertCmd(p.slice(0, -1), name, value, { label });
     const pin = at && !into && mode === '3d' ? placeAt(name, add, at) : undefined;
     const cmd = pin ? seqCmd(`${label} at [${pin.join(', ')}]`, [add, withPinsMoved(setCmd([PINS_KEY, 'layout', name], { at: pin }))]) : add;
     if (!run(doc, { ...cmd, select: [p] }, 'canvas', opts.note)) return undefined;
     if (at && !into && !pin) opts.note(mode === '2d' ? `${k.singular} ${name} added; the layout placed it (in 3D a drop pins it where it lands)` : `${k.singular} ${name} added; that spot is taken, so the layout placed it`);
     doc.select([p], 'canvas');
+    // (0.10.1) the canvas has the focus while the name is asked, so the dialog gives it back there (⌘Z works at once)
+    stage.focus({ preventScroll: true });
     renameDialog(doc, p, 'canvas', opts.note);
     return p;
   }
   const palette = h('div', { class: 'palette', role: 'toolbar', 'aria-label': T.palette, 'aria-orientation': 'vertical' });
-  for (const { kind: sec, icon: ic, label } of ui.palette) {
-    const b = h('button', { type: 'button', class: 'pal-item', 'data-section': sec, title: `Add ${label.toLowerCase()} (click), or drag it where it goes` }, icon(ic), h('span', { class: 'pal-label' }, label));
+  // (0.11.0) sections: a header (a button, aria-expanded) over its entries; open: the section last added from (the
+  // first, before any); the reader opens and closes the others as they like. The host's store may be off: guarded.
+  const sections = new Map<string, { head: HTMLButtonElement; body: HTMLElement }>();
+  const PAL_KEY = 'canvas-palette';
+  let lastSection: string | undefined;
+  try { const v = JSON.parse(opts.store?.get(PAL_KEY) ?? '{}') as { last?: unknown }; if (typeof v.last === 'string') lastSection = v.last; } catch { /* none */ }
+  const named = [...new Set(ui.palette.map(i => i.section).filter((x): x is string => x !== undefined))];
+  const openAtStart = lastSection !== undefined && named.includes(lastSection) ? lastSection : named[0];
+  const setOpen = (sec: string, open: boolean) => { const g = sections.get(sec); if (!g) return; g.head.setAttribute('aria-expanded', String(open)); g.body.hidden = !open; };
+  function sectionBody(sec: string): HTMLElement {
+    const have = sections.get(sec);
+    if (have) return have.body;
+    const id = `pal-sec-${sections.size}-${Math.random().toString(36).slice(2, 8)}`;
+    const head = h('button', { type: 'button', class: 'pal-head', 'aria-expanded': 'false', 'aria-controls': id, 'data-section-head': sec }, icon('chevron-right', 'pal-chev'), h('span', { class: 'pal-head-label' }, sec)) as HTMLButtonElement;
+    const body = h('div', { class: 'pal-body', id, role: 'group', 'aria-label': sec, 'data-section-body': sec });
+    head.addEventListener('click', () => setOpen(sec, head.getAttribute('aria-expanded') !== 'true'));
+    palette.append(h('div', { class: 'pal-section', 'data-pal-section': sec }, head, body));
+    sections.set(sec, { head, body });
+    setOpen(sec, sec === openAtStart);
+    return body;
+  }
+  // (0.12.0) docked: a pane of its own at the canvas's left (the stage beside it): a search box over the list, a
+  // control that collapses it to a strip, and a grip that resizes it; its width and state in the host's store
+  const DOCK_KEY = 'canvas-palette-dock';
+  const dockPref: { w?: number; collapsed?: boolean } = {};
+  try { const v = JSON.parse(opts.store?.get(DOCK_KEY) ?? '{}') as { w?: unknown; collapsed?: unknown }; if (typeof v.w === 'number' && Number.isFinite(v.w)) dockPref.w = v.w; if (v.collapsed === true) dockPref.collapsed = true; } catch { /* none */ }
+  const saveDock = () => { try { opts.store?.set(DOCK_KEY, JSON.stringify(dockPref)); } catch { /* storage may be off */ } };
+  const DOCK_MIN = 160, DOCK_MAX = 440;
+  const palHome: HTMLElement = docked ? h('aside', { class: 'pal-dock', 'aria-label': 'Palette' }) : palette;
+  const palGrip = h('div', { class: 'pal-grip', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Resize the palette', tabindex: '0' });
+  const search = h('input', { type: 'search', class: 'pal-search', placeholder: 'Search', 'aria-label': 'Search the palette', autocomplete: 'off', spellcheck: 'false' }) as HTMLInputElement;
+  const none = h('p', { class: 'pal-none', role: 'status', hidden: '' });
+  const collapseBtn = h('button', { type: 'button', class: 'btn sm quiet icon-only pal-collapse', 'aria-expanded': 'true', 'aria-label': 'Collapse the palette', title: 'Collapse the palette' }, icon('chevron-left')) as HTMLButtonElement;
+  const visibleItems = () => [...palette.querySelectorAll<HTMLButtonElement>('.pal-item')].filter(b => !b.hidden && !b.closest('[hidden]'));
+  /** the search: every word in the entry's label or its section; sections with a match open while it is on, and the
+   *  reader's own open and closed come back when it is cleared */
+  let before: Map<string, boolean> | undefined;
+  function filter() {
+    const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length && !before) before = new Map([...sections].map(([k, g]) => [k, g.head.getAttribute('aria-expanded') === 'true']));
+    let shown = 0;
+    for (const b of palette.querySelectorAll<HTMLButtonElement>('.pal-item')) {
+      const item = ui.palette[Number(b.dataset.entry)];
+      const hay = `${item.label} ${item.section ?? ''}`.toLowerCase();
+      b.hidden = !words.every(w => hay.includes(w));
+      if (!b.hidden) shown++;
+    }
+    for (const [sec, g] of sections) {
+      const any = [...g.body.querySelectorAll<HTMLButtonElement>('.pal-item')].some(b => !b.hidden);
+      (g.head.parentElement as HTMLElement).hidden = words.length > 0 && !any;
+      if (words.length) setOpen(sec, any);
+    }
+    if (!words.length && before) { for (const [sec, open] of before) setOpen(sec, open); before = undefined; }
+    none.hidden = shown > 0;
+    none.textContent = shown ? '' : `Nothing matches "${search.value.trim()}"`;
+  }
+  const setDockW = (w: number, keep = true) => { const v = Math.round(Math.min(DOCK_MAX, Math.max(DOCK_MIN, w))); host.style.setProperty('--pal-w', `${v}px`); palGrip.setAttribute('aria-valuenow', String(v)); if (keep) { dockPref.w = v; saveDock(); } };
+  const setCollapsed = (c: boolean, keep = true) => {
+    host.classList.toggle('pal-collapsed', c);
+    collapseBtn.setAttribute('aria-expanded', String(!c));
+    const say = c ? 'Show the palette' : 'Collapse the palette';
+    collapseBtn.setAttribute('aria-label', say); collapseBtn.title = say;
+    collapseBtn.replaceChildren(icon(c ? 'chevron-right' : 'chevron-left'));
+    if (keep) { if (c) dockPref.collapsed = true; else delete dockPref.collapsed; saveDock(); }
+  };
+  if (docked) {
+    host.classList.add('pal-docked');
+    palette.classList.add('pal-list');
+    palHome.append(h('div', { class: 'pal-dock-head' }, collapseBtn, h('label', { class: 'pal-search-wrap' }, icon('search'), search)), palette, none);
+    palGrip.setAttribute('aria-valuemin', String(DOCK_MIN)); palGrip.setAttribute('aria-valuemax', String(DOCK_MAX));
+    setDockW(dockPref.w ?? 220, false);
+    setCollapsed(!!dockPref.collapsed, false);
+    collapseBtn.addEventListener('click', () => { setCollapsed(!host.classList.contains('pal-collapsed')); if (!host.classList.contains('pal-collapsed')) search.focus(); });
+    search.addEventListener('input', filter);
+    search.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && search.value) { e.preventDefault(); e.stopPropagation(); search.value = ''; filter(); }
+      else if (e.key === 'ArrowDown') { const first = visibleItems()[0]; if (first) { e.preventDefault(); first.focus(); } }
+      else if (e.key === 'Enter') { const first = visibleItems()[0]; if (first) { e.preventDefault(); first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); } }
+    });
+    // the list's arrow keys: up and down through what is shown (up from the first: back to the search)
+    palette.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const all = [...palette.querySelectorAll<HTMLButtonElement>('.pal-head, .pal-item')].filter(b => !b.hidden && !b.parentElement?.closest('[hidden]') && (b.classList.contains('pal-head') || !b.closest('.pal-body[hidden]')));
+      const i = all.indexOf(document.activeElement as HTMLButtonElement);
+      if (i < 0) return;
+      e.preventDefault();
+      if (e.key === 'ArrowUp' && i === 0) search.focus(); else all[Math.min(all.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))].focus();
+    });
+    palGrip.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      try { palGrip.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+      const x0 = e.clientX, w0 = palHome.getBoundingClientRect().width;
+      const mv = (ev: PointerEvent) => setDockW(w0 + ev.clientX - x0, false);
+      const up = (ev: PointerEvent) => { palGrip.removeEventListener('pointermove', mv); palGrip.removeEventListener('pointerup', up); setDockW(w0 + ev.clientX - x0); };
+      palGrip.addEventListener('pointermove', mv); palGrip.addEventListener('pointerup', up);
+    });
+    palGrip.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowLeft' ? -16 : e.key === 'ArrowRight' ? 16 : 0;
+      if (d) { e.preventDefault(); setDockW(palHome.getBoundingClientRect().width + d); }
+    });
+  }
+  const usedSection = (item: PaletteItem) => {
+    if (item.section === undefined || item.section === lastSection) return;
+    lastSection = item.section;
+    try { opts.store?.set(PAL_KEY, JSON.stringify({ last: lastSection })); } catch { /* storage may be off */ }
+  };
+  ui.palette.forEach((item, idx) => {
+    const { kind: sec, icon: ic, label } = item;
+    const b = h('button', { type: 'button', class: 'pal-item', 'data-section': sec, 'data-entry': String(idx), title: `Add ${label.toLowerCase()} (click), or drag it where it goes` }, icon(ic), h('span', { class: 'pal-label' }, label));
     b.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       e.preventDefault();
       try { b.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer: the events come to the button anyway */ }
       const x0 = e.clientX, y0 = e.clientY;
       let ghost: HTMLElement | undefined;
-      const over = (ev: PointerEvent) => { const r = stage.getBoundingClientRect(); return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom && !palette.contains(document.elementFromPoint(ev.clientX, ev.clientY)); };
+      const over = (ev: PointerEvent) => { const r = stage.getBoundingClientRect(); return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom && !palHome.contains(document.elementFromPoint(ev.clientX, ev.clientY)); };
       const mv = (ev: PointerEvent) => {
         if (!ghost && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
         if (!ghost) { ghost = h('div', { class: 'pal-ghost', 'aria-hidden': 'true' }, icon(ic), label); host.append(ghost); }
@@ -944,18 +1219,18 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
         const dragged = !!ghost;
         ghost?.remove();
         if (!drop) return;
-        if (!dragged) addFromPalette(sec);
-        else if (over(ev)) addFromPalette(sec, { x: ev.clientX, y: ev.clientY });
+        if (!dragged) { usedSection(item); addFromPalette(sec, undefined, item); }
+        else if (over(ev)) { usedSection(item); addFromPalette(sec, { x: ev.clientX, y: ev.clientY }, item); }
       };
       const upH = (ev: PointerEvent) => done(ev, true), cancelH = (ev: PointerEvent) => done(ev, false);
       const esc = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); done(e, false); } };
       b.addEventListener('pointermove', mv); b.addEventListener('pointerup', upH); b.addEventListener('pointercancel', cancelH); addEventListener('keydown', esc, true);
     });
     // the keyboard: Enter or the space key adds (the layout places it)
-    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addFromPalette(sec); } });
-    palette.append(b);
-  }
-  host.append(palette);
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); usedSection(item); addFromPalette(sec, undefined, item); } });
+    (item.section === undefined ? palette : sectionBody(item.section)).append(b);
+  });
+  if (docked) host.prepend(palHome, palGrip); else host.append(palette);
 
   function resetLayout() {
     // wherever the pins are (x-editor, or the legacy key): removed, and their key too if it holds nothing else
@@ -992,7 +1267,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       case '0': fitItems(); break;
       case '1': actual(); break;
       case '@': case '2': if (e.shiftKey || e.key === '@') zoomToSelection(); else return; break;
-      case 'Escape': if (pinDrag()) { endPin(false); break; } doc.select([], 'canvas'); break;
+      case 'Escape': if (linking) { linking = undefined; paintOverlay(); opts.note('Not connected'); break; } if (pinDrag()) { endPin(false); break; } doc.select([], 'canvas'); break;
       case 'Delete': case 'Backspace': if (sel.length && !ro) deletePaths(doc, sel, 'canvas', opts.note); break;
       case 'F2': if (sel.length === 1 && !ro) renameDialog(doc, sel[0], 'canvas', opts.note); break;
       case 'ArrowUp': if (mod) { selectParent(); break; } return;
@@ -1008,11 +1283,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       }
       case 'ContextMenu': case 'F10':
         if (e.key === 'F10' && !e.shiftKey) return;
-        { const b = unionBox(sel); const r = host.getBoundingClientRect(); const k = scale(); openMenu(menuItems(sel.length ? toPointer(sel[0]) : undefined), b ? { x: r.left + (b.x + b.w - V.view!.x) * k, y: r.top + (b.y - V.view!.y) * k } : { x: r.left + 40, y: r.top + 40 }, 'Canvas'); }
+        { const b = unionBox(sel); const r = viewEl.getBoundingClientRect(); const k = scale(); openMenu(menuItems(sel.length ? toPointer(sel[0]) : undefined), b ? { x: r.left + (b.x + b.w - V.view!.x) * k, y: r.top + (b.y - V.view!.y) * k } : { x: r.left + 40, y: r.top + 40 }, 'Canvas'); }
         break;
       default:
         if (mod && e.key.toLowerCase() === 'd' && sel.length === 1 && !ro) { duplicate(doc, sel[0], 'canvas', opts.note); break; }
         if (mod && e.key.toLowerCase() === 'a') { doc.select(drawn.map(fromPointer), 'canvas'); break; }
+        if (mod && e.key.toLowerCase() === 'g' && K.group && sel.length && !ro) { groupSelection(); break; }
         return;
     }
     e.preventDefault();
@@ -1053,7 +1329,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   });
 
   const base = {
-    addFromPalette, palette,
+    addFromPalette, palette, groupSelection, startPick, objectsUnder, get linking() { return linking; },
     render, setTheme, paintOverlay, fit: fitItems, fitAll: fit, actual, zoomAt, itemsBox, get moved() { return V.moved; }, settled, get zoom() { return V.zoom; },
     dispose() { endMorph(); clearTimeout(relayout); V.dispose(); disposed = true; },
     focus: () => stage.focus(),
@@ -1063,7 +1339,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     /** the view (3D or 2D), and the 2D layout while it shows */
     get mode() { return mode; }, setMode, get flat() { return flat?.layout; },
     stage, key, scale: () => scale(), nav, paintNav, outlinesFor, footprints, get drag() { return pinDrag(); }, get lastMarquee() { return lastMarquee; },
-    boxFor, pageXYOf: (p: Path) => { const b = boxFor(p); const r = host.getBoundingClientRect(); const k = scale(); return b && V.view ? { x: r.left + (b.x + b.w / 2 - V.view.x) * k, y: r.top + (b.y + b.h / 2 - V.view.y) * k } : undefined; },
+    boxFor, pageXYOf: (p: Path) => { const b = boxFor(p); const r = viewEl.getBoundingClientRect(); const k = scale(); return b && V.view ? { x: r.left + (b.x + b.w / 2 - V.view.x) * k, y: r.top + (b.y + b.h / 2 - V.view.y) * k } : undefined; },
   };
   // the layer's calls, as they are (its getters stay getters)
   if (layer) Object.defineProperties(base, Object.getOwnPropertyDescriptors(layer.api));

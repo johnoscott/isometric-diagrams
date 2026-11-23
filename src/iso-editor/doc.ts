@@ -172,6 +172,12 @@ function parentByIndent(d: EditorDoc, lineStart: number, indent: number, forList
       if (a.where === 'key') return a.path.slice(0, -1);
       if (line.slice(ind).startsWith('- ')) return a.path.slice(0, -1);
     }
+    // (0.12.2) "- key: …" holds its item's first key two columns in: a key typed below it at that column is its
+    // sibling, in the same item (a list of maps, written in block style)
+    if (!forList && /^- /.test(line.slice(ind)) && ind + 2 === indent) {
+      const a = d.at(s + ind + 2);
+      if (a.where === 'key') return a.path.slice(0, -1);
+    }
     if (ind < indent || (forList && ind <= indent && /:\s*$/.test(line))) {
       const m = /^(\s*)(- )?([^\s:#][^:#]*?)\s*:/.exec(line);
       if (m) {

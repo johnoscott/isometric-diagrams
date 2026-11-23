@@ -144,6 +144,29 @@ export const boxesAdapter: DomainAdapter = {
   pins: { key: 'x-editor', legacyOnly: () => false },
   snippets: {},
   outline: { kinds: ['boxes'], first: ['format', 'title'], groups: [{ key: 'links', label: 'Links' }], rootLabel: d => String(d.title ?? 'boxes') },
+  // (0.10.0) a link drawn from one box to another; a link back over the same pair is refused
+  connect(from, to, data) {
+    const links = isMap(data) && Array.isArray(data.links) ? data.links : [];
+    if (links.some(l => isMap(l) && l.from === from.name && l.to === to.name)) return undefined;
+    return { at: ['links'], value: { from: from.name, to: to.name } };
+  },
+  // (0.10.1) a palette drop onto a tray or a zone puts the new box in it; a box holds nothing
+  dropInto(target, value, _kind, data) {
+    const boxes = isMap(data) && isMap(data.boxes) ? data.boxes : {};
+    const t = boxes[target.name];
+    if (!isMap(t) || !HOLDERS.includes(String(t.kind))) return undefined;
+    return { value: { ...(isMap(value) ? value : {}), in: target.name }, label: `in ${String(t.kind)} ${target.name}` };
+  },
+  // (0.10.0) the selected boxes into a new zone, in what they were all in (if one place), each now in the zone
+  group(members, data) {
+    const boxes = isMap(data) && isMap(data.boxes) ? data.boxes : {};
+    const ins = new Set(members.map(m => (isMap(boxes[m.name]) ? (boxes[m.name] as Raw).in : undefined)));
+    const parent = ins.size === 1 ? [...ins][0] : undefined;
+    return {
+      at: ['boxes'], name: 'group', value: { kind: 'zone', label: 'Group', ...(typeof parent === 'string' ? { in: parent } : {}) },
+      members: name => members.map(m => ({ path: ['boxes', m.name, 'in'], value: name })),
+    };
+  },
 };
 
 /** a fake state: each box on or off, as a host's observer would say */
@@ -190,6 +213,12 @@ export function boxesStill(text: string, theme: string, s: BoxStates = {}): stri
 export const boxesView = (theme: string): DomainView<BoxesRead, CanvasDrawing> => ({
   draw: drawBoxes, catalog: BOXES_CATALOG, theme, fileName: 'boxes.yaml',
   words: { brand: 'boxes' }, layer: boxesLayer as unknown as DomainView<BoxesRead, CanvasDrawing>['layer'],
+  // (0.10.0) the palette's presets: a box, a tray and a zone, each starting as itself
+  palette: [
+    { kind: 'boxes', label: 'Box', icon: 'box', name: 'box', value: { size: [2, 2, 1] } },
+    { kind: 'boxes', label: 'Tray', icon: 'layers', name: 'tray', value: { kind: 'tray', label: 'Tray' } },
+    { kind: 'boxes', label: 'Zone', icon: 'circle-dot', name: 'zone', value: { kind: 'zone', label: 'Zone' } },
+  ],
   // the 2D view (0.6.0): links drawn as the theme's send kind
   flat: { title: 'boxes, flat', styles: { send: { color: 'send' } }, load: () => import('../../src/iso-editor/ui/flat-canvas.ts').then(m => m.flatCanvas) },
 });

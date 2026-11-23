@@ -3,10 +3,12 @@
 // code at build time (ajv standalone), keyed by the schema's fingerprint. Both use these options.
 
 import Ajv2020Mod from 'ajv/dist/2020.js';
+// the class by its name: its type is the same under every moduleResolution (a default import's isn't)
+import type { Ajv2020 as Ajv2020Class } from 'ajv/dist/2020.js';
 import type { ValidateFunction } from 'ajv';
 
 // ajv is CommonJS; under Node's ESM loader the class may sit on `.default`.
-export const Ajv2020 = ((Ajv2020Mod as unknown as { default?: unknown }).default ?? Ajv2020Mod) as typeof Ajv2020Mod.default;
+export const Ajv2020 = ((Ajv2020Mod as unknown as { default?: unknown }).default ?? Ajv2020Mod) as typeof Ajv2020Class;
 export const AJV_OPTIONS = { allErrors: true, verbose: true, strict: false } as const;
 const ajv = new Ajv2020(AJV_OPTIONS);
 

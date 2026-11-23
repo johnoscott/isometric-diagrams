@@ -81,18 +81,19 @@ test('dist-iso is a package: its exports exist, its assets are there, and no Nod
   for (const e of ['./render', './editor', './systems']) for (const f of Object.values(pkg.exports[e]) as string[]) assert.ok(existsSync(join(OUT, f)), `${e}: ${f}`);
   for (const a of Object.keys(ASSETS)) assert.ok(existsSync(join(OUT, a)), a);
   const sprite = readFileSync(join(OUT, 'assets/icons.svg'), 'utf8');
-  assert.equal((sprite.match(/<symbol id="se-i-/g) ?? []).length, 21, 'L3\'s icons, as a file');
+  assert.equal((sprite.match(/<symbol id="se-i-/g) ?? []).length, 23, 'L3\'s icons, as a file');
   const viewer = readFileSync(join(OUT, 'types/iso-viewer/index.d.ts'), 'utf8');
   assert.doesNotMatch(viewer, /playerScript|bundle\./, 'the code leaves playerScript out; so do its types');
-  assert.ok(!existsSync(join(OUT, 'types/iso-viewer/bundle.d.ts')));
   // 0.9.0: MIT (the repository's LICENSE, in the package), published to npmjs, public
   assert.equal(pkg.license, 'MIT');
   assert.equal(readFileSync(join(OUT, 'LICENSE'), 'utf8'), readFileSync(new URL('../LICENSE', import.meta.url), 'utf8'));
   assert.match(readFileSync(join(OUT, 'LICENSE'), 'utf8'), /^MIT License\n/);
   assert.equal(pkg.private, undefined, 'a private package can\'t be published');
   assert.deepEqual(pkg.publishConfig, { registry: 'https://registry.npmjs.org/', access: 'public' });
-  assert.equal(pkg.repository, undefined, 'no link to a private repository');
-  assert.equal(pkg.homepage, undefined);
+  // 0.10.0: the public repository and its site (never the private one)
+  assert.deepEqual(pkg.repository, { type: 'git', url: 'git+https://github.com/johnoscott/isometric-diagrams.git' });
+  assert.equal(pkg.homepage, 'https://johnoscott.github.io/isometric-diagrams/');
+  assert.deepEqual(pkg.bugs, { url: 'https://github.com/johnoscott/isometric-diagrams/issues' });
   assert.deepEqual(pkg.files, PACKAGE_FILES);
   for (const f of ['LICENSES/yaml.txt', 'LICENSES/lucide-static.txt']) assert.ok(existsSync(join(OUT, f)), f);
   assert.match(readFileSync(join(OUT, 'README.md'), 'utf8'), /npm i @johnoscott\/isometric-engine/);
@@ -122,7 +123,7 @@ export const BRANDS: [string, RegExp][] = [
 ];
 /** the repository's own words: none in any file of the package (its npm page shows README.md and package.json) */
 export const INTERNAL: [string, RegExp][] = [
-  ['the repository\'s name', /isometric-diagrams/gi], ['the layer above\'s name', word('5fdff287404b2bfd0c1907d56ddac9e29badda7d0e09c5408301f36e47f42da2', '00c5d38bf900180869b6b335905483e93bf2363afa55b61d7f7b8dff9ea8d908')], ['the build script', /build-iso/gi], ['the layer above (L4)', /\bL4\b/g],
+  ['the private repository\'s name', word('65ab691b51a90c58cff0984c74086984605b082e79cd92cc6f4cfbaa45d23b77')], ['the layer above\'s name', word('5fdff287404b2bfd0c1907d56ddac9e29badda7d0e09c5408301f36e47f42da2', '00c5d38bf900180869b6b335905483e93bf2363afa55b61d7f7b8dff9ea8d908')], ['the build script', /build-iso/gi], ['the layer above (L4)', /\bL4\b/g],
 ];
 /** and on the page: the engine's term for a catalogue of kinds, which its sources may use */
 const PAGE_ONLY: [string, RegExp][] = [['the kind pack', /kind pack/gi]];
@@ -282,7 +283,7 @@ test('the package\'s modules (0.9.0): its sources and their JavaScript, and exac
   const want = SOURCE_LAYERS.flatMap(l => [...publicOf(l)].map(m => `./modules/${l.dir.slice(4)}/${m.replace(/\.ts$/, '')}`)).sort();
   assert.deepEqual(mods.map(([k]) => k).sort(), want);
   assert.deepEqual(Object.fromEntries(mods), moduleExports());
-  // each subpath: the source (types, and the "source" condition) and its JavaScript (the default), or a JSON file
+  // each subpath: its declarations (a .d.ts), its source (the "source" condition) and its JavaScript (the default), or a file
   const targets = (v: unknown) => typeof v === 'string' ? [v] : Object.values(v as Record<string, string>);
   for (const [, v] of mods) for (const f of targets(v)) assert.ok(existsSync(join(OUT, f)), f);
   assert.deepEqual(readdirSync(join(OUT, 'src')).sort(), ['iso-core', 'iso-editor', 'iso-objects', 'iso-systems', 'iso-viewer'], 'the layers\' sources and nothing else');
@@ -311,4 +312,38 @@ test('the package\'s modules (0.9.0): its sources and their JavaScript, and exac
   // Node, which won't strip types under node_modules, runs the JavaScript (a module that loads JSON, too)
   writeFileSync(join(app, 'run.mjs'), `import { parse } from '${PACKAGE}/modules/iso-core/parse'; import { toPointer } from '${PACKAGE}/modules/iso-editor/path'; import * as k from '${PACKAGE}/modules/iso-core/kernel'; console.log(JSON.stringify([toPointer(['boxes', 'a']), parse('a: 1').data, typeof k]));`);
   assert.equal(execFileSync(process.execPath, ['run.mjs'], { cwd: app, encoding: 'utf8' }).trim(), JSON.stringify(['/boxes/a', { a: 1 }, 'object']));
+});
+
+// 0.12.2: a fresh TypeScript host with nothing but the package: an import of every subpath type-checks, strict, under
+// bundler and NodeNext resolution (before, the modules' types were .ts sources, checked as the host's own code: 41
+// errors inside the package). With the packages the declarations name installed, it needs no skipLibCheck either.
+test('a fresh host type-checks an import of every subpath, strict, with nothing else installed; and without skipLibCheck given yaml, ajv and monaco-editor (0.12.2)', { timeout: 180000 }, async () => {
+  await bundles();
+  const pkg = JSON.parse(readFileSync(join(OUT, 'package.json'), 'utf8')) as { exports: Record<string, unknown> };
+  const typed = Object.entries(pkg.exports).filter(([, v]) => typeof v === 'object') as [string, { types?: string; source?: string; default: string }][];
+  assert.ok(typed.length > 90, `${typed.length} subpaths`);
+  for (const [k, v] of typed) {
+    assert.match(v.types ?? '', /\.d\.ts$/, `${k}: its types are declarations`);
+    assert.equal(Object.keys(v)[0], 'types', `${k}: types first`);
+    for (const [c, f] of Object.entries(v)) if (c !== 'source') assert.doesNotMatch(f, /(?<!\.d)\.ts$/, `${k}: TypeScript source only under "source"`);
+  }
+  const app = mkdtempSync(join(tmpdir(), 'iso-fresh-'));
+  cpSync(OUT, join(app, 'node_modules', PACKAGE), { recursive: true });
+  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'host', private: true, type: 'module' }));
+  writeFileSync(join(app, 'main.ts'), [
+    ...typed.map(([k], i) => `import * as m${i} from '${PACKAGE}${k.slice(1)}';\nexport const u${i}: object = m${i};`),
+    `import { viewer } from '${PACKAGE}/render';`,
+    `const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
+    `export const layer: viewer.MorphLayer = viewer.buildLayer(document.body, svg, svg, '3d');`,
+    `layer.at(viewer.ease(viewer.clamp(0.5)));`,
+  ].join('\n'));
+  const check = (moduleResolution: string, module: string, skipLibCheck: boolean) => {
+    writeFileSync(join(app, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module, moduleResolution, strict: true, noEmit: true, skipLibCheck, lib: ['ES2022', 'DOM', 'DOM.Iterable'], types: [] }, files: ['main.ts'] }));
+    try { execFileSync(new URL('../node_modules/.bin/tsc', import.meta.url).pathname, ['-p', app], { cwd: app, encoding: 'utf8' }); return ''; }
+    catch (e) { return String((e as { stdout?: string }).stdout ?? e); }
+  };
+  assert.equal(check('bundler', 'ESNext', true), '', 'bundler, nothing else installed');
+  assert.equal(check('nodenext', 'NodeNext', true), '', 'nodenext, nothing else installed');
+  for (const dep of ['yaml', 'ajv', 'monaco-editor']) symlinkSync(new URL(`../node_modules/${dep}`, import.meta.url).pathname, join(app, 'node_modules', dep));
+  assert.equal(check('bundler', 'ESNext', false), '', 'bundler, without skipLibCheck');
 });
