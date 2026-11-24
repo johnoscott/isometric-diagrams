@@ -2,6 +2,17 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.14.1 — a double click to rename
+
+- With `doubleClick: 'rename'`, a double click on a connection does nothing, and beside one on a group's floor it renames the group.
+
+## 0.14.0 — the editor's feel
+
+- Dragging over a taken cell and holding still: what is there jiggles, then makes way (at 700 ms), and goes back if you leave. A
+  drop without the wait pushes nothing. One undo step. `dragMotion: 'respect'` on the view follows Reduce Motion.
+- A palette drag drags the thing itself, in 3D, with the grid and the drop target, into containers too.
+- `paletteLook: 'object'` on the view: the palette's entries show what they make.
+
 ## 0.12.6 — Fit counts the connectors
 
 - A connector that goes past everything else drawn is on the canvas when fitted (3D and 2D); otherwise the fit is as it was.

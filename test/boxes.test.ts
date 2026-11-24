@@ -752,6 +752,39 @@ test('boxes/1 in Chrome (0.12.5): the inline name field, after a drop and for a 
   });
 });
 
+// 0.14.1: where the host asks for a rename, a double click takes the thing drawn there: on a group's floor beside a connection (which a click
+// takes within 6 px) it is the group; on the connection itself, and beside it on nothing, it does nothing; the text is never shown. By default,
+// as before: the connection beside it, shown in the text. 3D and 2D, a real mouse.
+test('boxes/1 in Chrome (0.14.1): a double click to rename takes what is drawn there, and never shows the text', { skip: chrome ? false : 'no Chrome', timeout: 180000 }, async () => {
+  const T = `format: boxes/1\ntitle: D\nboxes:\n  out: { size: [2, 2, 1] }\n  hall: { kind: zone, size: [20, 10] }\n  in: { in: hall, size: [2, 2, 1] }\nlinks:\n  - { from: out, to: in }\nx-editor:\n  layout:\n    out: { at: [0, 4] }\n    hall: { at: [14, 0] }\n    in: { at: [16, 4] }\n`;
+  for (const asks of [true, false]) await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until, cdp }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    await ev(`E.setText(${JSON.stringify(T)}, { fit: true });`); await until(`I.canvas.doc?.scene.layout.byId.get('hall') && document.querySelector('.iso-canvas svg.scene [data-id^="link-"]')`, 'drawn');
+    await ev(`window.__shown = []; const go = I.pane.goTo.bind(I.pane); I.pane.goTo = (p, ...a) => { window.__shown.push(p.join('/')); return go(p, ...a); };`);
+    const dbl = async (p: { x: number; y: number }) => { for (const n of [1, 2]) for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: n }); await ev(`await tick(200);`);
+      return ev<{ field: string | null; shown: string[] }>(`const o = { field: document.querySelector('.rename-field input')?.value ?? null, shown: window.__shown.splice(0) }; document.querySelector('.rename-field input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick(60); return o; `); };
+    for (const mode of ['3d', '2d']) {
+      if (mode === '2d') { await ev(`I.canvas.setMode('2d');`); await until(`I.canvas.mode === '2d' && document.querySelectorAll('.iso-canvas svg.scene').length === 1 && !document.querySelector('.dual-morph')`, '2d'); }
+      await ev(`I.canvas.fit(); await tick(250);`);
+      // along the connection's line: on it, and 4 px beside it, over the hall's floor and over nothing (clear of the things and of words)
+      const places = () => ev<Record<string, { x: number; y: number } | null>>(`const path = [...document.querySelectorAll('.iso-canvas svg.scene path')].find(p => !p.closest('.overlay') && /^link-/.test(p.closest('[data-id]')?.dataset.id ?? '') && getComputedStyle(p).fill === 'none'), m = path.getScreenCTM(), w = path.getTotalLength(), out = { on: null, hall: null, nothing: null };
+        const idAt = (x, y) => document.elementFromPoint(x, y)?.closest('[data-id]')?.dataset.id ?? '';
+        for (let t = 6; t < w - 6; t += 1) { const a = path.getPointAtLength(t - 1).matrixTransform(m), b = path.getPointAtLength(t + 1).matrixTransform(m), q = path.getPointAtLength(t).matrixTransform(m), l = Math.hypot(b.x - a.x, b.y - a.y) || 1, n = { x: -(b.y - a.y) / l, y: (b.x - a.x) / l };
+          if (!out.on && /^link-/.test(idAt(q.x, q.y)) && /^link-/.test(idAt(Math.floor(q.x), Math.floor(q.y)))) out.on = { x: Math.floor(q.x), y: Math.floor(q.y) };
+          for (const s of [4, -4]) { const p = { x: q.x + n.x * s, y: q.y + n.y * s }, id = idAt(p.x, p.y), el = document.elementFromPoint(p.x, p.y); if (el?.tagName === 'text') continue; // (well inside: a double click's place is whole pixels)
+            const all = v => [[2, 0], [-2, 0], [0, 2], [0, -2]].every(([dx, dy]) => idAt(p.x + dx, p.y + dy) === v); if (!out.hall && id === 'hall' && all('hall')) out.hall = p; if (!out.nothing && id === '' && all('') && el?.closest('.iso-canvas')) out.nothing = p; } }
+        return out;`);
+      // (where they are is asked again for each: a selection may have moved the view)
+      const r: Record<string, unknown> = {};
+      for (const k of ['on', 'hall', 'nothing']) { const at = (await places())[k]; assert.ok(at, `${mode}: a place ${k}`); r[k] = await dbl(at); }
+      const link = { field: null, shown: ['links/0'] }, none = { field: null, shown: [] };
+      assert.deepEqual(r, asks ? { on: none, hall: { field: 'hall', shown: [] }, nothing: none } : { on: link, hall: link, nothing: link }, `${mode}, ${asks ? 'rename' : 'by default'}`);
+      assert.equal(await ev(`return E.getText();`), T);
+    }
+    assert.deepEqual(await ev(`return { violations: B.violations, errors: B.errors };`), { violations: [], errors: [] });
+  }, '1280,860', { html: `<!doctype html><html><head><meta charset="utf-8"><title>page</title></head><body ${asks ? 'data-rename' : ''} style="margin:0"><div id="app" style="height:100vh"></div><script type="module" src="page.js"></script></body></html>` });
+});
+
 // 0.12.5: setText(text, { fit: true }): another document's drawing fitted once drawn, though the view had been moved (3D, 2D, and
 // the same text again); without it the view stays where it is.
 test('boxes/1 in Chrome (0.12.5): setText with fit', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {

@@ -23,6 +23,7 @@ import type { EditorModel, Command } from '../model.ts';
 import type { Problem } from '../validate.ts';
 import { applyStep } from '../splice.ts';
 import { seqCmd, type Commands } from '../commands.ts';
+import { makeWay, hits, DWELL_HINT, DWELL_GIVE, BACK_AFTER, GLIDE, JIGGLE, type Beside } from '../make-way.ts';
 import type { ObjectKindInfo, ObjectRef, ConnectPlan, GroupPlan } from '../adapter.ts';
 import { fromPointer, toPointer, type Path } from '../path.ts';
 import { buildSvg } from '../../iso-core/svg-dom.ts';
@@ -82,8 +83,12 @@ export interface CanvasUi {
    *  its own at the canvas's left, with a search box filtering by label and section, resizable and collapsible; its
    *  width and whether it is collapsed are kept in the host's store as `canvas-palette-dock`) */
   paletteLayout?: 'floating' | 'docked';
-  /** (0.12.5) what a double click on an object does: shows it in the text (the default), or renames it */
+  /** (0.12.5) what a double click on an object does: shows it in the text (the default), or renames it (0.14.1: what has no
+   *  name, a connection, does nothing then) */
   doubleClick?: 'text' | 'rename';
+  /** (0.14.0) whether what is in a drag's way jiggles before it gives way, and glides: 'always' (the default), or
+   *  'respect': not where the viewer prefers reduced motion (the outlines of where it would go still show) */
+  dragMotion?: 'always' | 'respect';
   text: {
     stage: string; dragGroup: string; dragSelectTip: string; unreadable: string; palette: string;
     /** the end of a pin drag's hint */
@@ -113,6 +118,9 @@ export interface CanvasKit<M, D extends CanvasDrawing> {
   dropOnto?(target: ObjectRef, value: unknown, kind: string, data: unknown): { value: unknown; label?: string } | undefined;
   /** (0.10.0) the selection made into a new container (the adapter's group): Group, ⌘G, one undo step */
   group?(members: ObjectRef[], data: unknown): GroupPlan | undefined;
+  /** (0.14.0) the palette's entries as what they make, drawn small (palette-look.ts): what draws those that show and aren't
+   *  drawn yet. None: the entries' icons */
+  looks?(palette: HTMLElement, data: () => unknown, ui: CanvasUi, theme: string): () => void;
   actions: Actions;
   /** what an object's own menu offers, beyond rename, duplicate and delete */
   objectItems(doc: EditorModel, path: Path, origin: 'canvas' | 'menu', note?: (t: string, tone?: 'bad') => void): MenuItem[];
@@ -147,6 +155,9 @@ export interface CanvasOpts<M, D extends CanvasDrawing, A extends object = objec
   /** a layer over the drawing (none: the drawing and its marks only) */
   layer?: (ctx: CanvasCtx<D>) => CanvasLayer<A>;
 }
+
+/** a new thing as a drag would make it: inside what (none: the canvas), by which command */
+export interface FreshPlan { into?: string; label: string; add: Command }
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -249,7 +260,8 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (next.diags.length) { showEmpty(`The canvas couldn't draw this: ${next.diags[0]}`); return; }
     lastKey = key;
     lastS3 = s3; lastData = data;
-    if (pinDrag()) { pendingAfterDrag = true; return; }      // a model change mid-drag: drawn when the drag ends
+    drawLooks();
+    if (pinDrag() || dropping) { pendingAfterDrag = true; return; }      // a model change mid-drag (or while its drop fades): drawn when the drag ends
     await draw(next);
     if (cd!.pinNotes.length) opts.note(`Pins: ${cd!.pinNotes.join('; ')}`, 'warn');
   }
@@ -568,8 +580,16 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     kind: 'pan' | 'marquee' | 'pin' | 'click'; x0: number; y0: number; v0?: View; emptyClick?: boolean;
     // a pin drag: where it started and what it is shown at, its size and floor, its parent and siblings, the move so far
     start?: [number, number]; shown?: [number, number]; z0?: number; size?: [number, number];
-    parent?: { w: number; d: number; pad: number; box: { x0: number; y0: number; x1: number; y1: number }; label: string };
-    siblings?: { x0: number; y0: number; x1: number; y1: number }[]; move?: Move; invalid?: boolean; step?: number; origCd?: D; gridShown?: boolean;
+    parent?: { id: string; w: number; d: number; pad: number; box: { x0: number; y0: number; x1: number; y1: number }; label: string };
+    /** (0.14.0) how far the view was moved to keep the container still on screen (a trial may lay it out elsewhere) */
+    shifted?: [number, number];
+    move?: Move; invalid?: boolean; step?: number; origCd?: D; gridShown?: boolean;
+    /** what stands beside it in its container, where it stood when the drag began */
+    beside?: Beside[];
+    /** (0.14.0) what gave way to it, by how many cells; what would, while the drop waits; the last cell it could drop on */
+    given?: Map<string, [number, number]>; way?: Map<string, [number, number]>; clearAt?: [number, number];
+    /** (0.14.0) a new thing, from the palette (origCd: the drawing without it): the drawing with it, and what it is made as */
+    fresh?: { base: D; name: string; path: Path; plan: FreshPlan; text: string };
     /** siblings that flow after the dragged item, pinned where they stand so the drag doesn't push them */
     keep?: [string, [number, number]][]; sel0?: Path[]; add?: boolean; touch?: boolean; name?: string; id?: string; box?: { x: number; y: number; w: number; h: number }; moved?: boolean; ptr?: string; narrow?: string } | undefined;
   let spaceKeyDown = false;
@@ -577,15 +597,16 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     stage.addEventListener('pointerdown', down);
     stage.addEventListener('pointermove', move);
     stage.addEventListener('pointerup', up);
-    stage.addEventListener('pointercancel', up);
+    stage.addEventListener('pointercancel', e => { if (pinDrag()) void endPin(false); else up(e); });
     stage.addEventListener('wheel', wheel, { passive: false });
     stage.addEventListener('contextmenu', context);
     stage.addEventListener('dblclick', e => {
       // (0.12.5) what is under the pointer: the presses were captured, so a real double click's target is the stage
-      const p = pathAt(e.target === stage ? fdoc().elementFromPoint(e.clientX, e.clientY) : e.target, e.clientX, e.clientY);
-      if (p === undefined) return;
-      if (ui.doubleClick === 'rename' && doc.doc.ok && resourceOf(p)?.path === p) rename(fromPointer(p));
-      else opts.showInText(fromPointer(p));
+      const t = e.target === stage ? fdoc().elementFromPoint(e.clientX, e.clientY) : e.target;
+      // (0.14.1) to rename: the thing drawn there (not a connection near it); what has no name, nothing
+      if (ui.doubleClick === 'rename') { const p = pathAtEvent(t), r = p === undefined ? p : resourceOf(p); if (r && doc.doc.ok) rename(fromPointer(r.path)); return; }
+      const p = pathAt(t, e.clientX, e.clientY);
+      if (p !== undefined) opts.showInText(fromPointer(p));
     });
   };
   // in the page, a pointer's coordinates are already the page's
@@ -635,10 +656,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       const start = localAt(cd.scene, id);
       if (item && start) {
         const b = item.box, par = item.parent;
-        const siblings = (par ? par.children : cd.scene.layout.items.filter(i => !i.parent)).filter(i => i !== item).map(i => ({ x0: i.box.x0, y0: i.box.y0, x1: i.box.x1, y1: i.box.y1 }));
         drag = {
-          kind: 'pin', x0: x, y0: y, name, id, ptr, narrow, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], siblings,
-          parent: par ? { w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: par.box, label: par.region?.label ?? par.id } : undefined,
+          kind: 'pin', x0: x, y0: y, name, id, ptr, narrow, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], beside: besideOf(cd, id),
+          parent: par ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: par.box, label: par.region?.label ?? par.id } : undefined,
           origCd: cd,
         };
       }
@@ -721,6 +741,16 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   }
   let pinFrame = false, lastPin: { x: number; y: number; alt: boolean } | undefined, relayout = 0;
   const pinDrag = () => (drag?.kind === 'pin' && drag.moved ? drag : undefined);
+  /** what stands beside a drawn thing, in its container (or on the canvas), and whether each can be pinned elsewhere */
+  function besideOf(d: D, id: string, inside = d.scene.layout.byId.get(id)?.parent): Beside[] {
+    const pinned = new Set(d.pinId.values());
+    return (inside ? inside.children : d.scene.layout.items.filter(i => !i.parent)).filter(i => i.id !== id)
+      .map(i => ({ id: i.id, x0: i.box.x0, y0: i.box.y0, x1: i.box.x1, y1: i.box.y1, movable: pinned.has(i.id) && !!localAt(d.scene, i.id) }));
+  }
+  /** where those are now: where they stood, or where they gave way to */
+  const besideNow = (g: NonNullable<typeof drag>) => g.beside!.map(b => { const [dx, dy] = g.given?.get(b.id) ?? [0, 0]; return { ...b, x0: b.x0 + dx, x1: b.x1 + dx, y0: b.y0 + dy, y1: b.y1 + dy }; });
+  const footAt = (g: NonNullable<typeof drag>, [x, y]: [number, number]) => { const ox = g.parent ? g.parent.box.x0 : 0, oy = g.parent ? g.parent.box.y0 : 0; return { x0: ox + x, y0: oy + y, x1: ox + x + g.size![0], y1: oy + y + g.size![1] }; };
+  const motionOn = () => ui.dragMotion !== 'respect' || !matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** one step of a pin drag: snap, clamp, check, move the drawing, and lay it out again when the cell changes */
   function pinStep() {
     const g = pinDrag();
@@ -728,71 +758,201 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const k = scale();
     const step = lastPin.alt ? 0.5 : 1;
     g.step = step;
-    const m = snapMove(g.start!, screenToGrid((lastPin.x - g.x0) / k, (lastPin.y - g.y0) / k), step, g.size!, g.parent);
-    const ox = g.parent ? g.parent.box.x0 : 0, oy = g.parent ? g.parent.box.y0 : 0;
-    const foot = { x0: ox + m.at[0], y0: oy + m.at[1], x1: ox + m.at[0] + g.size![0], y1: oy + m.at[1] + g.size![1] };
+    const p = g.fresh ? toSvg(lastPin.x, lastPin.y) : undefined;
+    // a new thing is held by its floor's middle
+    const f0 = footAt(g, g.start!), grip = iso((f0.x0 + f0.x1) / 2, (f0.y0 + f0.y1) / 2, g.z0!);
+    const d = p ? screenToGrid(p.x - grip[0], p.y - grip[1]) : screenToGrid((lastPin.x - g.x0) / k, (lastPin.y - g.y0) / k);
+    const m = snapMove(g.start!, d, step, g.size!, g.parent);
+    const foot = footAt(g, m.at);
     const changed = !g.move || g.move.at[0] !== m.at[0] || g.move.at[1] !== m.at[1];
     g.move = m;
-    g.invalid = overlaps(foot, g.siblings!);
+    g.invalid = overlaps(foot, besideNow(g));
+    if (changed) dwell(g);
+    if (!g.invalid) g.clearAt = m.at;
     svg?.classList.add('dragging');
     svg?.classList.toggle('drag-bad', g.invalid);
     // at once: the drawn item (and what stands on it) moved by transform, from where the drawing has it
     shiftDragged(g.id!, [m.at[0] - g.shown![0], m.at[1] - g.shown![1]]);
     paintDrag(foot);
-    const within = g.parent ? `within ${g.parent.label}` : 'on the canvas';
-    opts.onHint?.(`Moving ${g.name} ${within} · ${step === 1 ? 'whole cells (⌥: half cells)' : 'half cells'} · ${g.invalid ? 'overlaps: it won\'t drop here' : 'Esc cancels'}${T.pinHint}`);
+    sayDrag(g);
     // then the real layout, with its routes and labels, once per cell (and only where it may drop)
-    if (changed && !g.invalid && lastS3) {
-      clearTimeout(relayout);
-      relayout = window.setTimeout(async () => {
-        const now = pinDrag();
-        if (!now || now.invalid || !now.move) return;
-        let next: D;
-        try { ({ next, keep: now.keep } = trialLayout(now)); } catch { return; }
-        if (pinDrag() !== now) return;                     // the drag ended meanwhile: don't draw a stale trial
-        await draw(next);
-        if (pinDrag() !== now) return;
-        now.shown = now.move.at;
-        shiftDragged(now.id!, [0, 0]);
-        paintDrag(now.parent ? { x0: now.parent.box.x0 + now.move.at[0], y0: now.parent.box.y0 + now.move.at[1], x1: now.parent.box.x0 + now.move.at[0] + now.size![0], y1: now.parent.box.y0 + now.move.at[1] + now.size![1] } : foot);
-      }, 0);
-    }
+    if (changed && !g.invalid) relayoutSoon(g);
+  }
+  function sayDrag(g: NonNullable<typeof drag>) {
+    const within = g.parent ? `${g.fresh ? 'in' : 'within'} ${g.parent.label}` : 'on the canvas';
+    const n = g.given?.size ?? 0;
+    opts.onHint?.(`${g.fresh ? 'Adding' : 'Moving'} ${g.name} ${within} · ${g.step === 1 ? 'whole cells (⌥: half cells)' : 'half cells'} · ${g.invalid ? (g.way ? 'hold still: it makes way' : g.fresh ? 'taken: the layout places it' : 'overlaps: it won\'t drop here') : n ? `${n} made way · Esc cancels` : 'Esc cancels'}${T.pinHint}`);
+  }
+  function relayoutSoon(g: NonNullable<typeof drag>, glide = false) {
+    if (!g.fresh && !lastS3) return;
+    clearTimeout(relayout);
+    const go = () => {
+      const now = pinDrag();
+      if (!now || now !== g || now.invalid || !now.move) return;
+      let next: D;
+      try { ({ next, keep: now.keep } = trialLayout(now)); } catch { return; }
+      showTrial(now, next, now.move.at, glide);
+    };
+    if (glide) go(); else relayout = window.setTimeout(go, 0);
+  }
+  /** a trial drawing on the stage, the dragged thing at `at` in it; what moved since the last one glides there, if asked */
+  function showTrial(g: NonNullable<typeof drag>, next: D, at: [number, number], glide: boolean) {
+    const was = cd!;
+    stillOn(g, next);
+    void draw(next);
+    if (pinDrag() !== g) return;
+    g.shown = at;
+    shiftDragged(g.id!, [g.move!.at[0] - at[0], g.move!.at[1] - at[1]]);
+    paintDrag(footAt(g, g.move!.at));
+    if (!glide || !motionOn()) return;
+    const from = new Map<string, [number, number]>();
+    for (const b of g.beside!) { const a = was.scene.layout.byId.get(b.id)?.box, z = next.scene.layout.byId.get(b.id)?.box; if (a && z && (Math.abs(a.x0 - z.x0) > 1e-6 || Math.abs(a.y0 - z.y0) > 1e-6)) from.set(b.id, [a.x0 - z.x0, a.y0 - z.y0]); }
+    glideFrom(from);
+  }
+  /** a trial lays the container out at another place (it fits what it holds): the view moved with it, so it stands still on
+   *  screen, and what the drag knows of the container with it */
+  function stillOn(g: NonNullable<typeof drag>, next: D) {
+    const now = g.parent && next.scene.layout.byId.get(g.parent.id)?.box;
+    if (!g.parent || !now || !V.view) return;
+    const was = g.parent.box, dx = now.x0 - was.x0, dy = now.y0 - was.y0;
+    g.parent = { ...g.parent, box: now, w: Math.max(g.parent.w, now.x1 - now.x0), d: Math.max(g.parent.d, now.y1 - now.y0) };
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return;
+    g.beside = g.beside!.map(b => ({ ...b, x0: b.x0 + dx, x1: b.x1 + dx, y0: b.y0 + dy, y1: b.y1 + dy }));
+    shiftView(g, (dx - dy) * C * S, (dx + dy) * 0.5 * S);
+  }
+  function shiftView(g: NonNullable<typeof drag>, x: number, y: number) {
+    if (!V.view) return;
+    V.view = { ...V.view, x: V.view.x + x, y: V.view.y + y };
+    g.shifted = [(g.shifted?.[0] ?? 0) + x, (g.shifted?.[1] ?? 0) + y];
+  }
+  /** the view as it would be without that (the drag put back) */
+  function unshift(g: NonNullable<typeof drag>) { if (g.shifted) { shiftView(g, -g.shifted[0], -g.shifted[1]); g.shifted = undefined; } }
+  // ---------- (0.14.0) making way: a drop that waits on a taken cell (make-way.ts has the numbers and the arithmetic) ----------
+  let hintTimer = 0, giveTimer = 0, backTimer = 0, wayFrame = 0, jiggling: string[] = [];
+  /** the jiggle and the glide, off; what they moved, back where the drawing has it */
+  function stillWay() {
+    cancelAnimationFrame(wayFrame); wayFrame = 0;
+    for (const id of jiggling) shiftDragged(id, [0, 0]);
+    jiggling = [];
+  }
+  function restart() { clearTimeout(hintTimer); clearTimeout(giveTimer); stillWay(); }
+  function endWay() { clearTimeout(backTimer); backTimer = 0; restart(); }
+  /** does what gave way still have to, with the dragged thing here */
+  const needed = (g: NonNullable<typeof drag>, foot: Beside | { x0: number; y0: number; x1: number; y1: number }) => g.beside!.some(b => g.given?.has(b.id) && hits(b, foot));
+  /** the dragged thing is on another cell: the clock starts again; what gave way and is no longer needed goes back */
+  function dwell(g: NonNullable<typeof drag>) {
+    restart();
+    g.way = undefined;
+    const foot = footAt(g, g.move!.at);
+    // what gave way: kept while this cell needs it, else back after a moment (so a wobble doesn't flicker)
+    if (!g.given?.size || needed(g, foot)) { clearTimeout(backTimer); backTimer = 0; }
+    else if (!backTimer) backTimer = window.setTimeout(() => { backTimer = 0; if (pinDrag() === g) putBack(g); }, BACK_AFTER);
+    if (!g.invalid || !g.beside!.some(b => hits(b, foot))) return;
+    hintTimer = window.setTimeout(() => {
+      if (pinDrag() !== g) return;
+      const from = g.clearAt ?? g.start!, par = g.parent, pad = par?.pad ?? 0;
+      const way = makeWay({
+        foot, others: g.beside!, going: [g.move!.at[0] - from[0], g.move!.at[1] - from[1]],
+        bounds: par ? { x0: par.box.x0 + pad, y0: par.box.y0 + pad, x1: par.box.x1 - pad, y1: par.box.y1 - pad } : undefined,
+      });
+      if (!way?.size) return;
+      g.way = way;
+      paintDrag(foot); sayDrag(g); jiggle(g);
+      giveTimer = window.setTimeout(() => { if (pinDrag() === g && g.way === way) give(g, way); }, DWELL_GIVE - DWELL_HINT);
+    }, DWELL_HINT);
+  }
+  function give(g: NonNullable<typeof drag>, way: Map<string, [number, number]>) {
+    stillWay();
+    g.given = way; g.way = undefined; g.invalid = false; g.clearAt = g.move!.at;
+    relayoutSoon(g, true);
+    sayDrag(g);
+  }
+  function putBack(g: NonNullable<typeof drag>) {
+    stillWay();
+    g.given = undefined;
+    g.invalid = overlaps(footAt(g, g.move!.at), besideNow(g));
+    sayDrag(g);
+    if (!g.invalid) { relayoutSoon(g, true); return; }
+    // over something else: as the drag began, the dragged thing shown where it is held
+    showTrial(g, g.fresh?.base ?? g.origCd!, g.start!, true);
+    dwell(g);
+  }
+  function jiggle(g: NonNullable<typeof drag>) {
+    if (!motionOn()) return;
+    const t0 = performance.now(), ids = [...g.way!.keys()];
+    jiggling = ids;
+    const frame = (now: number) => {
+      if (pinDrag() !== g || !g.way) return;
+      const t = now - t0, a = (JIGGLE.px * Math.min(1, 0.25 + 0.75 * t / (DWELL_GIVE - DWELL_HINT))) / scale();
+      ids.forEach((id, i) => shiftScreen(id, a * Math.sin((t / 1000) * JIGGLE.hz * 2 * Math.PI + i * 1.7)));
+      wayFrame = requestAnimationFrame(frame);
+    };
+    wayFrame = requestAnimationFrame(frame);
+  }
+  function glideFrom(from: Map<string, [number, number]>) {
+    if (!from.size) return;
+    const t0 = performance.now(), on = svg;
+    jiggling = [...from.keys()];
+    const frame = (now: number) => {
+      if (svg !== on) { jiggling = []; return; }
+      const f = Math.min(1, Math.max(0, (now - t0) / GLIDE)), left = Math.pow(1 - f, 3);
+      for (const [id, [dx, dy]] of from) shiftDragged(id, [dx * left, dy * left]);
+      if (f < 1) wayFrame = requestAnimationFrame(frame); else jiggling = [];
+    };
+    frame(t0);
   }
   /**
    * The drawing with the dragged item pinned at its move. Siblings placed after it (in the flow, or beside it) would move
    * with it; any that did, and can be pinned, are kept where they stood, and the drop pins them too.
    */
-  function trialLayout(g: NonNullable<typeof drag>): { next: D; keep: [string, [number, number]][] } {
-    const base = JSON.parse(JSON.stringify(lastData ?? {})) as Record<string, Record<string, Record<string, unknown>>>;
-    // pins kept under the legacy key are read there; the trial puts them where the drop will (x-editor)
-    if (K.pins.legacyOnly(base)) { base[PINS_KEY] = base[K.pins.legacyKey!]; delete base[K.pins.legacyKey!]; }
-    base[PINS_KEY] ??= {}; base[PINS_KEY].layout ??= {};
-    const pins = base[PINS_KEY].layout;
-    pins[g.name!] = { at: g.move!.at };
-    let next = K.draw(lastS3!, base, opts.theme);
+  function trialLayout(g: NonNullable<typeof drag>, at = g.move!.at): { next: D; keep: [string, [number, number]][] } {
     const orig = g.origCd!, nameOf = new Map([...orig.pinId].map(([n, id]) => [id, n]));
-    const me = orig.scene.layout.byId.get(g.id!)!;
-    const sibs = me.parent ? me.parent.children : orig.scene.layout.items.filter(i => !i.parent);
+    // what gave way, where it gave way to (a pin each)
+    const gave: [string, [number, number]][] = [];
+    for (const [id, [dx, dy]] of g.given ?? []) { const was = localAt(orig.scene, id)!; gave.push([nameOf.get(id)!, [was[0] + dx, was[1] + dy]]); }
+    const set: [string, [number, number]][] = [[g.name!, at], ...gave];
+    const lay = layWith(g);
+    let next = lay(set);
+    const have = new Set([...Object.keys(K.pins.of(lastData) ?? {}), ...set.map(([n]) => n)]);
     const keep: [string, [number, number]][] = [];
-    for (const sb of sibs) {
-      if (sb === me) continue;
-      const n = nameOf.get(sb.id), was = localAt(orig.scene, sb.id), now = next.scene.layout.byId.get(sb.id)?.box;
-      if (!n || !was || !now || n in pins) continue;
-      if (Math.abs(now.x0 - sb.box.x0) > 1e-6 || Math.abs(now.y0 - sb.box.y0) > 1e-6) keep.push([n, was]);
+    for (const b of g.beside!) {
+      const n = nameOf.get(b.id), was = localAt(orig.scene, b.id), now = localAt(next.scene, b.id);
+      if (!n || !was || !now || have.has(n)) continue;
+      if (Math.abs(now[0] - was[0]) > 1e-6 || Math.abs(now[1] - was[1]) > 1e-6) keep.push([n, was]);
     }
-    if (keep.length) { for (const [n, at] of keep) pins[n] = { at }; next = K.draw(lastS3!, base, opts.theme); }
-    return { next, keep };
+    if (keep.length) next = lay([...set, ...keep]);
+    return { next, keep: [...gave, ...keep] };
+  }
+  /** the drawing with these pins: of the file's data, or (a new thing) of the text it would make */
+  function layWith(g: NonNullable<typeof drag>): (pins: [string, [number, number]][]) => D {
+    if (g.fresh) {
+      const text = g.fresh.text;
+      return list => { const t = K.trial(pinsCmd(list, '').build(text).steps.reduce((u, st) => applyStep(u, st), text), opts.theme); if (!t) throw new Error('not drawn'); return t; };
+    }
+    return list => {
+      const base = JSON.parse(JSON.stringify(lastData ?? {})) as Record<string, Record<string, Record<string, unknown>>>;
+      // pins kept under the legacy key are read there; the trial puts them where the drop will (x-editor)
+      if (K.pins.legacyOnly(base)) { base[PINS_KEY] = base[K.pins.legacyKey!]; delete base[K.pins.legacyKey!]; }
+      base[PINS_KEY] ??= {}; base[PINS_KEY].layout ??= {};
+      for (const [n, at] of list) base[PINS_KEY].layout[n] = { at };
+      return K.draw(lastS3!, base, opts.theme);
+    };
   }
   /** move a drawn item, and everything standing on it, by a grid offset (a transform: the next layout replaces it) */
   function shiftDragged(id: string, [gx, gy]: [number, number]) {
     if (!svg || !cd) return;
-    const [sx, sy] = [(gx - gy) * C * S, (gx + gy) * 0.5 * S];
+    shiftBy(id, (gx - gy) * C * S, (gx + gy) * 0.5 * S);
+  }
+  /** the same, sideways on screen */
+  const shiftScreen = (id: string, dx: number) => shiftBy(id, dx, 0);
+  function shiftBy(id: string, sx: number, sy: number) {
+    if (!svg || !cd) return;
     const ids = new Set([id]);
     for (const it of cd.scene.layout.items) { let p = it.parent; while (p) { if (p.id === id) { ids.add(it.id); break; } p = p.parent; } }
     for (const el of svg.querySelectorAll<SVGElement>('[data-id]')) {
       if (!ids.has(el.getAttribute('data-id') ?? '')) continue;
       if (el.parentElement?.closest(`[data-id="${CSS.escape(el.getAttribute('data-id')!)}"]`)) continue;
-      el.setAttribute('transform', gx || gy ? `translate(${sx.toFixed(1)} ${sy.toFixed(1)})` : '');
+      el.setAttribute('transform', sx || sy ? `translate(${sx.toFixed(2)} ${sy.toFixed(2)})` : '');
     }
   }
   /** the drag's overlay: the grid on the parent's floor (half cells too, with ⌥), the drop target, the clamped edges */
@@ -820,10 +980,21 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     for (let v = Math.ceil((area.y0 - oy) / st) * st; oy + v <= area.y1 + 1e-9; v += st) line(area.x0, oy + v, area.x1, oy + v, Number.isInteger(v) ? 'dgrid' : 'dgrid sub');
     overlay.append(wrap);
     // the drop target: the footprint, accent where it may drop, red where it can't
-    const t = d.createElementNS(SVGNS, 'polygon');
-    t.setAttribute('class', `drop${g.invalid ? ' bad' : ''}`);
-    t.setAttribute('points', [[foot.x0, foot.y0], [foot.x1, foot.y0], [foot.x1, foot.y1], [foot.x0, foot.y1]].map(([x, y]) => P(x, y)).join(' '));
-    overlay.append(t);
+    const poly = (b: { x0: number; y0: number; x1: number; y1: number }, cls: string) => {
+      const t = d.createElementNS(SVGNS, 'polygon');
+      t.setAttribute('class', cls);
+      t.setAttribute('points', [P(b.x0, b.y0), P(b.x1, b.y0), P(b.x1, b.y1), P(b.x0, b.y1)].join(' '));
+      overlay!.append(t);
+      return t;
+    };
+    poly(foot, `drop${g.invalid ? ' bad' : ''}`);
+    // what would make way, outlined where it would go
+    for (const b of g.way ? besideNow({ ...g, given: g.way }) : []) {
+      if (!g.way!.has(b.id)) continue;
+      const w = poly(b, 'drop way');
+      w.setAttribute('stroke-dasharray', '5 4');
+      w.dataset.way = b.id;
+    }
     // the parent's edges the move is held at
     if (g.parent && g.move) {
       const pb = g.parent.box, c = g.move.clamped, pad = g.parent.pad;
@@ -847,6 +1018,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (!g) return;
     drag = undefined;
     clearTimeout(relayout);
+    endWay();
+    // dropped where what gave way isn't needed, before it went back: it stays where it was
+    let stale = false;
+    if (commit && g.given?.size && g.move) {
+      const foot = footAt(g, g.move.at);
+      if (!needed(g, foot)) { g.given = undefined; g.invalid = overlaps(foot, besideNow(g)); stale = true; }
+    }
     // the grid and the drop target fade out, then the drop
     const shown = overlay ? [...overlay.querySelectorAll('.gridwrap, .drop, .edge')] : [];
     if (shown.length) {
@@ -857,19 +1035,137 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     svg?.classList.remove('dragging', 'drag-bad');
     paintNav();
     const m = g.move;
+    if (g.fresh) { await endFresh(g, commit, stale); return; }
     const moved = m && (m.at[0] !== g.start![0] || m.at[1] !== g.start![1]);
     if (commit && m && moved && !g.invalid) {
       // the item, and the neighbours the move would have pushed, kept where they stand: one command, one undo step
       const label = `Pin ${describe(fromPointer(g.ptr!))} at [${m.at.join(', ')}]`;
       let keep = g.keep ?? [];
-      if (!g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1]) try { keep = trialLayout(g).keep; } catch { /* drop it as it is */ }
-      run(doc, keep.length ? pinsCmd([[g.name!, m.at], ...keep], `${label} (${keep.map(([n]) => n).join(', ')} kept in place)`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: m.at }, label)), 'canvas', opts.note);
-      if (pendingAfterDrag && lastS3) { pendingAfterDrag = false; lastKey = ''; render(lastS3, lastData); }
+      if (stale || !g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1]) try { keep = trialLayout(g).keep; } catch { /* drop it as it is */ }
+      run(doc, keep.length ? pinsCmd([[g.name!, m.at], ...keep], `${label}${wayWords(g, keep)}`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: m.at }, label)), 'canvas', opts.note);
+      pendingAfterDrag = false;                            // the drop's own reading draws what came meanwhile too
       return;
     }
     if (commit && g.invalid) opts.note(`${g.name} can't go there: it would overlap`, 'warn');
+    unshift(g);
     await draw(g.origCd!);
-    if (pendingAfterDrag && lastS3) { pendingAfterDrag = false; lastKey = ''; render(lastS3, lastData); }
+    redrawPending();
+  }
+
+  /** a reading that came during a drag that changed nothing: drawn now it is over */
+  function redrawPending() { if (pendingAfterDrag) { pendingAfterDrag = false; lastKey = ''; setTimeout(() => { if (lastS3 && !pinDrag()) void render(lastS3, lastData); }, 0); } }
+  /** what a drop's command says of the things it pins beside the dragged one */
+  function wayWords(g: NonNullable<typeof drag>, keep: [string, [number, number]][]): string {
+    const nameOf = new Map([...g.origCd!.pinId].map(([n, id]) => [id, n])), gave = new Set([...g.given?.keys() ?? []].map(id => nameOf.get(id)));
+    const a = keep.filter(([n]) => gave.has(n)).map(([n]) => n), b = keep.filter(([n]) => !gave.has(n)).map(([n]) => n);
+    const words = [...(a.length ? [`${a.join(', ')} made way`] : []), ...(b.length ? [`${b.join(', ')} kept in place`] : [])].join('; ');
+    return words && ` (${words})`;
+  }
+  // ---------- (0.14.0) a new thing dragged from the palette: the real one, in a trial drawing, by the drag above ----------
+  /** what it would be made as at a point: the container (or the object that holds it) under the point, as the drawing
+   *  was before it, so what it does to the drawing never changes the answer */
+  function freshPlan(sec: string, item: PaletteItem | undefined, name: string, p: Path, at: { x: number; y: number } | undefined, home: D | undefined): FreshPlan {
+    const k = kindOf(sec), preset = item?.value?.() as Record<string, unknown> | undefined;
+    const what = item && preset !== undefined ? item.label.toLowerCase() : k.singular;
+    const under = at && home ? outlinesAt(home, at) : [], drop = K.dropInto?.(sec);
+    let value = (preset ?? k.template()) as Record<string, unknown>, into: string | undefined, words = '';
+    const c = drop ? under.find(u => u.kind === drop.container) : undefined;
+    if (drop && c) { into = c.name; value = { ...(drop.value(c.name) as Record<string, unknown>), ...(preset ?? {}) }; words = drop.label(c.name); }
+    if (!into && K.dropOnto) for (const t of under) {
+      const plan = K.dropOnto(t, value, sec, doc.goodDoc.data);
+      if (plan) { into = t.name; value = plan.value as Record<string, unknown>; words = plan.label ? ` ${plan.label}` : ` in ${t.name}`; break; }
+    }
+    const label = `Add ${what} ${name}${words}`;
+    return { into, label, add: insertCmd(p.slice(0, -1), name, value, { label }) };
+  }
+  /** the objects whose outline a point of the drawing is in, innermost first */
+  function outlinesAt(d: D, q: { x: number; y: number }): ObjectRef[] {
+    // 2D: the panels under it
+    if (flat) return flat.panelsAt(q.x, q.y).map(id => { const ptr = d.pathOf.get(id), ref = ptr === undefined ? undefined : resourceOf(ptr); return ref && ref.path === ptr ? ref : undefined; }).filter((x): x is ObjectRef => !!x);
+    // on its drawn outline counts too: 2 px more each way
+    const e = 2 / scale() / S;
+    const inside = (poly: [number, number][]) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > q.y) !== (yj > q.y) && q.x < (xj - xi) * (q.y - yi) / (yj - yi) + xi) c = !c; } return c; };
+    const out: { r: ObjectRef; depth: number; area: number }[] = [];
+    for (const [id, ptr] of d.pathOf) {
+      const it = d.scene.layout.byId.get(id), ref = resourceOf(ptr);
+      if (!it || !ref || ref.path !== ptr) continue;
+      const b = it.box;
+      if (!inside(boxSilhouette({ ...b, x0: b.x0 - e, y0: b.y0 - e, x1: b.x1 + e, y1: b.y1 + e }))) continue;
+      let depth = 0; for (let up = it.parent; up; up = up.parent) depth++;
+      out.push({ r: ref, depth, area: (b.x1 - b.x0) * (b.y1 - b.y0) });
+    }
+    return out.sort((a, b) => b.depth - a.depth || a.area - b.area).map(x => x.r);
+  }
+  /** begin, or go on, dragging a new thing at a point (client px); false: it can't be drawn (the label is dragged) */
+  function dragFresh(sec: string, item: PaletteItem | undefined, at: { x: number; y: number; alt: boolean }): boolean {
+    if (mode !== '3d' || !cd || !svg || !doc.doc.ok || !lastS3) return false;
+    const was = pinDrag()?.fresh ? pinDrag() : undefined, home = was?.origCd ?? cd;
+    const k = kindOf(sec), name = was?.fresh!.name ?? freshName(doc.text, item?.name ?? k.singular), path = [...k.section, name] as Path;
+    const sv = toSvg(at.x, at.y), off = was?.shifted ?? [0, 0];
+    const plan = freshPlan(sec, item, name, path, { x: sv.x - off[0], y: sv.y - off[1] }, home);
+    if (!was || was.fresh!.plan.into !== plan.into) {
+      const text = plan.add.build(doc.text).steps.reduce((t, st) => applyStep(t, st), doc.text);
+      let trial: D | undefined;
+      try { trial = K.trial(text, opts.theme); } catch { /* not drawn */ }
+      const id = trial?.pinId.get(name), it = id ? trial!.scene.layout.byId.get(id) : undefined, start = id ? localAt(trial!.scene, id) : undefined;
+      if (!trial || trial.diags.length || !id || !it || !start) return false;
+      const b = it.box, par = it.parent, inHome = par ? home.scene.layout.byId.get(par.id) : undefined;
+      // drawn in a container of its own, made with it: it could only be moved inside that
+      if (par && !inHome) return false;
+      endWay(); clearTimeout(relayout);
+      const g: NonNullable<typeof drag> = {
+        kind: 'pin', x0: at.x, y0: at.y, moved: true, name, id, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], origCd: home,
+        // its container, as it was: what is drawn is moved to it (stillOn)
+        parent: par && inHome ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: inHome.box, label: par.region?.label ?? par.id } : undefined,
+        beside: besideOf(home, id, inHome), shifted: was?.shifted,
+        fresh: { base: trial, name, path, plan, text },
+        gridShown: was?.gridShown,
+      };
+      drag = g;
+      // out of one container and into another: the view as it was, then the new one still
+      unshift(g);
+      try { g.fresh!.base = trialLayout(g, start).next; } catch { /* as the layout has it */ }
+      stillOn(g, g.fresh!.base);
+      void draw(g.fresh!.base);
+      if (pinDrag() !== g) return false;
+    }
+    lastPin = { x: at.x, y: at.y, alt: at.alt };
+    pinStep();
+    return true;
+  }
+  /** the new thing off the canvas again: the drawing without it, the drag not over */
+  function hideFresh() {
+    const g = pinDrag();
+    if (!g?.fresh) return;
+    endWay(); clearTimeout(relayout);
+    drag = undefined;
+    lastKey = '';
+    unshift(g);
+    void draw(g.origCd!);
+    paintNav();
+  }
+  async function endFresh(g: NonNullable<typeof drag>, commit: boolean, stale: boolean) {
+    const f = g.fresh!, m = g.move;
+    if (!commit || !m) {
+      unshift(g);
+      await draw(g.origCd!);
+      redrawPending();
+      return;
+    }
+    pendingAfterDrag = false;
+    // where it is dropped, unless that is where the layout puts it anyway; on a taken cell, where the layout puts it
+    let keep = g.keep ?? [];
+    if (!g.invalid && (stale || !g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1] || g.keep === undefined)) try { keep = trialLayout(g).keep; } catch { keep = []; }
+    // (the layout's own place needn't be on the grid: the same cell is the same place)
+    const own = snapMove(g.start!, [0, 0], g.step ?? 1, g.size!, g.parent).at, its = m.at[0] !== own[0] || m.at[1] !== own[1];
+    const pins: [string, [number, number]][] = g.invalid ? [] : [...(its || keep.length ? [[f.name, m.at] as [string, [number, number]]] : []), ...keep];
+    const cmd = pins.length ? seqCmd(`${f.plan.label} at [${m.at.join(', ')}]${wayWords(g, keep)}`, [f.plan.add, pinsCmd(pins, '')]) : f.plan.add;
+    if (g.invalid) unshift(g);
+    if (!run(doc, { ...cmd, select: [f.path] }, 'canvas', opts.note)) { lastKey = ''; unshift(g); await draw(g.origCd!); return; }
+    if (g.invalid) opts.note(`${f.name} added; that spot is taken, so the layout placed it`);
+    doc.select([f.path], 'canvas');
+    // its name, in the inline field above it; the drop and the name are one undo step
+    rename(f.path, { joins: doc.undoId, at: lastPin });
   }
 
   function up(e: PointerEvent) {
@@ -911,10 +1207,6 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     }
     return out;
   }
-  const round = (v: number) => Math.round(v * 2) / 2;
-  const snap = ([x, y]: [number, number]): [number, number] => [round(x), round(y)];
-  const gridToScreen = (gx: number, gy: number): [number, number] => { const [ux, uy] = screenToGrid(1, 0), [vx, vy] = screenToGrid(0, 1); const det = ux * vy - uy * vx; return [(gx * vy - gy * vx) / det, (gy * ux - gx * uy) / det]; };
-
   function wheel(e: WheelEvent) {
     e.preventDefault();
     const { x, y } = pageXY(e);
@@ -1041,110 +1333,21 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     }
   }
   // ---------- E11: the palette: add a resource by a click, or by a drag onto the canvas ----------
-  /** Where a drop lands, as a pin: the new thing laid out once (a trial), then moved from where the layout put it to
-   *  the point, in its parent's frame and on the grid. Undefined: the spot is taken, or it can't be placed. */
-  function placeAt(name: string, add: Command, at: { x: number; y: number }): [number, number] | undefined {
-    if (!cd || !svg) return undefined;
-    const text = add.build(doc.text).steps.reduce((t, st) => applyStep(t, st), doc.text);
-    let trial: D | undefined;
-    try { trial = K.trial(text, opts.theme); } catch { return undefined; }
-    if (!trial) return undefined;
-    const id = trial.pinId.get(name), item = id ? trial.scene.layout.byId.get(id) : undefined, start = id ? localAt(trial.scene, id) : undefined;
-    if (!item || !start) return undefined;
-    const b = item.box, par = item.parent;
-    // the drawing's coordinates are the projection's: the trial's centre and the drop point, in the same units
-    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
-    const centre = [(cx - cy) * C * S, (cx + cy) * 0.5 * S - b.z0 * S], drop = toSvg(at.x, at.y);
-    const m = snapMove(start, screenToGrid(drop.x - centre[0], drop.y - centre[1]), 1, [b.x1 - b.x0, b.y1 - b.y0],
-      par ? { w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region) } : undefined);
-    const dx = m.at[0] - start[0], dy = m.at[1] - start[1];
-    const moved = { x0: b.x0 + dx, y0: b.y0 + dy, x1: b.x1 + dx, y1: b.y1 + dy };
-    const siblings = (par ? par.children : trial.scene.layout.items.filter(i => !i.parent)).filter(i => i !== item).map(i => i.box);
-    return overlaps(moved, siblings) ? undefined : m.at;
-  }
-  /** The container (of the kind given) whose floor a point is on (its footprint, as drawn), if any. */
-  function containerAt(kind: string, at: { x: number; y: number }): string | undefined {
-    if (!cd) return undefined;
-    const p = toSvg(at.x, at.y);
-    if (flat) {
-      // 2D: the innermost panel of that kind under the point
-      for (const id of flat.panelsAt(p.x, p.y)) {
-        const name = [...cd.pinId].find(([, pid]) => pid === id)?.[0];
-        if (name && resourceOf(cd.pathOf.get(id) ?? '')?.kind === kind) return name;
-      }
-      return undefined;
-    }
-    const inside = (poly: [number, number][]) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > p.y) !== (yj > p.y) && p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi) c = !c; } return c; };
-    for (const [name, id] of cd.pinId) {
-      if (resourceOf(cd.pathOf.get(id) ?? '')?.kind !== kind) continue;
-      const item = cd.scene.layout.byId.get(id);
-      if (item && inside(floorOf(item.box))) return name;
-    }
-    return undefined;
-  }
-  /** (0.10.1) the objects whose drawn floor a point is on, innermost first: in 2D the panels under it; in 3D every placed
-   *  thing whose floor holds the point, the deepest (then the smallest) first */
-  function objectsUnder(at: { x: number; y: number }): ObjectRef[] {
-    if (!cd) return [];
-    const p = toSvg(at.x, at.y);
-    const refOf = (id: string) => { const ptr = cd!.pathOf.get(id); const r = ptr === undefined ? undefined : resourceOf(ptr); return r && r.path === ptr ? r : undefined; };
-    if (flat) return flat.panelsAt(p.x, p.y).map(refOf).filter((r): r is ObjectRef => !!r);
-    const inside = (poly: [number, number][]) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > p.y) !== (yj > p.y) && p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi) c = !c; } return c; };
-    const depth = (i: { parent?: unknown }) => { let n = 0; for (let q = i.parent as { parent?: unknown } | undefined; q; q = q.parent as { parent?: unknown } | undefined) n++; return n; };
-    // what is drawn under the point, topmost (innermost) first, as the eye sees it; then any whose floor holds the point
-    const seen = new Map<string, ObjectRef>();
-    for (const e of fdoc().elementsFromPoint(at.x, at.y)) {
-      if (!svg?.contains(e)) continue;
-      for (let el = e.closest('[data-id]'); el; el = el.parentElement?.closest('[data-id]') ?? null) {
-        const r = refOf(el.getAttribute('data-id') ?? '');
-        if (r && !seen.has(r.path)) seen.set(r.path, r);
-      }
-    }
-    const hits: { r: ObjectRef; d: number; a: number }[] = [];
-    for (const [, id] of cd.pinId) {
-      const item = cd.scene.layout.byId.get(id), r = refOf(id);
-      if (item && r && !seen.has(r.path) && inside(floorOf(item.box))) hits.push({ r, d: depth(item), a: (item.box.x1 - item.box.x0) * (item.box.y1 - item.box.y0) });
-    }
-    return [...seen.values(), ...hits.sort((x, y) => y.d - x.d || x.a - y.a).map(h => h.r)];
-  }
-  /** Add an object from the palette: dropped at a point, it is pinned there; dropped on a container the kit names, it
-   *  is made inside it; else the layout places it. One command (one undo step); then it is selected and named. */
+  /** Add an object from the palette, by a click or (where it isn't dragged itself: 2D, a container of its own) by a drop at
+   *  a point: into what holds it there, else the layout places it. One command (one undo step); then it is selected and named. */
   function addFromPalette(sec: string, at?: { x: number; y: number }, item?: PaletteItem): Path | undefined {
     if (!doc.doc.ok) { opts.note('Fix the YAML first', 'warn'); return undefined; }
-    const k = kindOf(sec);
-    // (0.10.0) a palette entry's preset: what it starts as, and the base of its name
-    const preset = item?.value?.() as Record<string, unknown> | undefined;
-    const what = item && preset !== undefined ? item.label.toLowerCase() : k.singular;
-    const name = freshName(doc.text, item?.name ?? k.singular);
-    const p = [...k.section, name] as Path;
-    let value = (preset ?? k.template()) as Record<string, unknown>;
-    let into: string | undefined;
-    const drop = at ? K.dropInto?.(sec) : undefined;
-    if (at && drop) {
-      const c = containerAt(drop.container, at);
-      // dropped into a container: what puts it there, and the preset's own keys over it
-      if (c) { into = c; value = { ...(drop.value(c) as Record<string, unknown>), ...(preset ?? {}) }; }
-    }
-    let intoLabel = into ? drop!.label(into) : '';
-    // (0.10.1) the domain's rule: the innermost object under the drop that holds it
-    if (at && !into && K.dropOnto) {
-      for (const t of objectsUnder(at)) {
-        const plan = K.dropOnto(t, value, sec, doc.goodDoc.data);
-        if (plan) { into = t.name; value = plan.value as Record<string, unknown>; intoLabel = plan.label ? ` ${plan.label}` : ` in ${t.name}`; break; }
-      }
-    }
-    const label = `Add ${what} ${name}${intoLabel}`;
-    const add = insertCmd(p.slice(0, -1), name, value, { label });
-    const pin = at && !into && mode === '3d' ? placeAt(name, add, at) : undefined;
-    const cmd = pin ? seqCmd(`${label} at [${pin.join(', ')}]`, [add, withPinsMoved(setCmd([PINS_KEY, 'layout', name], { at: pin }))]) : add;
-    if (!run(doc, { ...cmd, select: [p] }, 'canvas', opts.note)) return undefined;
-    if (at && !into && !pin) opts.note(mode === '2d' ? `${k.singular} ${name} added; the layout placed it (in 3D a drop pins it where it lands)` : `${k.singular} ${name} added; that spot is taken, so the layout placed it`);
+    const k = kindOf(sec), name = freshName(doc.text, item?.name ?? k.singular), p = [...k.section, name] as Path;
+    const plan = freshPlan(sec, item, name, p, at && toSvg(at.x, at.y), cd);
+    if (!run(doc, { ...plan.add, select: [p] }, 'canvas', opts.note)) return undefined;
+    if (at && !plan.into) opts.note(`${k.singular} ${name} added; the layout placed it${mode === '2d' ? ' (in 3D a drop pins it where it lands)' : ''}`);
     doc.select([p], 'canvas');
     // (0.12.5) its name, in the inline field above it; the drop and the name are one undo step
     rename(p, { joins: doc.undoId, at });
     return p;
   }
   const palette = h('div', { class: 'palette', role: 'toolbar', 'aria-label': T.palette, 'aria-orientation': 'vertical' });
+  const drawLooks = K.looks?.(palette, () => (disposed ? undefined : doc.goodDoc.data), ui, opts.theme) ?? (() => {});
   // (0.11.0) sections: a header (a button, aria-expanded) over its entries; open: the section last added from (the
   // first, before any); the reader opens and closes the others as they like. The host's store may be off: guarded.
   const sections = new Map<string, { head: HTMLButtonElement; body: HTMLElement }>();
@@ -1153,7 +1356,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   try { const v = JSON.parse(opts.store?.get(PAL_KEY) ?? '{}') as { last?: unknown }; if (typeof v.last === 'string') lastSection = v.last; } catch { /* none */ }
   const named = [...new Set(ui.palette.map(i => i.section).filter((x): x is string => x !== undefined))];
   const openAtStart = lastSection !== undefined && named.includes(lastSection) ? lastSection : named[0];
-  const setOpen = (sec: string, open: boolean) => { const g = sections.get(sec); if (!g) return; g.head.setAttribute('aria-expanded', String(open)); g.body.hidden = !open; };
+  const setOpen = (sec: string, open: boolean) => { const g = sections.get(sec); if (!g) return; g.head.setAttribute('aria-expanded', String(open)); g.body.hidden = !open; if (open) drawLooks(); };
   function sectionBody(sec: string): HTMLElement {
     const have = sections.get(sec);
     if (have) return have.body;
@@ -1199,6 +1402,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     }
     if (!words.length && before) { for (const [sec, open] of before) setOpen(sec, open); before = undefined; }
     none.hidden = shown > 0;
+    drawLooks();
     none.textContent = shown ? '' : `Nothing matches "${search.value.trim()}"`;
   }
   const setDockW = (w: number, keep = true) => { const v = Math.round(Math.min(DOCK_MAX, Math.max(DOCK_MIN, w))); host.style.setProperty('--pal-w', `${v}px`); palGrip.setAttribute('aria-valuenow', String(v)); if (keep) { dockPref.w = v; saveDock(); } };
@@ -1259,19 +1463,35 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       e.preventDefault();
       try { b.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer: the events come to the button anyway */ }
       const x0 = e.clientX, y0 = e.clientY;
-      let ghost: HTMLElement | undefined;
+      let ghost: HTMLElement | undefined, dragged = false, real = false, frame = 0, last: PointerEvent | undefined;
       const over = (ev: PointerEvent) => { const r = stage.getBoundingClientRect(); return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom && !palHome.contains(document.elementFromPoint(ev.clientX, ev.clientY)); };
+      // the thing itself on the canvas (0.14.0: 3D), else its label
+      const step = (ev: PointerEvent) => {
+        const on = over(ev);
+        real = on && dragFresh(sec, item, { x: ev.clientX, y: ev.clientY, alt: ev.altKey });
+        if (!on || !real) hideFresh();
+        if (!real) {
+          if (!ghost) { ghost = h('div', { class: 'pal-ghost', 'aria-hidden': 'true' }, icon(ic), label); host.append(ghost); }
+          const hr = host.getBoundingClientRect();
+          ghost.style.left = `${ev.clientX - hr.left + 8}px`; ghost.style.top = `${ev.clientY - hr.top + 8}px`;
+          ghost.classList.toggle('bad', !on);
+        } else { ghost?.remove(); ghost = undefined; }
+      };
       const mv = (ev: PointerEvent) => {
-        if (!ghost && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
-        if (!ghost) { ghost = h('div', { class: 'pal-ghost', 'aria-hidden': 'true' }, icon(ic), label); host.append(ghost); }
-        const hr = host.getBoundingClientRect();
-        ghost.style.left = `${ev.clientX - hr.left + 8}px`; ghost.style.top = `${ev.clientY - hr.top + 8}px`;
-        ghost.classList.toggle('bad', !over(ev));
+        if (!dragged && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+        dragged = true;
+        last = ev;
+        if (frame) return;
+        const go = () => { if (!frame) return; cancelAnimationFrame(frame); frame = 0; if (last) step(last); };
+        frame = requestAnimationFrame(go); setTimeout(go, 32);
       };
       const done = (ev: PointerEvent, drop: boolean) => {
         b.removeEventListener('pointermove', mv); b.removeEventListener('pointerup', upH); b.removeEventListener('pointercancel', cancelH); removeEventListener('keydown', esc, true);
-        const dragged = !!ghost;
+        cancelAnimationFrame(frame); frame = 0;
+        if (drop && dragged) step(ev);
         ghost?.remove();
+        if (real && pinDrag()?.fresh) { if (drop) usedSection(item); void endPin(drop); return; }
+        hideFresh();
         if (!drop) return;
         if (!dragged) { usedSection(item); addFromPalette(sec, undefined, item); }
         else if (over(ev)) { usedSection(item); addFromPalette(sec, { x: ev.clientX, y: ev.clientY }, item); }
@@ -1398,9 +1618,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   });
 
   const base = {
-    addFromPalette, palette, groupSelection, startPick, objectsUnder, get linking() { return linking; },
+    addFromPalette, palette, groupSelection, startPick, get linking() { return linking; },
     render, setTheme, paintOverlay, fit: fitItems, fitNext() { toFit = true; }, fitAll: fit, actual, zoomAt, itemsBox, routesBox, get moved() { return V.moved; }, settled, get zoom() { return V.zoom; },
-    dispose() { endMorph(); clearTimeout(relayout); V.dispose(); disposed = true; },
+    dispose() { endMorph(); endWay(); clearTimeout(relayout); V.dispose(); disposed = true; },
     focus: () => stage.focus(),
     /** for the tests */
     get view() { return V.view; },

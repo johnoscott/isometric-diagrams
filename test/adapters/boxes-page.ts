@@ -49,7 +49,11 @@ const { palette: _p, ...plainView } = boxesView(String(THEME));
 const sectioned = document.body.hasAttribute('data-sections');
 const stored: Record<string, string> = JSON.parse(document.body.dataset.stored ?? '{}');
 // <body data-rename>: (0.12.5) a double click renames
-const view = { ...boxesView(String(THEME)), ...(document.body.hasAttribute('data-rename') ? { doubleClick: 'rename' as const } : {}) };
+const view = { ...boxesView(String(THEME)), ...(document.body.hasAttribute('data-rename') ? { doubleClick: 'rename' as const } : {}),
+  // <body data-looks>: (0.14.0) the palette's entries as what they make
+  ...(document.body.hasAttribute('data-looks') ? { paletteLook: 'object' as const } : {}),
+  // <body data-drag-motion>: (0.14.0) whether what makes way jiggles and glides
+  ...(document.body.dataset.dragMotion ? { dragMotion: document.body.dataset.dragMotion as 'always' | 'respect' } : {}) };
 const SECTION: Record<string, string> = { Box: 'Things', Tray: 'Holders', Zone: 'Holders' };
 // <body data-docked>: (0.12.0) the palette docked, a pane of its own at the canvas's left
 const sectionedView = { ...view, palette: view.palette!.map(e => ({ ...e, section: SECTION[e.label] })), ...(document.body.hasAttribute('data-docked') ? { paletteLayout: 'docked' as const } : {}) };

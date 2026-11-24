@@ -7,6 +7,7 @@
 // The text pane is given, not imported: Monaco is a big dependency, and a host without it still gets the canvas, the
 // tree and the panel.
 
+import { paletteLooks } from './palette-look.ts';
 import type { DomainAdapter, FileRole, ObjectRef } from '../adapter.ts';
 import type { Path } from '../path.ts';
 import { toPointer } from '../path.ts';
@@ -58,6 +59,11 @@ export interface DomainView<R, D extends CanvasDrawing> {
   paletteLayout?: 'floating' | 'docked';
   /** (0.12.5) what a double click on an object of the canvas does: shows it in the text (the default), or renames it */
   doubleClick?: 'text' | 'rename';
+  /** (0.14.0) the palette's entries with their icon (the default), or with the thing itself, drawn small in the current theme */
+  paletteLook?: 'icon' | 'object';
+  /** (0.14.0) what is in a drag's way jiggles before it gives way, and glides: 'always' (the default), or 'respect': not where
+   *  the viewer prefers reduced motion */
+  dragMotion?: 'always' | 'respect';
   /** the canvas's 2D view (0.6.0): a 3D | 2D switch; its link kinds' styles (the host's canvas CSS adds flatCss) */
   flat?: CanvasKit<R, D>['flat'];
   /** a layer over the canvas, and a part beside the views (A: their calls) */
@@ -115,6 +121,7 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
       : a.kinds.map(k => ({ kind: k.kind, icon: icon(k.kind), label: k.singular[0].toUpperCase() + k.singular.slice(1) })),
     ...(v.paletteLayout === undefined ? {} : { paletteLayout: v.paletteLayout }),
     ...(v.doubleClick === undefined ? {} : { doubleClick: v.doubleClick }),
+    ...(v.dragMotion === undefined ? {} : { dragMotion: v.dragMotion }),
     text: {
       stage: 'The file, drawn: arrow keys and Tab move through what is drawn; + and − zoom, 0 fits', dragGroup: 'A drag on nothing',
       dragSelectTip: 'Drag draws a selection; hold the space key to pan', unreadable: 'The canvas draws a file that reads cleanly; fix the problems listed to see it.',
@@ -128,6 +135,7 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
     ...(a.dropInto ? { dropOnto: (t: ObjectRef, v: unknown, k: string, d: unknown) => a.dropInto!(t, v, k, d) } : {}),
     trial: (text, theme) => { const r = read(text); return r.read === undefined || r.diags.some(d => d.severity === 'error') ? undefined : v.draw(r.read as R, (r.read as { data?: unknown }).data, theme); },
   };
+  if (v.paletteLook === 'object') canvas.looks = paletteLooks(canvas);
   const kit: MountKit<R, undefined> = {
     async check(text) {
       const r = analyse(a, text, { fileName: v.fileName });

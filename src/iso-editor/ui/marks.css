@@ -7,6 +7,8 @@
 @layer views {
 .iso-canvas { --iso-sel: var(--accent); --iso-sel-fill: color-mix(in srgb, var(--iso-sel) 12%, transparent);
   --iso-sel-faint: color-mix(in srgb, var(--iso-sel) 6%, transparent); --iso-bad: var(--bad); --iso-warn: var(--warn); }
+/* a drag moves things, it doesn't select the drawing's words */
+.iso-canvas svg.scene { user-select: none; -webkit-user-select: none; }
 .iso-canvas svg.scene [data-id] { cursor: pointer; }
 .iso-canvas svg.scene.mode-pan { cursor: grab; }
 .iso-canvas svg.scene.mode-select { cursor: crosshair; }
