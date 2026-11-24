@@ -5,7 +5,8 @@
 # sha256 ("package-sha256: <hex>"). This job builds the package from the tagged tree and publishes it only if the
 # checksum is exactly that one. If the version is already on npm, it publishes nothing and checks the build against
 # the registry's copy instead (so re-running it on an old tag proves the build is reproducible here).
-# Actions are pinned by commit SHA, as in ci.yml.
+# Actions are pinned by commit SHA, as in ci.yml; dependencies install with no scripts. Whoever may push a v* tag to this
+# repository may publish: keep tag pushes to the owner.
 name: publish
 
 on:
@@ -44,12 +45,15 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       # trusted publishing needs npm 11.5.1 or later
       - run: npm install -g npm@11.6.2
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: The verified checksum, from the tag's message
         run: |
           git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
-          want=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^package-sha256: *\([0-9a-f]\{64\}\).*/\1/p' | head -1)
-          if [ -z "$want" ]; then echo "::error::the tag $TAG has no 'package-sha256:' line: it was not made by the release check"; exit 1; fi
+          if [ "$(git cat-file -t "refs/tags/$TAG")" != tag ]; then echo "::error::$TAG is not an annotated tag"; exit 1; fi
+          lines=$(git tag -l --format='%(contents)' "$TAG" | grep -c '^package-sha256:' || true)
+          if [ "$lines" != 1 ]; then echo "::error::the tag $TAG must have exactly one 'package-sha256:' line (it has $lines)"; exit 1; fi
+          want=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^package-sha256: *\([0-9a-f]\{64\}\) *$/\1/p')
+          if [ -z "$want" ]; then echo "::error::the tag $TAG's 'package-sha256:' line is not 64 hex characters"; exit 1; fi
           echo "WANT=$want" >> "$GITHUB_ENV"
       - name: Build the package from the tagged tree
         run: |
