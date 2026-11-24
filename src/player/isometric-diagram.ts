@@ -5,22 +5,37 @@
 //   <isometric-diagram controls autoplay="visible" loop>
 //     <script type="text/yaml"> isodiag: 1 … </script>          (or the text itself, with & and < escaped)
 //   </isometric-diagram>
+//
+// A host's own marks (registerMarks) are registered with this script's copy of the engine: each bundle has its own. The elements on the
+// page are drawn again with them. Enlarged (expand()), the player itself is in a modal dialog of the element's own, and back after:
+// it is the same player, so nothing about it changes but its size.
 
 import { compile, type Compiled, type CompiledScene } from '../iso-systems/compile.ts';
 import { bindMotion, motionOfSteps, type BeatInfo, type Timeline } from '../iso-objects/timeline.ts';
 import type { MotionDoc } from '../iso-objects/motion-doc.ts';
-import { mountPlayer, PLAY_CSS, type Player } from '../iso-viewer/play.ts';
+import { registerMarks as register } from '../iso-objects/assets.ts';
+import { h } from '../iso-viewer/dom.ts';
+import { mountPlayer, playersMoved, PLAY_CSS, type Player } from '../iso-viewer/play.ts';
 import type { Transport } from '../iso-viewer/transport.ts';
 import THEME from '../../themes/default.yaml';
 
-const HOST_CSS = ':host{display:block}:host([hidden]){display:none}.iso-play-problem{margin:0;padding:10px 12px;border:1px solid #c9463d;border-radius:8px;color:#c9463d;font:13px/1.5 system-ui,sans-serif;white-space:pre-wrap}';
+const HOST_CSS = ':host{display:block}:host([hidden]){display:none}.iso-play-problem{margin:0;padding:10px 12px;border:1px solid #c9463d;border-radius:8px;color:#c9463d;font:13px/1.5 system-ui,sans-serif;white-space:pre-wrap}'
+  + '.iso-frame{position:relative}'
+  + '.iso-enlarge{position:absolute;top:10px;right:10px;box-sizing:border-box;width:36px;height:36px;display:grid;place-items:center;padding:0;border:1px solid #000;border-radius:10px;background:#fff;color:#000;box-shadow:0 2px 0 #000;cursor:pointer;opacity:0}'
+  + '.iso-enlarge[hidden]{display:none}:host(:hover) .iso-enlarge,.iso-enlarge:focus-visible{opacity:1}@media (hover:none){.iso-enlarge{opacity:1}}@media print{.iso-enlarge{display:none}}'
+  + '.iso-enlarge:focus-visible,.iso-full-close:focus-visible{outline:2px solid #2a64d6;outline-offset:2px}'
+  + '.iso-full{position:fixed;inset:0;box-sizing:border-box;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;padding:72px 16px 16px;background:rgba(12,12,14,.95);overflow:hidden;overscroll-behavior:contain}'
+  + '.iso-full[open]{display:flex}.iso-full::backdrop{background:none}'
+  + '.iso-full-close{position:absolute;top:16px;right:16px;width:44px;height:44px;padding:0;border:1px solid #000;border-radius:50%;background:#fff;color:#000;font:20px/1 system-ui,sans-serif;cursor:pointer}'
+  + '.iso-full>.iso-play{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto}.iso-full>.iso-play>*{flex:none}'
+  + '.iso-full>.iso-play>.iso-play-stage{flex:1 1 0;min-height:45%;position:relative}.iso-full>.iso-play>.iso-play-stage svg{position:absolute;inset:0;width:100%;height:100%}';
 let sheet: CSSStyleSheet | undefined;
 
 /** a page with no DOM (a server that imports this) has no elements: the class is there, and does nothing */
 const Base = (typeof HTMLElement === 'function' ? HTMLElement : class {}) as typeof HTMLElement;
 
 export class IsometricDiagram extends Base {
-  static readonly observedAttributes = ['ambient', 'autoplay', 'controls', 'label', 'loop', 'mode', 'rate', 'reduced-motion', 'scene', 'treatment'];
+  static readonly observedAttributes = ['ambient', 'autoplay', 'controls', 'expand', 'label', 'loop', 'mode', 'rate', 'reduced-motion', 'scene', 'treatment'];
   #source: string | undefined;
   #theme: string | undefined;
   #motion: MotionDoc | undefined;
@@ -29,6 +44,15 @@ export class IsometricDiagram extends Base {
   #due = false;
   #steps = false;
   #media: MediaQueryList | undefined;
+  /** what it is drawn in, the button over it, and the dialog it is in while it is enlarged */
+  #frame: HTMLElement | undefined;
+  #enlarge: HTMLButtonElement | undefined;
+  #full: HTMLDialogElement | undefined;
+  #back: HTMLElement | undefined;
+  #still = false;
+  static readonly #live = new Set<IsometricDiagram>();
+  /** every one on the page, drawn again (its place in its motion kept) */
+  static redraw(): void { for (const el of IsometricDiagram.#live) el.#later(); }
 
   /** the drawing's text: the property when set, else what is written in the element */
   get source(): string { return this.#source ?? dedent(this.querySelector('script[type="text/yaml"],script[type="application/yaml"]')?.textContent ?? this.textContent ?? ''); }
@@ -43,6 +67,7 @@ export class IsometricDiagram extends Base {
   get transport(): Transport | undefined { return this.#player?.transport; }
 
   connectedCallback() {
+    IsometricDiagram.#live.add(this);
     this.#shadow ??= this.attachShadow({ mode: 'open' });
     sheet ??= (() => { const s = new CSSStyleSheet(); s.replaceSync(PLAY_CSS + HOST_CSS); return s; })();
     this.#shadow.adoptedStyleSheets = [sheet];
@@ -52,6 +77,8 @@ export class IsometricDiagram extends Base {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', this.#later, { once: true }); else this.#later();
   }
   disconnectedCallback() {
+    IsometricDiagram.#live.delete(this);
+    this.#restore(false);
     this.#media?.removeEventListener('change', this.#later);
     document.removeEventListener('DOMContentLoaded', this.#later);
     this.#player?.dispose(); this.#player = undefined;
@@ -59,6 +86,7 @@ export class IsometricDiagram extends Base {
   attributeChangedCallback(name: string, was: string | null, now: string | null) {
     const tr = this.#player?.transport;
     if (was === now) return;
+    if (name === 'expand') { if (!this.#may()) this.collapse(); this.#corner(); return; }
     if (!tr) { this.#later(); return; }
     // what the transport takes as it plays; the rest is drawn again
     if (name === 'loop') tr.loop = now !== null;
@@ -77,6 +105,7 @@ export class IsometricDiagram extends Base {
     const root = this.#shadow!, mode = this.#mode();
     let drawn: { c: Compiled; s: CompiledScene; tl?: Timeline; steps: boolean };
     try { drawn = read(this.source, this.theme, mode, this.getAttribute('scene'), this.#motion, this.getAttribute('treatment')); } catch (e) {
+      this.#restore(true);
       this.#player?.dispose(); this.#player = undefined;
       const p = document.createElement('p');
       p.className = 'iso-play-problem'; p.setAttribute('role', 'alert'); p.textContent = (e as Error).message;
@@ -88,10 +117,13 @@ export class IsometricDiagram extends Base {
     if (this.#player && this.#steps !== drawn.steps) { this.#player.dispose(); this.#player = undefined; }
     this.#steps = drawn.steps;
     if (this.#player) { this.#player.set(drawn.s, drawn.tl, mode); return; }
-    root.replaceChildren();
+    // (while it is enlarged, what is mounted anew goes there)
+    if (!this.#full?.open) { this.#frame = h('div', { class: 'iso-frame' }); root.replaceChildren(this.#frame); this.#enlarge = undefined; }
     const at = this.getAttribute('autoplay'), link = linkOf(this.hasAttribute('links') ? location.hash : '', drawn.tl);
-    this.#player = mountPlayer(root, {
-      scene: drawn.s, timeline: drawn.tl, mode, steps: drawn.steps, label: this.getAttribute('label') ?? drawn.s.raw.title ?? drawn.c.doc?.title,
+    this.#still = !!link?.still;
+    this.#name = this.getAttribute('label') ?? drawn.s.raw.title ?? drawn.c.doc?.title ?? 'Diagram';
+    this.#player = mountPlayer(this.#full?.open ? this.#full : this.#frame!, {
+      scene: drawn.s, timeline: drawn.tl, mode, steps: drawn.steps, label: this.#name,
       controls: this.hasAttribute('controls'), loop: this.hasAttribute('loop'), rate: rateOf(this.getAttribute('rate')),
       autoplay: link ? false : at === 'visible' ? 'visible' : at !== null,
       ...(this.getAttribute('ambient') === null ? {} : { ambient: this.getAttribute('ambient') === 'off' ? 'off' as const : 'on' as const }),
@@ -101,7 +133,72 @@ export class IsometricDiagram extends Base {
     tr.on('beat', (beat: BeatInfo, how) => tell('beat', { beat, how }));
     for (const k of ['play', 'pause', 'end', 'loop'] as const) tr.on(k, () => tell(k));
     if (link) { if (link.still) this.#player.freeze(link.at); else tr.seek(link.at); }
+    this.#corner();
     tell('isometric-ready');
+  }
+
+  // ---- enlarged ----
+  #name = 'Diagram';
+  #may(): boolean { return this.getAttribute('expand') !== 'off' && !this.#still && typeof HTMLDialogElement === 'function'; }
+  /** the button over the drawing's corner */
+  #corner() {
+    if (!this.#frame) return;
+    if (!this.#enlarge) {
+      this.#enlarge = h('button', { type: 'button', class: 'iso-enlarge', on: { click: (() => this.expand()) as EventListener } });
+      const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), path = document.createElementNS(ns, 'path');
+      for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '18', height: '18', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
+      path.setAttribute('d', 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7');
+      svg.append(path); this.#enlarge.append(svg);
+      this.#frame.append(this.#enlarge);
+    }
+    this.#enlarge.hidden = !this.#may() || !this.#player;
+    this.#enlarge.setAttribute('aria-label', `Enlarge: ${this.#name}`); this.#enlarge.title = 'Enlarge';
+    this.#full?.setAttribute('aria-label', this.#name);
+  }
+  /** whether it is enlarged */
+  get expanded(): boolean { return !!this.#full?.open; }
+  /** nearly all of the window, until Esc, the ✕ or collapse(); whether it is */
+  expand(): boolean {
+    if (this.expanded) return true;
+    const root = this.#player?.root, frame = this.#frame;
+    if (!root || !frame || !this.isConnected || !this.#may()) return false;
+    let was = document.activeElement as HTMLElement | null;
+    while (was?.shadowRoot?.activeElement) was = was.shadowRoot.activeElement as HTMLElement;
+    this.#back = was ?? undefined;
+    if (!this.#full) {
+      const close = h('button', { type: 'button', class: 'iso-full-close', 'aria-label': 'Close', title: 'Close', on: { click: (() => this.collapse()) as EventListener } }, '✕');
+      const full = this.#full = document.createElement('dialog');
+      full.className = 'iso-full'; full.append(close);
+      // Esc: at once, as collapse() is ('close' comes a moment after, and whatever way it closed)
+      full.addEventListener('cancel', e => { e.preventDefault(); this.collapse(); });
+      full.addEventListener('close', () => { if (full === this.#full && !full.open && this.#player && full.contains(this.#player.root)) this.#restore(true); });
+    }
+    this.#full.setAttribute('aria-label', this.#name);
+    this.#shadow!.append(this.#full);
+    // its place on the page is kept
+    frame.style.height = `${frame.getBoundingClientRect().height}px`;
+    this.#full.append(root);
+    this.#full.showModal();
+    if (root.tabIndex >= 0) root.focus();
+    playersMoved();
+    this.dispatchEvent(new CustomEvent('expand'));
+    return true;
+  }
+  collapse(): void { if (this.expanded) this.#restore(true); }
+  /** back where it was on the page. tell: the page is told, and the focus goes back */
+  #restore(tell: boolean) {
+    const full = this.#full, root = this.#player?.root;
+    if (!full || (!full.open && !(root && full.contains(root)))) return;
+    if (root && this.#frame) this.#frame.prepend(root);
+    if (full.open) full.close();
+    full.remove();
+    if (this.#frame) this.#frame.style.height = '';
+    const back = this.#back;
+    this.#back = undefined;
+    playersMoved();
+    if (!tell) return;
+    if (back?.isConnected && back !== document.body) back.focus({ preventScroll: true });
+    this.dispatchEvent(new CustomEvent('collapse'));
   }
   #mode(): 'light' | 'dark' {
     const m = this.getAttribute('mode');
@@ -137,5 +234,8 @@ function linkOf(hash: string, tl: Timeline | undefined): { at: number; still: bo
 }
 
 if (typeof customElements !== 'undefined' && !customElements.get('isometric-diagram')) customElements.define('isometric-diagram', IsometricDiagram);
+/** A host's icons and screen faces, by the names its drawings use, and their styles: for every <isometric-diagram>, now and from now on. The
+ *  engine has no one's marks of its own. Called again, the names it has before are replaced */
+export function registerMarks(marks: Parameters<typeof register>[0]): void { register(marks); IsometricDiagram.redraw(); }
 export { mountPlayer, PLAY_CSS } from '../iso-viewer/play.ts';
 export type { Player, PlayerOptions } from '../iso-viewer/play.ts';

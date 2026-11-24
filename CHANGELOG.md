@@ -2,6 +2,13 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.18.0 — your marks in the element, and the enlarged view
+
+- **Every `<isometric-diagram>` now has an Enlarge button** in its corner, shown when it is pointed at or reached by keyboard (always on a touch screen). It opens the same drawing, playing on,
+  in nearly the whole window; Esc or ✕ closes it. **`expand="off"` leaves it out.** From a page: `expand()`, `collapse()`, `expanded`, and the events `expand` and `collapse`.
+- `registerMarks` from `isometric-diagram.js`: your own icons and screen faces in the element's drawings, also in those already on the page.
+- Tried in Chrome; Safari and Firefox are untried.
+
 ## 0.17.2 — Motion off, whoever asks
 
 - While **Motion off** is on, a host's `transport.play()` does nothing: the drawing, the time and the Play button stay as they are.

@@ -139,7 +139,7 @@ const doc = objects.motion()
 ## On a page: `<isometric-diagram>`
 
 One script, with the compiler, the theme and the player in it. It fetches and stores nothing, evaluates nothing and adds no style
-element, so it runs under `script-src 'self'` alone (118 KB gzipped).
+element, so it runs under `script-src 'self'` alone (120 KB gzipped).
 
 ```html
 <script type="module" src="isometric-diagram.js"></script>
@@ -177,14 +177,28 @@ a drawing with neither is drawn.
 | `treatment` | `mono`: black and white, in either mode; `none`: in colour, whatever the drawing says. |
 | `label` | What a screen reader calls it. |
 | `reduced-motion` | `ignore` (the default: motion plays, and a reader who asked for less has a **Motion off** button, with or without `controls`: everything is in place and lit, nothing moves, and the steps are open as text; and the page's own `transport.play()` does nothing; pressed again, it plays from the first step, unless the reader had paused it) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
+| `expand` | `off`: no **Enlarge** button (0.18.0; by default there is one, in the corner, shown when the drawing is pointed at or by keyboard, always on a touch screen). It opens the same player, as it is, in a dialog nearly the size of the window; Esc or ✕ closes it and the focus goes back. Not on a `#still`. |
 | `links` | It follows the page's `#step=3`, `#t=0.5` (how far into the step) and `#still` (one picture, no controls). |
 
-Its properties are `source`, `theme`, `motion` (a document as data) and `transport`. Its events are `beat` (`detail.beat`, `detail.how`),
+Its properties are `source`, `theme`, `motion` (a document as data), `transport` and `expanded`; its methods, `expand()` (whether it is, after) and `collapse()`. Its events are `expand`, `collapse`, `beat` (`detail.beat`, `detail.how`),
 `play`, `pause`, `end`, `loop`, `isometric-ready` and `isometric-error` (a fault is also said in its place, in words). Arrow keys step; on
 the player itself, Space plays and pauses.
 
 A reader without the script sees what is in the element besides the text. `isodiag build` writes a still there: **it is a command of the repository (`bin/isodiag.mjs`), not in the npm package**. `isodiag build PAGE.html -o OUT.html` writes one for
 each element whose text is in a `<script type="text/yaml">`, in its mode and treatment; run again, it replaces the stills it wrote.
+
+**Your own marks** (0.18.0): icons and screen faces a drawing names (`deco: [{ icon: ours }]`, `face: ours`). The engine has nobody's. Register them with the element's own script: each
+of the package's bundles keeps its own, so `registerMarks` from another doesn't reach it. Elements already on the page are drawn again, where they were in their motion.
+
+```js
+import { registerMarks } from './isometric-diagram.js';
+
+registerMarks({
+  // (kernel, box) => SVG text: the box is the thing's, in grid units; line3 and poly take points [x, y, z]
+  icons: { ours: (k, b) => k.line3([b.x0, b.y0, b.z1], [b.x1, b.y1, b.z1], 'ico-ours') },
+  css: '.ico-ours { stroke: #d97757; stroke-width: 3 }',
+});
+```
 
 ## Black and white
 

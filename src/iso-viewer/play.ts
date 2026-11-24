@@ -47,9 +47,15 @@ export interface Player {
 const mounted = new Map<HTMLElement, { seen: number; auto(on: boolean): void; wants: boolean }>();
 function pick() {
   let best: HTMLElement | undefined, most = 0.35;
+  // one in an open dialog covers the rest: it, and nothing behind it
+  for (const el of mounted.keys()) if (el.closest('dialog[open]')) best = el;
+  if (best) { for (const [el, m] of mounted) if (m.wants) m.auto(el === best); return; }
   for (const [el, m] of mounted) if (m.wants && m.seen >= most && (m.seen > most || !best)) { best = el; most = m.seen; }
   for (const [el, m] of mounted) if (m.wants) m.auto(el === best);
 }
+
+/** a player was put somewhere else on the page: which plays may be another */
+export const playersMoved = (): void => pick();
 
 const svgOf = (text: string): SVGSVGElement => {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');

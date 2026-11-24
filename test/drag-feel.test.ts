@@ -68,13 +68,16 @@ function tools({ ev, until, cdp }: Driver) {
   /** the pointer's own times of its moves since record() began: a step of a test is one move, so the nth is the one that came to the nth cell. What
    *  the canvas does is after it however late a frame shows it; a frame's time, taken as the start, is late on a slow machine */
   const moves = () => ev<number[]>(`return window.__moves;`);
-  /** what is only so when it is quick (two of the pointer's own times within `limit` ms): tried again, from the start, when the machine wasn't */
-  const quickly = async (limit: number, again: () => Promise<void>, attempt: () => Promise<[number, number]>) => {
-    for (let n = 0; n < 6; n++) { const [a, b] = await attempt(); if (b - a < limit) return; await again(); }
-    assert.fail(`never within ${limit} ms: the machine is too slow to say`);
-  };
-  /** the pointer's own time of its last move, and of its release */
-  const times = () => ev<[number, number]>(`return [window.__moves.at(-1), window.__upAt];`);
+  /** the canvas's own timers of these lengths don't run until they are let go (the test's waits are a promise's resolve, native code: not these).
+   *  What is only so before one runs is then so on any machine; that they run no sooner than they say is the timed tests' */
+  const hold = (...lengths: number[]) => ev(`const set = window.setTimeout, clear = window.clearTimeout, held = window.__held = new Map(); let id = 1e9;
+    window.__letGo = () => { window.setTimeout = set; window.clearTimeout = clear; const all = [...held.values()]; held.clear(); for (const [f] of all) f(); return all.map(x => x[1]); };
+    window.setTimeout = (f, ms, ...a) => { if (!${JSON.stringify(lengths)}.includes(ms) || /\\[native code\\]/.test(Function.prototype.toString.call(f))) return set.call(window, f, ms, ...a); held.set(++id, [f, ms]); return id; };
+    window.clearTimeout = x => { if (!held.delete(x)) clear.call(window, x); };`);
+  /** the lengths of those waiting */
+  const held = () => ev<number[]>(`return [...window.__held.values()].map(x => x[1]);`);
+  /** they run now, the ones still waiting: their lengths */
+  const letGo = () => ev<number[]>(`return window.__letGo();`);
   const wait = (ms: number) => ev(`await tick(${ms});`);
   const esc = async () => { for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await until(`!I.canvas.drag`, 'the drag is over'); };
   const undo = async (t: string, why: string) => { await ev(`I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`); await until(`E.getText() === ${JSON.stringify(t)}`, why); await wait(150); };
@@ -85,7 +88,7 @@ function tools({ ev, until, cdp }: Driver) {
     for (let i = 1; i <= 8; i++) { await mouse('mouseMoved', b.x + (to.x - b.x) * i / 8, b.y + (to.y - b.y) * i / 8); await wait(25); }
     await wait(60);
   };
-  return { mouse, load, cell, middle, grab, by, up, text, at, record, moves, quickly, times, log, wait, esc, undo, take };
+  return { mouse, load, cell, middle, grab, by, up, text, at, record, moves, hold, held, letGo, log, wait, esc, undo, take };
 }
 const ROW = doc({ a: [0, 0], b: [4, 0], far: [0, 9] });
 
@@ -123,15 +126,14 @@ test('make way (0.14.0): a drop that waits, with a real mouse: 150 ms of nothing
 });
 
 test('make way: no wait, no push; another cell starts the clock again; drifting in the cell does not; Esc at any time is all back', { skip, timeout: 180000 }, async () => {
-  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, esc, cell, mouse, ev, until, quickly, times }) => {
+  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, esc, cell, mouse, ev, until, hold, held, letGo }) => {
     await load(ROW);
-    const reset = async () => { await load(ROW); };
     // dropped at once: refused
     let p = { x: 0, y: 0 };
-    await quickly(DWELL_GIVE - 50, reset, async () => { await record(); p = await grab('a'); await by(p, [3, 0]); await up(); return times(); }); await wait(400);
+    await hold(DWELL_HINT, DWELL_GIVE - DWELL_HINT); p = await grab('a'); await by(p, [3, 0]); assert.deepEqual(await held(), [DWELL_HINT], 'waiting'); await up(); await letGo(); await wait(400);
     assert.equal(await text(), ROW); assert.deepEqual(await at(), { a: [0, 0], b: [4, 0], far: [0, 9] });
     // dropped in the jiggle: refused
-    await quickly(DWELL_GIVE - 50, reset, async () => { await record(); p = await grab('a'); await by(p, [3, 0]); await until(`document.querySelector('.iso-canvas .overlay .way') || I.canvas.drag?.given?.size`, 'the hint'); await up(); return times(); }); await wait(400);
+    await hold(DWELL_GIVE - DWELL_HINT); p = await grab('a'); await by(p, [3, 0]); await until(`document.querySelector('.iso-canvas .overlay .way')`, 'the hint'); assert.deepEqual(await held(), [DWELL_GIVE - DWELL_HINT], 'waiting'); await up(); await letGo(); await wait(400);
     assert.equal(await text(), ROW); assert.equal(await ev(`return document.querySelectorAll('.iso-canvas .overlay .way, .iso-canvas svg.scene [transform^="translate"]').length;`), 0);
     // another taken cell before it gives way: the outlines go at once and the clock starts again
     p = await grab('a'); await record(); await by(p, [3, 0]); await until(`document.querySelector('.iso-canvas .overlay .way')`, 'begun'); await by(p, [4, 0], [3, 0]); await until(`I.canvas.drag.given?.size`, 'it gave way'); await wait(100);
@@ -155,7 +157,7 @@ test('make way: no wait, no push; another cell starts the clock again; drifting 
 });
 
 test('make way: left again, it goes back (after 250 ms, no sooner), and a drop elsewhere leaves it unpinned; kept while the place is still needed', { skip, timeout: 180000 }, async () => {
-  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, undo, until, quickly, times }) => {
+  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, undo, until, hold, held, letGo }) => {
     const gave = () => until(`I.canvas.doc.scene.layout.byId.get('b').box.x0 === 5`, 'it gave way');
     await load(ROW);
     let p = await grab('a'); await by(p, [3, 0]); await gave(); assert.deepEqual((await at()).b, [5, 0]);
@@ -166,14 +168,12 @@ test('make way: left again, it goes back (after 250 ms, no sooner), and a drop e
     await up(); await wait(300);
     assert.deepEqual(pinsOf(await text()), { a: [3, 5], b: [4, 0], far: [0, 9] }); await undo(ROW, 'one step');
     // one more cell the same way still needs the place of b: it stays out of it, with no new wait for what is clear
-    await quickly(BACK_AFTER - 40, async () => { await up(); await load(ROW); }, async () => {
-      p = await grab('a'); await by(p, [3, 0]); await gave(); await record(); await by(p, [2, 0], [3, 0]); await by(p, [3, 0], [2, 0]);
-      const m = await moves(); return [m[0], m[1]];
-    });
+    p = await grab('a'); await by(p, [3, 0]); await gave(); await hold(BACK_AFTER); await by(p, [2, 0], [3, 0]); assert.deepEqual(await held(), [BACK_AFTER], 'out: it waits to go back'); await by(p, [3, 0], [2, 0]);
+    assert.deepEqual(await held(), [], 'in again: it waits no more'); await letGo();
     await wait(120); assert.deepEqual((await at()).b, [5, 0], 'out and in again within 250 ms: no flicker');
     await up(); await wait(300); assert.deepEqual(pinsOf(await text()), { a: [3, 0], b: [5, 0], far: [0, 9] }); await undo(ROW, 'one step');
     // dropped beyond it before it went back: it isn't pinned anywhere else
-    await quickly(BACK_AFTER - 20, async () => { await load(ROW); }, async () => { await record(); p = await grab('a'); await by(p, [3, 0]); await gave(); const n = (await moves()).length; await by(p, [0, 3], [3, 0]); await up(); const m = await moves(); return [m[n], (await times())[1]]; });
+    p = await grab('a'); await by(p, [3, 0]); await gave(); await hold(BACK_AFTER); await by(p, [0, 3], [3, 0]); assert.deepEqual(await held(), [BACK_AFTER], 'not gone back yet'); await up(); await letGo();
     await wait(400); assert.deepEqual(pinsOf(await text()), { a: [0, 3], b: [4, 0], far: [0, 9] });
   });
 });
