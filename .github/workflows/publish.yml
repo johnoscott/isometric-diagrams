@@ -50,6 +50,7 @@ jobs:
         run: |
           git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
           if [ "$(git cat-file -t "refs/tags/$TAG")" != tag ]; then echo "::error::$TAG is not an annotated tag"; exit 1; fi
+          if [ "$(git rev-parse "refs/tags/$TAG^{commit}")" != "$(git rev-parse HEAD)" ]; then echo "::error::the tag $TAG does not point at the commit being built"; exit 1; fi
           lines=$(git tag -l --format='%(contents)' "$TAG" | grep -c '^package-sha256:' || true)
           if [ "$lines" != 1 ]; then echo "::error::the tag $TAG must have exactly one 'package-sha256:' line (it has $lines)"; exit 1; fi
           want=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^package-sha256: *\([0-9a-f]\{64\}\) *$/\1/p')
@@ -68,7 +69,9 @@ jobs:
           if [ "$got" != "$WANT" ]; then echo "::error::built sha256 $got is not the verified $WANT: not publishing"; exit 1; fi
       - name: Publish (or, if already published, check against the registry)
         run: |
-          have=$(npm view "$PKG" dist.shasum 2>/dev/null || true)
+          if have=$(npm view "$PKG" dist.shasum 2>view.err); then :; else
+            if grep -q E404 view.err; then have=""; else cat view.err; echo "::error::could not ask npm whether $PKG exists"; exit 1; fi
+          fi
           if [ -n "$have" ]; then
             got=$(shasum "$TGZ" | cut -c1-40)
             if [ "$have" = "$got" ]; then echo "$PKG is already on npm and this build is byte-identical (sha1 $got): nothing to publish"; exit 0; fi
