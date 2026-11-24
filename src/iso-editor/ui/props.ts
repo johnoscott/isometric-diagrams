@@ -38,7 +38,7 @@ export interface PropsUi {
 /** what the panel is given of the domain */
 export interface PropsKit {
   commands: Pick<Commands, 'setCmd' | 'deleteCmd' | 'insertItemCmd' | 'referencesTo' | 'describe'>;
-  actions: Pick<Actions, 'deletePaths' | 'renameDialog'>;
+  actions: Pick<Actions, 'deletePaths' | 'rename'>;
   slotAt(ptr: string): RefSlot | undefined;
   objectOf(ptr: string): ObjectRef | undefined;
   kinds: ObjectKindInfo[];
@@ -67,7 +67,7 @@ export function propsPanel(body: HTMLElement, doc: EditorModel, opts: PropsOpts)
   let focusInput = false;
   const K = opts.kit, ui = K.ui;
   const { setCmd, deleteCmd, insertItemCmd, referencesTo, describe } = K.commands;
-  const { deletePaths, renameDialog } = K.actions;
+  const { deletePaths, rename } = K.actions;
   const kindOf = (k: string) => K.kinds.find(x => x.kind === k);
   const singular = (k: string) => kindOf(k)?.singular ?? 'item';
 
@@ -101,7 +101,7 @@ export function propsPanel(body: HTMLElement, doc: EditorModel, opts: PropsOpts)
     if (!r) { settings(p); return; }
     const head = h('div', { class: 'sel-headrow' }, h('div', { class: 'sel-title' }, describe(target)));
     const rn = h('button', { type: 'button', class: 'btn sm quiet icon-only', 'aria-label': `Rename ${describe(target)}`, title: 'Rename (F2)' }, icon('pencil'));
-    rn.addEventListener('click', () => renameDialog(doc, target, 'props', opts.note));
+    rn.addEventListener('click', () => void rename(doc, target, 'props', opts.note, { over: true, place: () => (head.isConnected ? head.firstElementChild!.getBoundingClientRect() : undefined) }));
     head.append(rn);
     body.append(head);
     if (toPointer(p) !== r.path) pendingFocus = toPointer(p);

@@ -48,7 +48,8 @@ const { palette: _p, ...plainView } = boxesView(String(THEME));
 // as data-stored says and records what the editor writes (window.__boxes.stored)
 const sectioned = document.body.hasAttribute('data-sections');
 const stored: Record<string, string> = JSON.parse(document.body.dataset.stored ?? '{}');
-const view = boxesView(String(THEME));
+// <body data-rename>: (0.12.5) a double click renames
+const view = { ...boxesView(String(THEME)), ...(document.body.hasAttribute('data-rename') ? { doubleClick: 'rename' as const } : {}) };
 const SECTION: Record<string, string> = { Box: 'Things', Tray: 'Holders', Zone: 'Holders' };
 // <body data-docked>: (0.12.0) the palette docked, a pane of its own at the canvas's left
 const sectionedView = { ...view, palette: view.palette!.map(e => ({ ...e, section: SECTION[e.label] })), ...(document.body.hasAttribute('data-docked') ? { paletteLayout: 'docked' as const } : {}) };

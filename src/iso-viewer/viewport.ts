@@ -6,6 +6,24 @@
 // Moved here from the editor canvas (R1 S4); the canvas owns the drawing, the overlay and the pointer.
 
 export type View = { x: number; y: number; w: number; h: number };
+/** (0.12.6) how far inside the stage what must be on it is, px */
+const INSET = 6;
+/** What a fit makes of a stage (px) and what it frames, `box` PAD px inside it, and what must be on it too, `also` INSET px inside:
+ *  the zoom and the middle. Pure. */
+export function fitted(s: { w: number; h: number }, box: View, also?: View): { k: number; cx: number; cy: number } {
+  const pad = 24;
+  // along one axis: the most zoom that `box`, and `also`, and the one's end and the other's together, allow
+  const most = (len: number, a0: number, a1: number, b0?: number, b1?: number) => Math.min((len - pad * 2) / (a1 - a0), ...(b0 === undefined || b1 === undefined ? [] : [[b1 - b0, INSET * 2], [b1 - a0, pad + INSET], [a1 - b0, pad + INSET]].map(([d, edges]) => (d > 0 ? (len - edges) / d : Infinity))));
+  const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(most(s.w, box.x, box.x + box.w, also?.x, also && also.x + also.w), most(s.h, box.y, box.y + box.h, also?.y, also && also.y + also.h))));
+  // the middle of `box`, moved only as far as `also` needs
+  const middle = (len: number, a0: number, a1: number, b0?: number, b1?: number) => {
+    const c = (a0 + a1) / 2;
+    if (b0 === undefined || b1 === undefined) return c;
+    const lo = b1 - (len / 2 - INSET) / k, hi = b0 + (len / 2 - INSET) / k;
+    return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, c));
+  };
+  return { k, cx: middle(s.w, box.x, box.x + box.w, also?.x, also && also.x + also.w), cy: middle(s.h, box.y, box.y + box.h, also?.y, also && also.y + also.h) };
+}
 export const MIN_ZOOM = 0.1, MAX_ZOOM = 8;
 
 export interface ViewportOpts {
@@ -17,6 +35,8 @@ export interface ViewportOpts {
   onRezoom(): void;
   /** what a fit frames (the drawing's own things, the overlay's shown marks), if not the whole scene */
   itemsBox(): View | undefined;
+  /** (0.12.6) what must be on the stage too when the things are fitted (the connectors), a few px from its edges */
+  alsoBox?(): View | undefined;
   /** the overlay has marks that keep their size on screen (a fit repeats while they are showing) */
   marksShowing(): boolean;
 }
@@ -59,11 +79,11 @@ export function viewport(host: HTMLElement, o: ViewportOpts) {
     view = { x: p.x - (px - r.left) / nk, y: p.y - (py - r.top) / nk, w: s.w / nk, h: s.h / nk };
     applyView();
   }
-  function fit(box = full) {
+  /** `also` (0.12.6): what must be on the stage too, INSET px from its edges, and nothing more: the zoom and the middle change only as
+   *  much as that takes (not at all where it is inside already) */
+  function fit(box = full, also?: View) {
     if (!box) return;
-    const s = size(), pad = 24;
-    const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((s.w - pad * 2) / box.w, (s.h - pad * 2) / box.h)));
-    const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+    const s = size(), { k, cx, cy } = fitted(s, box, also);
     const next = { x: cx - s.w / k / 2, y: cy - s.h / k / 2, w: s.w / k, h: s.h / k };
     // v0.4.2: a fit that lands where the view already is (a refit after a resize that changed nothing it fits) leaves
     // it alone: no new zoom by a rounding error, so nothing on the overlay is redrawn
@@ -82,7 +102,7 @@ export function viewport(host: HTMLElement, o: ViewportOpts) {
       if (key === last) break;
       last = key;
       const m = Math.max(24, Math.min(b.w, b.h) * 0.06);
-      quietly(() => fit({ x: b.x - m, y: b.y - m, w: b.w + m * 2, h: b.h + m * 2 }));
+      quietly(() => fit({ x: b.x - m, y: b.y - m, w: b.w + m * 2, h: b.h + m * 2 }, o.alsoBox?.()));
       // the marks are redrawn for a new zoom only past the same 2% the zoom itself uses (applyView's rezoom)
       if (!o.marksShowing() || !paintedK || Math.abs(scale() / paintedK - 1) <= 0.02) break;
       cancelAnimationFrame(rezoom); rezoom = 0;

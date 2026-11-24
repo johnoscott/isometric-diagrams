@@ -319,6 +319,7 @@ Its `index.html` gives the editor a sized element: `<div id="app" style="height:
 | a palette drop that lands inside a container (0.10.1) | `adapter.dropInto` |
 | palette sections under collapsible headers (0.11.0) | `view.palette[].section` |
 | the palette docked at the canvas's left, searchable (0.12.0) | `view.paletteLayout: 'docked'` |
+| a double click on an object renames it, in place (0.12.5) | `view.doubleClick: 'rename'` (default: shows it in the text) |
 
 ## 5. Testing your adapter
 

@@ -16,6 +16,7 @@ import { applyStep } from '../src/iso-editor/splice.ts';
 import { LAYERS, layerOf, publicOf, importsOf, ROOT } from '../scripts/layers.ts';
 // @ts-ignore plain JS helper
 import { chromePath } from '../scripts/chrome.mjs';
+import { connectionsOf, nearestOn } from '../src/iso-editor/connections.ts';
 
 let chrome: string | undefined;
 try { chrome = chromePath(); } catch { chrome = undefined; }
@@ -38,6 +39,11 @@ test('boxes/1 reads, draws (pins applied), and keeps its references through a re
   const renamed = run(TEXT, C.renameCmd(['boxes', 'a'], 'alpha'));
   assert.match(renamed, /^  alpha: \{ in: shelf/m);
   assert.match(renamed, /from: alpha, to: b/);
+  // (0.12.5) its pin follows the name, so it stays where it was put; a pin of the new name's already there is left alone
+  const withPin = TEXT + '\nx-editor:\n  layout:\n    a: { at: [5, 6] }\n';
+  assert.match(run(withPin, C.renameCmd(['boxes', 'a'], 'alpha')), /layout:\n    alpha: \{ at: \[5, 6\] \}\n$/);
+  const taken = run(withPin + '    alpha: { at: [1, 1] }\n', C.renameCmd(['boxes', 'a'], 'alpha'));
+  assert.match(taken, /    a: \{ at: \[5, 6\] \}\n    alpha: \{ at: \[1, 1\] \}\n$/); assert.deepEqual(readBoxes(taken).diags, []);
   assert.deepEqual(readBoxes(renamed).diags, []);
   const gone = run(TEXT, C.deleteCmd(['boxes', 'c'], { withRefs: true }));
   assert.doesNotMatch(gone, /\bc:|to: c/);
@@ -150,7 +156,7 @@ test('boxes/1 in 2D (0.6.0): the switch, select on the canvas, rename and undo, 
 
     // F2 on the canvas renames it, references and all; ⌘Z takes it back
     await ev(`I.canvas.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true })); await tick();
-      const inp = document.querySelector('dialog.dlg .field input'); inp.value = 'alpha'; inp.dispatchEvent(new Event('input')); await tick(); document.querySelector('dialog.dlg button[value="ok"]').click();`);
+      const inp = document.querySelector('.rename-field input'); inp.value = 'alpha'; inp.dispatchEvent(new Event('input')); await tick(); inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));`);
     await until(`/from: alpha, to: b/.test(E.getText())`, 'the rename');
     await until(`I.canvas.mode === '2d' && document.querySelector('.iso-canvas svg.scene.flat [data-id="alpha"]')`, 'redrawn in 2D');
     await ev(`I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`);
@@ -180,7 +186,7 @@ test('boxes/1 in 2D (0.6.0): the switch, select on the canvas, rename and undo, 
     // the palette: a drop on the 2D canvas adds it, placed by the layout (a pin is 3D's), and asks for its name
     const added = await ev<{ path: string; text: string }>(`const sec = document.querySelector('.palette .pal-item').dataset.section, r = I.canvas.stage.getBoundingClientRect();
       const p = I.canvas.addFromPalette(sec, { x: r.left + r.width - 30, y: r.top + r.height - 30 }); await tick();
-      document.querySelector('dialog.dlg button[value="cancel"]')?.click(); await tick();
+      document.querySelector('.rename-field input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();
       return { path: p.join('/'), text: E.getText() };`);
     assert.match(added.path, /^boxes\//);
     assert.ok(added.text.includes(`  ${added.path.split('/')[1]}:`), 'the new box is in the file');
@@ -235,7 +241,7 @@ test('boxes/1 in Chrome (0.10.0): palette presets, connect by drag and by the me
     // (0.11.0) entries without a section are as before: the palette's own children, no header, no group
     assert.deepEqual(await ev(`const p = document.querySelector('.palette'); return { kids: [...p.children].map(c => c.className), heads: p.querySelectorAll('.pal-head, .pal-section, .pal-body').length };`), { kids: ['pal-item', 'pal-item', 'pal-item'], heads: 0 });
     await ev(`document.querySelector('.palette .pal-item[data-entry="2"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await tick();
-      document.querySelector('dialog.dlg button[value="cancel"]')?.click(); await tick();`);
+      document.querySelector('.rename-field input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();`);
     await until(`/\\n  zone-1:/.test(E.getText())`, 'the zone added');
     assert.deepEqual(parsed(await ev<string>(`return E.getText();`)).boxes['zone-1'], { kind: 'zone', label: 'Zone' }, 'named from the preset, as the preset says');
     await until(`document.querySelector('.iso-canvas svg.scene [data-id="zone-1"]')`, 'drawn');
@@ -327,7 +333,7 @@ test('boxes/1 in Chrome (0.10.1): a palette drop onto a container nests the new 
     const dropBox = (where: string) => `${where}; const btn = document.querySelector('.palette .pal-item[data-entry="0"]');
       const r0 = btn.getBoundingClientRect(), P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 11 }));
       P(btn, 'pointerdown', r0.left + 5, r0.top + 5); for (let i = 1; i <= 6; i++) { P(btn, 'pointermove', r0.left + 5 + (at.x - r0.left - 5) * i / 6, r0.top + 5 + (at.y - r0.top - 5) * i / 6); await tick(20); }
-      P(btn, 'pointerup', at.x, at.y); await tick(); document.querySelector('dialog.dlg button[value="cancel"]')?.click(); await tick();`;
+      P(btn, 'pointerup', at.x, at.y); await tick(); document.querySelector('.rename-field input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();`;
     // onto the floor zone: in it, and not pinned
     await ev(dropBox(onFloor));
     await until(`/\\n  box-1:/.test(E.getText())`, 'added');
@@ -354,7 +360,7 @@ test('boxes/1 in Chrome (0.10.1): a palette drop onto a container nests the new 
 });
 
 // 0.10.1, from the cloud editor's palette turn: a long palette scrolls (its items keep their height), and a palette add
-// as the page's first action leaves the focus on the canvas once the name dialog is cancelled, so a real ⌘Z (on the
+// as the page's first action leaves the focus on the canvas once the name field is dismissed, so a real ⌘Z (on the
 // focused element) undoes it.
 test('boxes/1 in Chrome (0.10.1): palette items keep their height; after a palette add, the focus is the canvas\'s', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
   await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
@@ -367,8 +373,8 @@ test('boxes/1 in Chrome (0.10.1): palette items keep their height; after a palet
       const to = { x: r.right - 40, y: r.bottom - 40 };
       P(btn, 'pointerdown', r0.left + 5, r0.top + 5); for (let i = 1; i <= 6; i++) { P(btn, 'pointermove', r0.left + 5 + (to.x - r0.left - 5) * i / 6, r0.top + 5 + (to.y - r0.top - 5) * i / 6); await tick(20); }
       P(btn, 'pointerup', to.x, to.y); await tick();`);
-    await until(`/\\n  box-1:/.test(E.getText()) && document.querySelector('dialog.dlg[open]')`, 'added, its name asked');
-    await ev(`document.querySelector('dialog.dlg[open]').close('cancel'); await tick();`);
+    await until(`/\\n  box-1:/.test(E.getText()) && document.querySelector('.rename-field')`, 'added, its name asked');
+    await ev(`document.querySelector('.rename-field input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();`);
     assert.equal(await ev(`return document.activeElement === I.canvas.stage;`), true, 'the focus is the canvas\'s');
     await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`);
     await until(`E.getText() === ${JSON.stringify(TEXT)}`, 'a real ⌘Z undoes it');
@@ -403,7 +409,7 @@ test('boxes/1 in Chrome (0.11.0): palette sections, collapsed but the last used,
     assert.equal(await ev(`return document.querySelector('.pal-head').tagName;`), 'BUTTON', 'a header is a button (Enter and space operate it)');
     assert.equal(await ev(`return B.stored['canvas-palette'] ?? null;`), null, 'opening and closing records nothing');
     // adding from Zone (Enter on its entry) records Holders as the last used
-    await ev(`document.querySelector('.palette .pal-item[data-entry="2"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await tick(); document.querySelector('dialog.dlg button[value="cancel"]')?.click(); await tick();`);
+    await ev(`document.querySelector('.palette .pal-item[data-entry="2"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await tick(); document.querySelector('.rename-field input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();`);
     await until(`/zone/.test(E.getText())`, 'a zone added');
     assert.equal(await ev(`return B.stored['canvas-palette'];`), '{"last":"Holders"}');
     const bad = await ev<{ violations: string[]; errors: string[] }>(`return { violations: B.violations, errors: B.errors };`);
@@ -452,8 +458,8 @@ test('boxes/1 in Chrome (0.12.0): the palette docked, searchable, resizable and 
     // Enter in the search adds the first match (one undo step), and records its section
     await ev(type('tray'));
     await ev(`document.querySelector('.pal-search').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await tick();`);
-    await until(`document.querySelector('dialog.dlg[open]')`, 'added, its name asked');
-    await ev(`document.querySelector('dialog.dlg[open]').close('cancel'); await tick();`);
+    await until(`document.querySelector('.rename-field')`, 'added, its name asked');
+    await ev(`document.querySelector('.rename-field input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();`);
     assert.notEqual(await ev(`return E.getText();`), TEXT);
     assert.equal(await ev(`return B.stored['canvas-palette'];`), '{"last":"Holders"}');
     await ev(`I.canvas.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true })); await tick();`);
@@ -465,8 +471,8 @@ test('boxes/1 in Chrome (0.12.0): the palette docked, searchable, resizable and 
       const x0 = r.left + 10, y0 = r.top + 8, x1 = s.left + s.width * 0.8, y1 = s.top + s.height * 0.8;
       P('pointerdown', x0, y0); for (let i = 1; i <= 6; i++) { P('pointermove', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await tick(20); } P('pointerup', x1, y1); await tick();
       return [x1, y1];`);
-    await until(`document.querySelector('dialog.dlg[open]')`, 'dropped, its name asked');
-    await ev(`document.querySelector('dialog.dlg[open]').close('cancel'); await tick(200);`);
+    await until(`document.querySelector('.rename-field')`, 'dropped, its name asked');
+    await ev(`document.querySelector('.rename-field input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick(200);`);
     assert.match(await ev<string>(`return E.getText();`), /\n  box-1:/, 'a box, from the drag');
     // (0.12.1) where it was dropped: the view is the stage's, not the host's (the pane beside it), so the drawing
     // fills the stage at its own aspect and a drop lands under the pointer
@@ -526,4 +532,288 @@ test('boxes/1 in Chrome (0.12.3): the canvas\'s toolbar stays on the stage, howe
       assert.deepEqual(await ev(`return [B.errors, B.violations];`), [[], []], what);
     }, size, page(attrs));
   }
+});
+
+// 0.12.4: connections (routes that are entries of the file's own): on one within 6 px of it, a node under the pointer first,
+// a node that hides it too; Tab reaches them after the objects; hovered, selected, deleted and back in one step.
+test('connections (0.12.4): the routes that are entries of the file\'s own, and nothing else', () => {
+  const d = drawBoxes(readBoxes(TEXT).read!, undefined, THEME), isRoute = (id: string) => Object.hasOwn(d.scene.rendered.paths, id);
+  assert.deepEqual([...connectionsOf(d.pathOf, isRoute, boxesAdapter.objectOf)], [['/links/0', 'link-0'], ['/links/1', 'link-1']]);
+  const of = (m: [string, string][], objects: string[] = []) => [...connectionsOf(new Map(m), id => id.startsWith('r'), p => (objects.some(o => p === o || p.startsWith(o + '/')) ? {} : undefined)).keys()];
+  assert.deepEqual(of([['r1', '/links/0'], ['n', '/boxes/a']]), ['/links/0']);
+  assert.deepEqual(of([['r1', '/boxes/a']], ['/boxes/a']), [], 'a route that stands for an object');
+  assert.deepEqual(of([['r1', '/boxes/a/setting']], ['/boxes/a']), [], 'or for a key inside one');
+  assert.deepEqual(of([['r1', '/archive']]), [], 'or for a whole section');
+  assert.deepEqual(of([['r1', '/links/0'], ['r2', '/links/0']]), [], 'or is one of several for an entry');
+  assert.deepEqual(of([['n1', '/links/0']]), [], 'a thing that isn\'t a route');
+  const q = nearestOn('M0,0 L10,0 L10,10', 4, 3)!;
+  assert.deepEqual([q.x, q.y, q.dist], [4, 0, 3]);
+  assert.deepEqual(nearestOn('M0,0 L10,0 L10,10', 14, 20)!.dist, Math.hypot(4, 10));
+  assert.equal(nearestOn('M0,0', 1, 1), undefined);
+});
+test('boxes/1 in Chrome (0.12.4): connections are easy to click, and the keyboard reaches them', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until, cdp }) => {
+    await until(`document.title === 'ready' && I.canvas.stage.querySelector('svg')`, 'mounted');
+    // a place on a connection with its floor, or nothing, all round it; and the way square to it there
+    type At = { x: number; y: number; nx: number; ny: number; id: string };
+    const spot = `const find = () => { for (const p of document.querySelectorAll('.canvas-stage svg.scene .flow, .canvas-stage svg.flat path.conn')) { const id = p.closest('[data-id]')?.dataset.id; if (!id) continue; const L = p.getTotalLength(), m = p.getScreenCTM(), at = l => { const q = p.getPointAtLength(l); return [m.a * q.x + m.c * q.y + m.e, m.b * q.x + m.d * q.y + m.f]; };
+      for (let f = 0.08; f < 0.95; f += 0.01) { const [x, y] = at(L * f), [x2, y2] = at(L * f + 1), l = Math.hypot(x2 - x, y2 - y) || 1, nx = -(y2 - y) / l, ny = (x2 - x) / l;
+        const free = d => { const e = document.elementFromPoint(x + nx * d, y + ny * d); return e && !e.closest('.g-blocks, .g-labels, .card, .pal, .palette, .canvas-tools'); };
+        if ([-9, -6, -3, 0, 3, 6, 9].every(free) && document.elementFromPoint(x, y)?.closest('[data-id]')?.dataset.id === id) return { x, y, nx, ny, id }; } } }; return find();`;
+    const mouse = async (x: number, y: number, click = true) => { for (const type of click ? ['mouseMoved', 'mousePressed', 'mouseReleased'] : ['mouseMoved']) await cdp('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 }); await ev('await tick(80);'); };
+    const key = async (k: string, code: string, n: number, modifiers = 0) => { await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: n, modifiers }); await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: n, modifiers }); await ev('await tick(120);'); };
+    const sel = () => ev<string>(`return I.doc.selection.map(p => p.join('.')).join(' ');`);
+    for (const zoomed of [false, true]) {
+      if (zoomed) { await ev(`I.canvas.stage.focus();`); for (let i = 0; i < 8; i++) await key('-', 'Minus', 189); }
+      const a = await ev<At>(spot);
+      assert.ok(a, `a clear place on a connection (${zoomed ? 'zoomed out' : 'fitted'})`);
+      for (const d of [-5, -3, 0, 3, 5]) { await ev(`I.doc.select([], 'canvas'); await tick(40);`); await mouse(a.x + a.nx * d, a.y + a.ny * d); assert.equal(await sel(), `links.${a.id.slice(5)}`, `${d} px off (${zoomed ? 'zoomed out' : 'fitted'})`); }
+      for (const d of [-9, 9]) { await ev(`I.doc.select([], 'canvas'); await tick(40);`); await mouse(a.x + a.nx * d, a.y + a.ny * d); assert.notEqual(await sel(), `links.${a.id.slice(5)}`, `${d} px off is not on it`); }
+      // hovered there, its mark
+      await ev(`I.doc.select([], 'canvas'); await tick(40);`);
+      await mouse(a.x + a.nx * 4, a.y + a.ny * 4, false);
+      assert.equal(await ev(`return document.querySelectorAll('.overlay .route-hover').length;`), 1, 'its hover mark');
+      if (!zoomed) {
+        // deleted, and back, one step each
+        await mouse(a.x + a.nx * 4, a.y + a.ny * 4);
+        assert.equal(await ev(`return document.querySelectorAll('.overlay .route-ring').length;`), 1, 'its ring');
+        await key('Backspace', 'Backspace', 8);
+        assert.equal(await ev<number>(`return E.getText().split('\\n').length;`), TEXT.split('\n').length - 1, 'its entry went');
+        assert.equal(await ev(`return !!document.querySelector('dialog[open]');`), false);
+        await key('z', 'KeyZ', 90, 4);
+        assert.equal(await ev(`return E.getText();`), TEXT);
+      }
+    }
+    // a node under the pointer is the one meant, however near a connection's end is
+    await ev(`I.canvas.fit(); await tick(200);`);
+    const nodes = await ev<{ id: string; x: number; y: number }[]>(`return [...document.querySelectorAll('.canvas-stage .g-blocks [data-id="a"], .canvas-stage .g-blocks [data-id="b"], .canvas-stage .g-blocks [data-id="c"]')].flatMap(e => { const r = e.getBoundingClientRect(), out = []; for (let x = r.left; x < r.right; x += 4) for (let y = r.top; y < r.bottom; y += 4) if (document.elementFromPoint(x, y)?.closest('[data-id]')?.dataset.id === e.dataset.id) out.push({ id: e.dataset.id, x, y }); return out; });`);
+    assert.ok(nodes.length > 100);
+    const wrong = [];
+    for (const n of nodes.filter((_, i) => i % 9 === 0)) { await mouse(n.x, n.y, false); const h = await ev<boolean>(`return document.querySelectorAll('.overlay .route-hover').length > 0;`); if (h) wrong.push(n); }
+    assert.deepEqual(wrong, []);
+    // the keyboard: the objects, then the connections, and round
+    await ev(`I.canvas.stage.focus(); I.doc.select([], 'canvas'); await tick(60);`);
+    const seen: string[] = [];
+    for (let i = 0; i < 8; i++) { await key('Tab', 'Tab', 9); seen.push(await sel()); }
+    assert.deepEqual(seen, ['boxes.shelf', 'boxes.a', 'boxes.b', 'boxes.floor', 'boxes.c', 'links.0', 'links.1', 'boxes.shelf']);
+    // ⌘A is the objects, as before
+    await key('a', 'KeyA', 65, 4);
+    assert.doesNotMatch(await sel(), /links/);
+    // 2D: the same
+    await ev(`[...document.querySelectorAll('.canvas-tools button')].find(b => b.textContent.trim() === '2D').click(); await tick(1200); I.doc.select([], 'canvas'); await tick(60);`);
+    const b = await ev<At>(spot);
+    assert.ok(b, 'a clear place on a connection in 2D');
+    for (const d of [-5, 0, 5]) { await ev(`I.doc.select([], 'canvas'); await tick(40);`); await mouse(b.x + b.nx * d, b.y + b.ny * d); assert.equal(await sel(), `links.${b.id.slice(5)}`, `2D, ${d} px off`); }
+    assert.deepEqual(await ev(`return [B.errors, B.violations];`), [[], []]);
+  }, '1280,860');
+});
+
+// 0.12.5: the inline name field, driven with a real mouse and keyboard: right after a drop, above the thing, its name
+// selected; Enter names it (the drop and the name one undo step); Esc and a press elsewhere keep the name, and the press
+// does what it always does; what is wrong with a name shows under the field; it follows a zoom; F2 (the references
+// too), the menu, the properties' pencil and, where the host asks, a double click use it. No <dialog> is ever made.
+test('boxes/1 in Chrome (0.12.5): the inline name field, after a drop and for a rename; nothing modal', { skip: chrome ? false : 'no Chrome', timeout: 180000 }, async () => {
+  for (const motion of ['no-preference', 'reduce']) await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until, cdp }) => {
+    await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] });
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    await ev(`window.__dialogs = 0; new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeName === 'DIALOG' || n.querySelector?.('dialog')) window.__dialogs++; }).observe(document, { childList: true, subtree: true });`);
+    const mouse = (type: string, x: number, y: number, n = 1) => cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: n });
+    const KEYS: Record<string, [string, number]> = { Enter: ['\r', 13], Escape: ['', 27], F2: ['', 113] };
+    const key = async (k: string) => { const [text, code] = KEYS[k]; await cdp('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key: k, code: k, windowsVirtualKeyCode: code, ...(text ? { text } : {}) }); await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code }); };
+    const type = (t: string) => cdp('Input.insertText', { text: t });
+    const field = () => ev<{ value: string; sel: string; focus: boolean; x: number; bottom: number; why: string; invalid: string | null } | null>(`const i = document.querySelector('.rename-field input'); if (!i) return null; const r = i.getBoundingClientRect();
+      return { value: i.value, sel: i.value.slice(i.selectionStart, i.selectionEnd), focus: document.activeElement === i, x: r.left + r.width / 2, bottom: r.bottom, why: document.querySelector('.rename-error').textContent, invalid: i.getAttribute('aria-invalid') };`);
+    const drop = async (fx = 0.7, fy = 0.9) => {
+      const [x0, y0, x1, y1] = await ev<number[]>(`const b = document.querySelector('.palette .pal-item[data-entry="0"]').getBoundingClientRect(), s = I.canvas.stage.getBoundingClientRect(); return [b.left + 8, b.top + 8, s.left + s.width * ${fx}, s.top + s.height * ${fy}];`);
+      await mouse('mousePressed', x0, y0); for (let i = 1; i <= 6; i++) await mouse('mouseMoved', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await mouse('mouseReleased', x1, y1);
+      await until(`document.querySelector('.rename-field') && document.querySelector('.iso-canvas svg.scene [data-id="box-1"]')`, 'dropped, drawn, its name asked');
+    };
+    const undone = async (why: string) => { await ev(`I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`); await until(`E.getText() === ${JSON.stringify(TEXT)}`, why); };
+    const boxOf = (id: string) => ev<{ x: number; top: number }>(`const rs = [...document.querySelectorAll('.iso-canvas svg.scene [data-id="${id}"]')].filter(e => !e.closest('.overlay')).map(e => e.getBoundingClientRect()).filter(r => r.width); const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right)); return { x: (l + rr) / 2, top: Math.min(...rs.map(r => r.top)) };`);
+    const above = async (id: string, why: string) => { await ev(`await tick(120);`); const f = (await field())!, b = await boxOf(id); assert.ok(Math.abs(f.x - b.x) < 3 && Math.abs(b.top - 8 - f.bottom) < 3, `${why}: the field ${JSON.stringify(f)} above ${JSON.stringify(b)}`); };
+
+    // dropped: the field, focused, the generated name selected, above the box; typed, Enter: named, one undo step
+    await drop();
+    const f = (await field())!;
+    assert.deepEqual([f.value, f.sel, f.focus], ['box-1', 'box-1', true]);
+    await above('box-1', 'after the drop');
+    await type('front'); await key('Enter');
+    await until(`/\\n  front:/.test(E.getText())`, 'named');
+    assert.equal(await field(), null);
+    { const t = await ev<string>(`return E.getText();`); assert.ok(!/box-1/.test(t), 'the generated name is nowhere (its pin too): ' + t); }
+    assert.equal(await ev(`return document.activeElement === I.canvas.stage;`), true, 'the focus is the canvas\'s');
+    assert.match(await ev<string>(`return I.doc.undoLabel;`), /^Add box front/);
+    assert.deepEqual(await ev(`return I.doc.selection.map(p => p.join('/'));`), ['boxes/front']);
+    await undone('one undo takes the drop and the name');
+    await ev(`I.doc.redo();`); await until(`/\\n  front:/.test(E.getText())`, 'and redo brings both'); await undone('undone again');
+
+    // Esc keeps the generated name
+    await drop(); await type('nope'); await key('Escape');
+    assert.equal(await field(), null);
+    assert.match(await ev<string>(`return E.getText();`), /\n  box-1:/); assert.doesNotMatch(await ev<string>(`return E.getText();`), /nope/);
+    assert.equal(await ev(`return document.activeElement === I.canvas.stage;`), true);
+    await undone('one step');
+
+    // half off the canvas: the field stays on it
+    await drop();
+    const corner = await ev<{ x: number; y: number }>(`const r = I.canvas.stage.getBoundingClientRect(); return { x: r.left + 12, y: r.top + r.height / 2 };`);
+    for (let i = 0; i < 12; i++) await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: corner.x, y: corner.y, deltaX: 0, deltaY: -120 });
+    await ev(`await tick(250);`);
+    const edge = await ev<{ in: number; stage: number; box: number }>(`const right = e => e.getBoundingClientRect().right; return { in: right(document.querySelector('.rename-field input')), stage: right(I.canvas.stage), box: right(document.querySelector('.iso-canvas svg.scene .g-blocks [data-id="box-1"]')) };`);
+    assert.ok(edge.box > edge.stage && edge.in <= edge.stage, JSON.stringify(edge));
+    await key('Escape'); await undone('one step');
+    await ev(`[...document.querySelectorAll('.canvas-tools button')].find(b => b.textContent === 'Fit').click(); await tick(100);`);
+
+    // a press elsewhere saves a good name, and is a press as ever: c is selected; one undo step still
+    const press = async (id: string) => { const c = await ev<{ x: number; y: number }>(`return I.canvas.pageXYOf(['boxes', '${id}']);`); await mouse('mousePressed', c.x, c.y); await mouse('mouseReleased', c.x, c.y); };
+    await drop(); await type('half'); await press('c');
+    await until(`!document.querySelector('.rename-field') && /\\n  half:/.test(E.getText()) && I.doc.selection.map(p => p.join('/')).join() === 'boxes/c'`, 'saved, and c selected');
+    assert.match(await ev<string>(`return E.getText();`), /layout:\n    half:/, 'its pin too');
+    await undone('one step');
+    // a bad one isn't saved: in use, or one the rule refuses
+    for (const bad of ['c', 'Bad Name!']) {
+      await drop(); await type(bad); await press('c');
+      await until(`!document.querySelector('.rename-field') && I.doc.selection.map(p => p.join('/')).join() === 'boxes/c'`, 'dismissed');
+      await ev(`await tick(100);`); assert.match(await ev<string>(`return E.getText();`), /\n  box-1:/, bad);
+      await undone('one step');
+    }
+    // on the thing itself: selected under its new name
+    await drop(); await type('self'); await press('box-1');
+    await until(`/\\n  self:/.test(E.getText()) && I.doc.selection.map(p => p.join('/')).join() === 'boxes/self'`, 'selected by its new name');
+    await undone('one step');
+    // a drag of the thing itself: dragged, then named, its pin where the drag left it
+    await drop(); await type('moved'); { const pin = async (n: string) => (await ev<string>(`return E.getText();`)).match(new RegExp(`${n}: \\{ at: \\[([^\\]]*)`))?.[1];
+      const was = await pin('box-1'), c = await ev<{ x: number; y: number }>(`return I.canvas.pageXYOf(['boxes', 'box-1']);`);
+      await mouse('mousePressed', c.x, c.y); for (let k = 1; k <= 8; k++) { await mouse('mouseMoved', c.x - k * 9, c.y - k * 3); await ev(`await tick(40);`); } await mouse('mouseReleased', c.x - 72, c.y - 24);
+      await until(`/\\n  moved:/.test(E.getText())`, 'named'); await ev(`await tick(300);`);
+      const now = await pin('moved'); assert.ok(now && now !== was, `moved from ${was} to ${now}`); assert.equal(await pin('box-1'), undefined, 'no pin under the old name');
+      assert.doesNotMatch(await ev<string>(`return E.getText();`), /box-1/); }
+    await ev(`while (I.doc.canUndo) I.doc.undo();`); await until(`E.getText() === ${JSON.stringify(TEXT)}`, 'all undone');
+    // a button elsewhere (Undo): the name is saved first, so one press takes both back; ⌘S in the field saves the file with it
+    await drop(); await type('gone'); { const u = await ev<{ x: number; y: number }>(`const r = [...document.querySelectorAll('button')].find(b => /^Undo/.test(b.textContent.trim())).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };`); await mouse('mousePressed', u.x, u.y); await mouse('mouseReleased', u.x, u.y); }
+    await until(`E.getText() === ${JSON.stringify(TEXT)}`, 'Undo took both');
+    await drop(); await type('kept'); await cdp('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 's', code: 'KeyS', windowsVirtualKeyCode: 83, modifiers: 4 });
+    await until(`B.saved.length && /\\n  kept:/.test(B.saved.at(-1))`, 'the file saved, with the name');
+    await ev(`while (I.doc.canUndo) I.doc.undo(); await tick(100);`);
+
+    // a name in use, one the rule refuses, none: said under the field, Enter does nothing; a good one after is taken
+    await drop();
+    for (const [bad, why] of [['c', /already used/], ['Bad Name!', /./], ['', /needed/]] as const) {
+      await ev(`document.querySelector('.rename-field input').select();`);
+      if (bad) await type(bad); else await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 });
+      await key('Enter');
+      const g = (await field())!;
+      assert.ok(g, `${bad}: still open`); assert.match(g.why, why); assert.equal(g.invalid, 'true');
+      assert.match(await ev<string>(`return E.getText();`), /\n  box-1:/, 'nothing changed');
+    }
+    const under = await ev<{ err: number; input: number }>(`return { err: document.querySelector('.rename-error').getBoundingClientRect().top, input: document.querySelector('.rename-field input').getBoundingClientRect().bottom };`);
+    assert.ok(under.err >= under.input, 'under the field');
+    await ev(`document.querySelector('.rename-field input').select();`); await type('good'); await key('Enter');
+    await until(`/\\n  good:/.test(E.getText())`, 'a good one'); await undone('one step');
+
+    // it follows a zoom and a pan, the canvas live under it
+    await ev(`[...document.querySelectorAll('.canvas-tools button')].find(b => b.textContent === 'Fit').click(); await tick(150);`);
+    await ev(`I.doc.select([['boxes', 'b']], 'canvas'); I.canvas.stage.focus();`); await key('F2'); await above('b', 'F2');
+    const at = await boxOf('b');
+    for (let i = 0; i < 3; i++) await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: at.x, y: at.top + 60, deltaX: 0, deltaY: 60 });
+    await ev(`await tick(200);`); assert.ok(await field(), 'the wheel leaves it open'); await above('b', 'zoomed');
+    await key('Escape');
+
+    // F2: the references follow; its own undo step
+    await ev(`I.doc.select([['boxes', 'a']], 'canvas'); I.canvas.stage.focus();`); await key('F2'); await type('alpha'); await key('Enter');
+    await until(`/from: alpha, to: b/.test(E.getText())`, 'renamed, the link too'); await undone('undone');
+    // the menu's Rename, and the properties' pencil (the field over the properties' heading)
+    await ev(`I.doc.select([['boxes', 'a']], 'canvas'); await tick(); I.canvas.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true })); await tick(); [...document.querySelectorAll('.menu .menu-item')].find(b => /^Rename/.test(b.textContent.trim())).click(); await tick();`);
+    assert.equal((await field())!.value, 'a'); await key('Escape');
+    await ev(`document.querySelector('[aria-label^="Rename box a"]').click(); await tick();`);
+    assert.equal((await field())!.value, 'a');
+    const on = await ev<number[]>(`const q = e => e.getBoundingClientRect(), f = q(document.querySelector('.rename-field input')), t = q(document.querySelector('.sel-title')); return [Math.abs(f.top + f.height / 2 - t.top - t.height / 2), f.left - t.left];`);
+    assert.ok(on[0] < 1.5 && on[1] > -10 && on[1] < 1, `on the heading: ${on}`);
+    await type('omega'); await key('Enter'); await until(`/from: omega, to: b/.test(E.getText())`, 'renamed from the properties'); await undone('undone');
+    // undone under it (the thing gone): the field goes too
+    await drop(); await ev(`I.doc.undo(); await tick(200);`); assert.equal(await field(), null, 'the thing gone, the field gone');
+
+    // a double click: shows it in the text (nothing to rename) unless the host asks for a rename
+    const b = await ev<{ x: number; y: number }>(`return I.canvas.pageXYOf(['boxes', 'b']);`);
+    for (const n of [1, 2]) { await mouse('mousePressed', b.x, b.y, n); await mouse('mouseReleased', b.x, b.y, n); }
+    await ev(`await tick(150);`);
+    assert.equal((await field())?.value, 'b', 'this host asks for a rename'); await key('Escape');
+
+    assert.deepEqual(await ev(`return { dialogs: window.__dialogs, violations: B.violations, errors: B.errors };`), { dialogs: 0, violations: [], errors: [] });
+  }, '1280,860', { html: '<!doctype html><html><head><meta charset="utf-8"><title>page</title></head><body data-rename style="margin:0"><div id="app" style="height:100vh"></div><script type="module" src="page.js"></script></body></html>' });
+  // without the option a double click is as it was
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until, cdp }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    const b = await ev<{ x: number; y: number }>(`return I.canvas.pageXYOf(['boxes', 'b']);`);
+    for (const n of [1, 2]) for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x: b.x, y: b.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: n });
+    await ev(`await tick(150);`);
+    assert.equal(await ev(`return !!document.querySelector('.rename-field');`), false);
+    assert.deepEqual(await ev(`return I.doc.selection.map(p => p.join('/'));`), ['boxes/b']);
+  });
+});
+
+// 0.12.5: setText(text, { fit: true }): another document's drawing fitted once drawn, though the view had been moved (3D, 2D, and
+// the same text again); without it the view stays where it is.
+test('boxes/1 in Chrome (0.12.5): setText with fit', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until, cdp }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    const OTHER = `format: boxes/1\ntitle: Other\nboxes:\n${Array.from({ length: 9 }, (_, i) => `  q${i}: { label: Q${i} }`).join('\n')}\n`;
+    const view = () => ev<string>(`const v = document.querySelector('.iso-canvas svg.scene').viewBox.baseVal; return [v.x, v.y, v.width, v.height].map(n => n.toFixed(1)).join();`);
+    const away = async () => {
+      const at = await ev<{ x: number; y: number }>(`const r = I.canvas.stage.getBoundingClientRect(); return { x: r.left + r.width * .4, y: r.top + r.height * .6 };`);
+      for (let i = 0; i < 8; i++) await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: at.x, y: at.y, deltaX: 0, deltaY: -120 });
+      await ev(`await tick(200);`); assert.equal(await ev(`return I.canvas.moved;`), true, 'the view was moved');
+    };
+    const set = async (t: string, id: string, o = '') => { await ev(`E.setText(${JSON.stringify(t)}${o});`); await until(`document.querySelector('.iso-canvas svg.scene [data-id="${id}"]') && !document.querySelector('.iso-canvas svg.scene [data-id="${id === 'c' ? 'q0' : 'c'}"]')`, `${id} drawn`); await ev(`await tick(200);`); };
+    const inside = () => ev<boolean>(`const s = I.canvas.stage.getBoundingClientRect(); return [...document.querySelectorAll('.iso-canvas svg.scene [data-id]')].filter(e => !e.closest('.overlay')).every(e => { const r = e.getBoundingClientRect(); return !r.width || (r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1); });`);
+    for (const mode of ['3d', '2d']) {
+      await ev(`I.canvas.setMode('${mode}');`); await until(`I.canvas.mode === '${mode}' && document.querySelectorAll('.iso-canvas svg.scene').length === 1 && !document.querySelector('.dual-morph') && !!document.querySelector('.iso-canvas svg.scene.flat') === ${mode === '2d'}`, mode);
+      await away(); const was = await view();
+      await set(OTHER, 'q0'); assert.equal(await view(), was, `${mode}: without fit the view stays`); assert.equal(await inside(), false);
+      await set(TEXT, 'c', ', { fit: true }'); assert.equal(await inside(), true, `${mode}: fitted`); assert.equal(await ev(`return I.canvas.moved;`), false);
+      await away(); await set(OTHER, 'q0', ', { fit: true }'); assert.equal(await inside(), true, `${mode}: another, fitted`);
+      await away(); await ev(`E.setText(${JSON.stringify(OTHER)}, { fit: true }); await tick(500);`); assert.equal(await inside(), true, `${mode}: the same again, fitted`);
+      // once only: an edit after doesn't fit again
+      await away(); const then = await view(); await ev(`E.setText(${JSON.stringify(OTHER.replace('Q8', 'Q8 x'))}); await tick(600);`); assert.equal(await view(), then, `${mode}: once`);
+      await set(TEXT, 'c', ', { fit: true }');
+    }
+    assert.deepEqual(await ev(`return { violations: B.violations, errors: B.errors };`), { violations: [], errors: [] });
+  });
+});
+
+// 0.12.6: what Fit fits has the connectors in it: one that goes round a thing, past everything drawn, is inside the stage, in 3D and 2D.
+test('boxes/1 in Chrome (0.12.6): Fit counts the connectors', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    // a long way round: in 3D one of these goes 140 units past everything drawn (the search that found it isn't kept); in 2D past the cards
+    const ROUND = `format: boxes/1\ntitle: Round\nboxes:\n  p: { size: [5, 1, 1] }\n  q: { size: [2, 2, 1] }\n  w: { size: [5, 2, 1] }\n  x: { size: [4, 8, 1] }\n  y: { size: [6, 3, 1] }\nlinks:\n  - { from: p, to: q }\n  - { from: q, to: p }\nx-editor:\n  layout:\n    p: { at: [12, 11] }\n    q: { at: [5, 2] }\n    w: { at: [1, 5] }\n    x: { at: [5, 13] }\n    y: { at: [4, 9] }\n`;
+    await ev(`E.setText(${JSON.stringify(ROUND)}, { fit: true });`);
+    await until(`document.querySelector('.iso-canvas svg.scene [data-id="w"]') && !document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'drawn');
+    for (const mode of ['3d', '2d']) {
+      await ev(`I.canvas.setMode('${mode}');`); await until(`I.canvas.mode === '${mode}' && document.querySelectorAll('.iso-canvas svg.scene').length === 1 && !document.querySelector('.dual-morph') && !!document.querySelector('.iso-canvas svg.scene.flat') === ${mode === '2d'}`, mode);
+      const r = await ev<{ routes: number; off: string[]; gap: number; things: number }>(`I.canvas.fit(); await tick(200); const svg = document.querySelector('.iso-canvas svg.scene'), st = I.canvas.stage.getBoundingClientRect();
+        const paths = [...svg.querySelectorAll('path')].filter(p => !p.closest('.overlay') && /^link-/.test(p.closest('[data-id]')?.dataset.id ?? p.dataset.id ?? '')); const off = []; let gap = Infinity;
+        const inside = q => Math.min(q.left - st.left, st.right - q.right, q.top - st.top, st.bottom - q.bottom);
+        for (const p of paths) { const g = inside(p.getBoundingClientRect()); gap = Math.min(gap, g); if (g < 4) off.push(JSON.stringify(p.getBoundingClientRect())); }
+        const things = Math.min(...[...svg.querySelectorAll('[data-id]')].filter(e => /^[pqwxy]$/.test(e.dataset.id) && !e.closest('.overlay')).map(e => inside(e.getBoundingClientRect())));
+        return { routes: paths.length, off, gap, things };`);
+      // and nothing that isn't seen: a step's mark on a connector, far away, changes nothing
+      const same = await ev<boolean>(`const svg = document.querySelector('.iso-canvas svg.scene'), was = JSON.stringify(I.canvas.routesBox()), m = svg.querySelector('.g-marks') ?? svg.appendChild(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'g'), {})); m.setAttribute('class', 'g-marks');
+        const g = m.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'circle')); for (const [k, v] of [['cx', 9000], ['cy', 9000], ['r', 9], ['data-hl', 'link-0']]) g.setAttribute(k, v); const now = JSON.stringify(I.canvas.routesBox()); g.remove(); return was === now;`);
+      assert.equal(same, true, `${mode}: a mark isn't fitted`);
+      assert.ok(r.routes >= 2, `${mode}: ${r.routes} connectors`); assert.deepEqual(r.off, [], `${mode}: every connector is on the stage`); assert.ok(r.things >= 23, `${mode}: the things keep their margin (${r.things})`);
+      if (mode === '3d') assert.ok(r.gap < 12, `no more than it takes: the furthest connector is ${r.gap} px inside`);
+    }
+    // where no connector goes past the things, the view is exactly the one without it
+    await ev(`I.canvas.setMode('3d');`); await until(`I.canvas.mode === '3d' && document.querySelectorAll('.iso-canvas svg.scene').length === 1 && !document.querySelector('.dual-morph')`, '3d');
+    const PLAIN = `format: boxes/1\ntitle: Plain\nboxes:\n  p: { size: [2, 2, 1] }\n  q: { size: [2, 2, 1] }\nlinks:\n  - { from: p, to: q }\nx-editor:\n  layout:\n    p: { at: [0, 0] }\n    q: { at: [9, 0] }\n`;
+    const view = async (t: string) => {
+      await ev(`E.setText(${JSON.stringify(t)}, { fit: true });`);
+      await until(`E.getText() === ${JSON.stringify(t)} && (document.querySelectorAll('.iso-canvas svg.scene [data-id^="link-"]').length > 0) === ${t.includes('links')} && !document.querySelector('.iso-canvas svg.scene [data-id="w"]')`, 'drawn');
+      await ev(`await tick(300);`);
+      return ev<string>(`const v = document.querySelector('.iso-canvas svg.scene').viewBox.baseVal; return [v.x, v.y, v.width, v.height].map(n => n.toFixed(2)).join();`);
+    };
+    assert.equal(await view(PLAIN), await view(PLAIN.replace(/links:\n.*\n/, '')));
+    assert.deepEqual(await ev(`return { violations: B.violations, errors: B.errors };`), { violations: [], errors: [] });
+  });
 });

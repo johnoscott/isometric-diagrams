@@ -2,6 +2,22 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.12.6 — Fit counts the connectors
+
+- A connector that goes past everything else drawn is on the canvas when fitted (3D and 2D); otherwise the fit is as it was.
+
+## 0.12.5 — the name is asked in place
+
+- A dropped thing's name is asked in an inline field above it, not a dialog: Enter or a press elsewhere names it, Esc
+  keeps the generated name; the drop and the name are one undo step. F2, the menu and the properties' pencil use it too.
+- `doubleClick: 'rename'` on the view; by default a double click shows the thing in the text (fixed: it found nothing).
+- `setText(text, { fit: true })` fits the new drawing.
+- A rename keeps the thing's pin.
+
+## 0.12.4 — connections are easy to select
+
+- A connection is selected within 6 px of it, 3D and 2D (a node under the pointer comes first); Tab reaches connections.
+
 ## 0.12.3 — the canvas's toolbar on a narrow canvas
 
 - The toolbar wraps inside a canvas too narrow for it (with the palette docked, or text beside it); it was cut off.

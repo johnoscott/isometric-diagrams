@@ -1,10 +1,11 @@
 // Actions the canvas and the properties panel share (the tree has its own inline forms of the same commands): delete
-// with a references dialog, rename in a dialog, duplicate, select connected. What an object is and how it is named
+// with a references dialog, rename in the inline field, duplicate, select connected. What an object is and how it is named
 // are the kit's (the domain's commands, objectOf, kinds and name rule); what each kind offers in its own menu is the
 // domain's too.
 
 import { h } from './icons.ts';
 import { ask } from './dialog.ts';
+import { renameField, type RenameAt } from './rename.ts';
 import type { EditorModel, Command } from '../model.ts';
 import type { Commands } from '../commands.ts';
 import type { ObjectKindInfo, ObjectRef } from '../adapter.ts';
@@ -23,8 +24,8 @@ export interface ActionsKit {
   nameHint: string;
 }
 
-export function run(doc: EditorModel, c: Command, origin: 'canvas' | 'props' | 'menu', note?: (t: string, tone?: 'bad') => void): boolean {
-  try { return doc.apply(c, origin); } catch (e) { note?.(String((e as Error).message), 'bad'); return false; }
+export function run(doc: EditorModel, c: Command, origin: 'canvas' | 'props' | 'menu', note?: (t: string, tone?: 'bad') => void, joins?: number): boolean {
+  try { return doc.apply(c, origin, joins); } catch (e) { note?.(String((e as Error).message), 'bad'); return false; }
 }
 
 /** Several commands as one undo step. */
@@ -68,26 +69,22 @@ async function deletePaths(doc: EditorModel, paths: Path[], origin: 'canvas' | '
   return ok;
 }
 
-/** Rename in a dialog (the canvas has no inline field). */
-async function renameDialog(doc: EditorModel, path: Path, origin: 'canvas' | 'props' | 'menu', note?: (t: string, tone?: 'bad') => void): Promise<boolean> {
-  const now = String(path[path.length - 1]);
-  const input = h('input', { type: 'text', value: now, 'aria-label': 'New name', spellcheck: 'false', autocomplete: 'off', class: 'mono-input' });
-  input.value = now;
-  const why = h('p', { class: 'dlg-error', role: 'alert' });
+/** Rename, in the inline field (rename.ts). `joins`: the undo step it becomes part of (an add's, so a drop and its name
+ *  are one), when that is still the last one. */
+async function rename(doc: EditorModel, path: Path, origin: 'canvas' | 'props' | 'menu', note: ((t: string, tone?: 'bad') => void) | undefined, at: RenameAt & { joins?: number }): Promise<boolean> {
+  const now = String(path[path.length - 1]), res = isRes(path);
+  let here: Path | null = path;
+  const off = doc.on(c => { if (here && c.remap) here = c.remap(here); });
   const used = () => kit.kinds.flatMap(k => Object.keys((getIn(doc.goodDoc.data, k.section) ?? {}) as Raw));
-  const check = () => {
-    const v = input.value.trim();
-    const bad = !kit.nameRule.test(v) && isRes(path) ? kit.nameHint : v !== now && used().includes(v) ? `"${v}" is already used` : '';
-    why.textContent = bad;
-    return bad ? undefined : v;
-  };
-  input.addEventListener('input', check);
-  const go = ask(`Rename ${describe(path)}`, [h('label', { class: 'field' }, h('span', null, 'Name'), input), why, isRes(path) ? h('p', { class: 'sub' }, 'Every reference to it is renamed too.') : ''], [{ label: 'Cancel', value: 'cancel' }, { label: 'Rename', value: 'ok', primary: true }]);
-  setTimeout(() => { input.focus(); input.select(); }, 0);
-  if (await go !== 'ok') return false;
-  const v = check();
-  if (!v || v === now) return false;
-  return run(doc, isRes(path) ? renameCmd(path, v) : renameKeyCmd(path, v), origin, note);
+  let ok = false;
+  await renameField({
+    label: `Rename ${describe(path)}`, value: now,
+    wrong: v => (!v ? 'A name is needed' : v === now ? '' : res && !kit.nameRule.test(v) ? kit.nameHint : used().includes(v) ? `"${v}" is already used` : ''),
+    alive: () => !!here && getIn(doc.goodDoc.data, here) !== undefined,
+    commit: v => { if (here) ok = run(doc, { ...(res ? renameCmd(here, v) : renameKeyCmd(here, v)), joined: l => l.replace(` ${now}`, ` ${v}`) }, origin, note, at.joins); },
+  }, at);
+  off();
+  return ok;
 }
 
 const duplicate = (doc: EditorModel, path: Path, origin: 'canvas' | 'menu', note?: (t: string, tone?: 'bad') => void) => {
@@ -114,6 +111,6 @@ function connected(doc: EditorModel, paths: Path[]): Path[] {
   return [...out.values()];
 }
 
-  return { deletePaths, renameDialog, duplicate, connected };
+  return { deletePaths, rename, duplicate, connected };
 }
 export type Actions = ReturnType<typeof actionsFor>;

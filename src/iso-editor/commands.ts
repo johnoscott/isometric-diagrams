@@ -132,6 +132,15 @@ export function commandsFor(a: CommandsAdapter) {
           const quote = now[0] === '"' || now[0] === "'" ? now[0] : undefined;
           edits.push({ start: range[0], end: range[1], text: quote === '"' ? JSON.stringify(v) : quote === "'" ? `'${v}'` : scalarText(v, { flow: true, indent: 0 }) });
         }
+        // (0.12.5) its pin is keyed by its name: it follows (a domain whose references include the pins has done it), so the
+        // thing stays where it was put. Not over a pin there already.
+        const data = dataOf(t) as Record<string, { layout?: Record<string, unknown> } | null> | undefined;
+        for (const k of [a.pins.key, a.pins.legacyKey]) {
+          const layout = k === undefined ? undefined : data?.[k]?.layout;
+          if (!layout || typeof layout !== 'object' || !Object.hasOwn(layout, from) || Object.hasOwn(layout, to)) continue;
+          const range = d.rangeOf([k!, 'layout', from], 'key');
+          if (range && !edits.some(e => e.start < range[1] && range[0] < e.end)) edits.push({ start: range[0], end: range[1], text: scalarText(to, { flow: true, indent: 0 }) });
+        }
         return { steps: [edits] };
       },
     };

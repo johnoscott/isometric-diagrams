@@ -14,6 +14,7 @@
 import { h, icon, type IconName } from './icons.ts';
 import { openMenu, type MenuItem } from './menu.ts';
 import { run, type Actions } from './actions.ts';
+import { connectionsOf, nearestOn } from '../connections.ts';
 import { screenToGrid, localAt, boxSilhouette, floorOf, snapMove, overlaps, paddingOf, type Move } from '../../iso-objects/geometry.ts';
 import { regionKind, type KindCatalog } from '../../iso-objects/kinds.ts';
 import type { CompiledScene } from '../../iso-objects/compile.ts';
@@ -81,6 +82,8 @@ export interface CanvasUi {
    *  its own at the canvas's left, with a search box filtering by label and section, resizable and collapsible; its
    *  width and whether it is collapsed are kept in the host's store as `canvas-palette-dock`) */
   paletteLayout?: 'floating' | 'docked';
+  /** (0.12.5) what a double click on an object does: shows it in the text (the default), or renames it */
+  doubleClick?: 'text' | 'rename';
   text: {
     stage: string; dragGroup: string; dragSelectTip: string; unreadable: string; palette: string;
     /** the end of a pin drag's hint */
@@ -151,7 +154,7 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 export function canvasView<M, D extends CanvasDrawing, A extends object = object>(host: HTMLElement, doc: EditorModel, opts: CanvasOpts<M, D, A>) {
   const K = opts.kit, ui = K.ui, T = ui.text;
   const { setCmd, deleteCmd, insertCmd, insertItemCmd, pinsCmd, withPinsMoved, freshName, describe } = K.commands;
-  const { deletePaths, renameDialog, duplicate, connected } = K.actions;
+  const { deletePaths, duplicate, connected } = K.actions;
   const resourceOf = (ptr: string) => K.objectOf(ptr);
   const kindOf = (k: string) => K.kinds.find(x => x.kind === k)!;
   const PINS_KEY = K.pins.key;
@@ -237,7 +240,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (!s3) { showEmpty(T.unreadable); return; }
     const key = JSON.stringify(data);
     // nothing new to draw: repaint the marks, unless a drag is showing its grid (it repaints when it ends)
-    if (key === lastKey && svg) { if (!pinDrag()) paintOverlay(); return; }
+    if (key === lastKey && svg) { if (!pinDrag()) paintOverlay(); if (toFit) { toFit = false; fitItems(); } return; }
     if (mode === '2d' && !flatImpl) {
       try { await loadFlat(); } catch (e) { mode = '3d'; paintNav(); opts.note(`The 2D view couldn't load: ${(e as Error).message}`, 'warn'); }
     }
@@ -250,6 +253,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     await draw(next);
     if (cd!.pinNotes.length) opts.note(`Pins: ${cd!.pinNotes.join('; ')}`, 'warn');
   }
+  let toFit = false;     // (0.12.5) the next drawing is another document's: fitted
   let lastS3: M | undefined, lastData: unknown, pendingAfterDrag = false;
   // ---------- the switch's morph (0.7.5): the 2D view's implementation runs it, over the stage ----------
   let morphFrom: { svg: SVGSVGElement; mode: '3d' | '2d' } | undefined;
@@ -308,7 +312,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     svg = s;
     const [x, y, w, hh] = full;
     V.full = { x, y, w, h: hh };
-    if (!V.view) { V.view = { ...V.full }; autoFit(); } else quietly(applyView);
+    if (toFit) { toFit = false; V.view = { ...V.full }; fitItems(); } else if (!V.view) { V.view = { ...V.full }; autoFit(); } else quietly(applyView);
     empty.hidden = true;
     layer?.drawn?.();
     if (pendingReveal && reveal(pendingReveal)) pendingReveal = undefined;
@@ -336,6 +340,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const live = layer?.extent?.() ?? [];
     return union([...ptrs.flatMap(p => elementsFor(p)).filter(e => e.getBBox().width || e.getBBox().height).map(boxOf), ...live]);
   }
+  /** (0.12.6) the connectors and their labels (not a step's marks on them, which a still doesn't show): Fit keeps them on the stage */
+  function routesBox() {
+    if (!cd || !svg) return undefined;
+    const els = Object.keys(cd.scene.rendered.paths).flatMap(id => [...svg!.querySelectorAll<SVGGraphicsElement>(`[data-id="${CSS.escape(id)}"], [data-hl="${CSS.escape(id)}"], [data-for="${CSS.escape(id)}"]`)]).filter(e => !e.closest('.pre, .overlay, .g-marks, .g-badges, .g-anim'));
+    return union(els.filter(e => e.getBBox().width || e.getBBox().height).map(boxOf));
+  }
   // (0.12.1) the view is the stage's: docked, the palette's pane shares the host, so the host is wider than what is
   // drawn (the scale, the pointer's place, a resize); floating, the stage is the host's whole area
   const docked = ui.paletteLayout === 'docked';
@@ -350,6 +360,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     },
     onRezoom: () => paintOverlay(),
     itemsBox: () => itemsBox(),
+    alsoBox: () => routesBox(),
     marksShowing: () => !!layer?.showing?.(),
   });
   const { size, scale, quietly, applyView, toSvg, zoomAt, fit, fitItems, autoFit, actual, settled } = V;
@@ -397,6 +408,37 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     let e: Element | null = el;
     while (e) { const id = e.getAttribute('data-id'); if (id && cd.pathOf.has(id)) return cd.pathOf.get(id); e = e.parentElement?.closest('[data-id]') ?? null; }
     return undefined;
+  };
+
+  // (0.12.4) connections: the routes that are entries of the file's own (src/iso-editor/connections.ts)
+  const isRouteId = (id: string) => !!cd && Object.hasOwn(cd.scene.rendered.paths, id);
+  const connections = () => (cd ? connectionsOf(cd.pathOf, isRouteId, K.objectOf) : new Map<string, string>());
+  /** how near a connection, in the page's pixels, is on it */
+  const NEAR = 6;
+  /** the drawn thing under a place on the page: a connection within NEAR of it, unless a node is there (a node's always the
+   *  one meant; a region's floor, or nothing, gives way) or a node hides that part of the connection */
+  const pathAt = (target: EventTarget | null, px: number, py: number): string | undefined => {
+    const direct = pathAtEvent(target);
+    const isNode = (el: Element | null): boolean => {
+      const id = el?.closest?.('[data-id]')?.getAttribute('data-id');
+      if (!id || !cd || isRouteId(id)) return false;
+      if (flat) { const q = toSvg(px, py); return !flat.panelsAt(q.x, q.y).includes(id) && cd.scene.layout.byId.has(id); }
+      return cd.scene.layout.byId.get(id)?.type === 'node';
+    };
+    const el = target as Element | null;
+    if (!cd || !svg || !el?.closest || (el !== svg && !svg.contains(el) && el !== stage) || isNode(el)) return direct;
+    const conns = connections();
+    if (!conns.size || (direct !== undefined && conns.has(direct))) return direct;
+    const at = toSvg(px, py), k = scale(), r = viewEl.getBoundingClientRect();
+    let best: { ptr: string; dist: number } | undefined;
+    for (const ptr of conns.keys()) for (const sh of outlinesFor(ptr)) {
+      if (sh.kind !== 'route') continue;
+      const q = nearestOn(sh.d, at.x, at.y);
+      if (!q || q.dist * k > NEAR || (best && q.dist >= best.dist)) continue;
+      if (isNode(fdoc().elementFromPoint(r.left + (q.x - V.view!.x) * k, r.top + (q.y - V.view!.y) * k))) continue;
+      best = { ptr, dist: q.dist };
+    }
+    return best ? best.ptr : direct;
   };
 
   // ---------- the overlay: selection rings, hover, problem badges ----------
@@ -538,7 +580,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     stage.addEventListener('pointercancel', up);
     stage.addEventListener('wheel', wheel, { passive: false });
     stage.addEventListener('contextmenu', context);
-    stage.addEventListener('dblclick', e => { const p = pathAtEvent(e.target); if (p !== undefined) opts.showInText(fromPointer(p)); });
+    stage.addEventListener('dblclick', e => {
+      // (0.12.5) what is under the pointer: the presses were captured, so a real double click's target is the stage
+      const p = pathAt(e.target === stage ? fdoc().elementFromPoint(e.clientX, e.clientY) : e.target, e.clientX, e.clientY);
+      if (p === undefined) return;
+      if (ui.doubleClick === 'rename' && doc.doc.ok && resourceOf(p)?.path === p) rename(fromPointer(p));
+      else opts.showInText(fromPointer(p));
+    });
   };
   // in the page, a pointer's coordinates are already the page's
   const pageXY = (e: PointerEvent | MouseEvent) => ({ x: e.clientX, y: e.clientY });
@@ -559,7 +607,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const pan = () => { drag = { kind: 'pan', x0: x, y0: y, v0: { ...V.view! } }; svg?.classList.add('panning'); e.preventDefault(); };
     if (e.button === 1 || spaceKeyDown) { pan(); return; }
     if (e.button !== 0) return;
-    const ptr = pathAtEvent(e.target);
+    const ptr = pathAt(e.target, x, y);
     if (ptr === undefined) {
       // nothing under the pointer: Pan mode pans (⇧ or ⌘ draws a selection instead); Select mode draws a selection (the space key pans)
       const mod = e.shiftKey || e.metaKey || e.ctrlKey;
@@ -606,7 +654,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       return;
     }
     if (!drag) {
-      const p = pathAtEvent(e.target);
+      const p = pathAt(e.target, x, y);
       if (p !== hoverId) { hoverId = p; paintOverlay(); }
       return;
     }
@@ -787,7 +835,14 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     }
   }
   /** end a pin drag: the drop commits one command; an overlap, a cancel or no move puts the drawing back */
+  /** drops whose pin isn't written yet (the grid fading out first) */
+  let dropping = 0;
   async function endPin(commit: boolean) {
+    if (!pinDrag()) return;
+    dropping++;
+    try { await endDrop(commit); } finally { dropping--; }
+  }
+  async function endDrop(commit: boolean) {
     const g = pinDrag();
     if (!g) return;
     drag = undefined;
@@ -876,7 +931,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     e.preventDefault();
     const { x, y } = pageXY(e);
     if (layer?.context?.(e, { x, y })) return;
-    const ptr = pathAtEvent(e.target);
+    const ptr = pathAt(e.target, x, y);
     if (ptr !== undefined && !doc.selection.some(p => toPointer(p) === ptr)) doc.select([fromPointer(ptr)], 'canvas');
     openMenu(menuItems(ptr), { x, y }, 'Canvas');
   }
@@ -897,7 +952,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (one) {
       items.push(...K.objectItems(doc, one, 'canvas', opts.note));
       if (items.length) items.push({ sep: true });
-      items.push({ label: 'Rename…', icon: 'pencil', keys: 'F2', disabled: ro || !isRes, why: T.renameWhy, onSelect: () => renameDialog(doc, one, 'canvas', opts.note) });
+      items.push({ label: 'Rename…', icon: 'pencil', keys: 'F2', disabled: ro || !isRes, why: T.renameWhy, onSelect: () => rename(one) });
       items.push({ label: 'Duplicate', icon: 'copy', keys: '⌘D', disabled: ro || !isRes, why: T.duplicateWhy, onSelect: () => duplicate(doc, one, 'canvas', opts.note) });
       const name = isRes ? resourceOf(toPointer(one))!.name : '';
       const pinned = !!K.pins.of(doc.goodDoc.data)?.[name];
@@ -982,7 +1037,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const p = [...k.section, name];
     if (run(doc, insertCmd(p.slice(0, -1), name, k.template(), { label: `Add ${k.singular} ${name}` }), 'canvas', opts.note)) {
       doc.select([p], 'canvas');
-      renameDialog(doc, p, 'canvas', opts.note);
+      rename(p, { joins: doc.undoId });
     }
   }
   // ---------- E11: the palette: add a resource by a click, or by a drag onto the canvas ----------
@@ -1085,9 +1140,8 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (!run(doc, { ...cmd, select: [p] }, 'canvas', opts.note)) return undefined;
     if (at && !into && !pin) opts.note(mode === '2d' ? `${k.singular} ${name} added; the layout placed it (in 3D a drop pins it where it lands)` : `${k.singular} ${name} added; that spot is taken, so the layout placed it`);
     doc.select([p], 'canvas');
-    // (0.10.1) the canvas has the focus while the name is asked, so the dialog gives it back there (⌘Z works at once)
-    stage.focus({ preventScroll: true });
-    renameDialog(doc, p, 'canvas', opts.note);
+    // (0.12.5) its name, in the inline field above it; the drop and the name are one undo step
+    rename(p, { joins: doc.undoId, at });
     return p;
   }
   const palette = h('div', { class: 'palette', role: 'toolbar', 'aria-label': T.palette, 'aria-orientation': 'vertical' });
@@ -1239,6 +1293,20 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const only = x && Object.keys(x).length === 1;
     run(doc, { ...deleteCmd(only ? [key] : [key, 'layout']), label: 'Reset the layout' }, 'canvas', opts.note);
   }
+  /** (0.12.5) name it, in the inline field above its drawing; Enter and Esc give the canvas the focus back (⌘Z works at once) */
+  function rename(p: Path, o: { joins?: number; at?: { x: number; y: number } } = {}) {
+    let path: Path | null = p;
+    const off = doc.on(c => { if (path && c.remap) path = c.remap(path); });
+    void K.actions.rename(doc, p, 'canvas', opts.note, {
+      ...o, back: stage, late: stage, busy: () => !!drag || dropping > 0, bounds: () => stage.getBoundingClientRect(),
+      place: () => {
+        const b = path && V.view ? boxFor(path) : undefined;
+        if (!b) return undefined;
+        const r = viewEl.getBoundingClientRect(), k = scale();
+        return { left: r.left + (b.x - V.view!.x) * k, top: r.top + (b.y - V.view!.y) * k, width: b.w * k, height: b.h * k };
+      },
+    }).finally(off);
+  }
   function selectParent() {
     const up = new Map<string, Path>();
     for (const p of doc.selection) {
@@ -1269,10 +1337,11 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       case '@': case '2': if (e.shiftKey || e.key === '@') zoomToSelection(); else return; break;
       case 'Escape': if (linking) { linking = undefined; paintOverlay(); opts.note('Not connected'); break; } if (pinDrag()) { endPin(false); break; } doc.select([], 'canvas'); break;
       case 'Delete': case 'Backspace': if (sel.length && !ro) deletePaths(doc, sel, 'canvas', opts.note); break;
-      case 'F2': if (sel.length === 1 && !ro) renameDialog(doc, sel[0], 'canvas', opts.note); break;
+      case 'F2': if (sel.length === 1 && !ro) rename(sel[0]); break;
       case 'ArrowUp': if (mod) { selectParent(); break; } return;
       case 'Tab': case 'ArrowRight': case 'ArrowLeft': case 'ArrowDown': {
-        // move through what is drawn, in the file's order
+        // move through what is drawn, in the file's order: the objects, then (0.12.4) the connections
+        drawn.push(...connections().keys());
         if (!drawn.length) return;
         const i = sel.length ? drawn.indexOf(toPointer(sel[0])) : -1;
         const back = e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey);
@@ -1330,7 +1399,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
 
   const base = {
     addFromPalette, palette, groupSelection, startPick, objectsUnder, get linking() { return linking; },
-    render, setTheme, paintOverlay, fit: fitItems, fitAll: fit, actual, zoomAt, itemsBox, get moved() { return V.moved; }, settled, get zoom() { return V.zoom; },
+    render, setTheme, paintOverlay, fit: fitItems, fitNext() { toFit = true; }, fitAll: fit, actual, zoomAt, itemsBox, routesBox, get moved() { return V.moved; }, settled, get zoom() { return V.zoom; },
     dispose() { endMorph(); clearTimeout(relayout); V.dispose(); disposed = true; },
     focus: () => stage.focus(),
     /** for the tests */

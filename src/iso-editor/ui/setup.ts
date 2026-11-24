@@ -56,6 +56,8 @@ export interface DomainView<R, D extends CanvasDrawing> {
   /** (0.12.0) the palette 'floating' over the canvas (the default) or 'docked': a pane of its own at the canvas's left,
    *  searchable by label and section, resizable and collapsible */
   paletteLayout?: 'floating' | 'docked';
+  /** (0.12.5) what a double click on an object of the canvas does: shows it in the text (the default), or renames it */
+  doubleClick?: 'text' | 'rename';
   /** the canvas's 2D view (0.6.0): a 3D | 2D switch; its link kinds' styles (the host's canvas CSS adds flatCss) */
   flat?: CanvasKit<R, D>['flat'];
   /** a layer over the canvas, and a part beside the views (A: their calls) */
@@ -112,6 +114,7 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
       ? v.palette.map(e => ({ kind: e.kind, label: e.label, icon: (e.icon ?? icon(e.kind)) as IconName, name: e.name, ...(e.section === undefined ? {} : { section: e.section }), ...(e.value === undefined ? {} : { value: () => structuredClone(e.value) }) }))
       : a.kinds.map(k => ({ kind: k.kind, icon: icon(k.kind), label: k.singular[0].toUpperCase() + k.singular.slice(1) })),
     ...(v.paletteLayout === undefined ? {} : { paletteLayout: v.paletteLayout }),
+    ...(v.doubleClick === undefined ? {} : { doubleClick: v.doubleClick }),
     text: {
       stage: 'The file, drawn: arrow keys and Tab move through what is drawn; + and − zoom, 0 fits', dragGroup: 'A drag on nothing',
       dragSelectTip: 'Drag draws a selection; hold the space key to pan', unreadable: 'The canvas draws a file that reads cleanly; fix the problems listed to see it.',

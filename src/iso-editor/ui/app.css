@@ -95,6 +95,12 @@ body[data-view="text"] .status .hint-mode { display: none; }
 .chip-add { width: auto !important; min-width: 80px; }
 .props-delete { margin-top: var(--sp-4); align-self: flex-start; }
 .mono-input { font-family: var(--mono); }
+.rename-field { position: fixed; z-index: var(--z-menu); }
+.rename-field > .rename-input { display: block; width: auto; max-width: calc(100vw - 16px); height: 26px; min-height: 26px; padding: 0 var(--sp-2); font-family: var(--mono); font-size: var(--fs-mono); text-align: center; box-shadow: var(--shadow-3); }
+.rename-field.over > .rename-input { text-align: left; }
+.rename-field > .rename-input[aria-invalid="true"] { border-color: var(--bad); }
+.rename-field > .rename-error { position: absolute; top: 100%; left: 50%; translate: -50% 4px; width: max-content; max-width: 280px; margin: 0; padding: var(--sp-1) var(--sp-2); background: var(--surface); border: var(--bw) solid var(--bad); border-radius: var(--r-md); color: var(--bad); font-size: var(--fs-sm); line-height: 1.35; box-shadow: var(--shadow-2); }
+.rename-field > .rename-error:empty { display: none; }
 #se-grip { height: 6px; margin: -3px 0; cursor: row-resize; z-index: 2; position: relative; }
 #se-grip:hover, #se-grip:focus-visible { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 #se-problems { height: var(--problems-h, 160px); flex: none; overflow: auto; border-top: var(--bw) solid var(--line); background: var(--bg); font-size: var(--fs-sm); }

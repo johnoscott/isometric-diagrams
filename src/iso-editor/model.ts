@@ -16,6 +16,8 @@ export interface Command {
   build(text: string): Splice;
   /** the paths it touched (for the views to refresh and reveal) */
   touched?: Path[];
+  /** (0.12.5) the label of the step it joined (apply's `joins`), given the step's own */
+  joined?(label: string): string;
   /** where a path is after the change (a rename moves paths); null when it no longer exists */
   remap?(p: Path): Path | null;
   /** the selection afterwards (default: the old one, remapped) */
@@ -119,8 +121,10 @@ export class EditorModel {
 
   // ---------- doing ----------
 
-  /** Run a command: build it against the text, apply its steps, push it. Returns false if it changed nothing. */
-  apply(cmd: Command, origin: Origin = 'api'): boolean {
+  /** Run a command: build it against the text, apply its steps, push it. Returns false if it changed nothing. `joins`
+   *  (0.12.5): the id of an undo step it is part of, when that is the last one, nothing was undone since and the file
+   *  wasn't saved at it (the saved text must stay a step of its own to come back to). */
+  apply(cmd: Command, origin: Origin = 'api', joins?: number): boolean {
     this.seal();
     const splice = cmd.build(this._text);
     if (!splice.steps.some(s => s.length)) return false;
@@ -129,7 +133,15 @@ export class EditorModel {
     const remap = cmd.remap ?? ((p: Path) => p);
     this.selection = cmd.select ?? this.selection.map(remap).filter((p): p is Path => p !== null);
     if (splice.fallback) this.fallbacks++;
-    this.push({ id: this.nextId++, label: cmd.label, origin, steps: splice.steps, inverse, before, after: { paths: this.selection, text: this.textSel }, time: this.now(), fallback: !!splice.fallback, open: false });
+    const top = this.undoStack[this.undoStack.length - 1];
+    if (top && joins !== undefined && top.id === joins && !this.redoStack.length && top.id !== this.cleanId) {
+      top.label = cmd.joined?.(top.label) ?? top.label;
+      top.steps.push(...splice.steps);
+      top.inverse.unshift(...inverse);
+      top.after = { paths: this.selection, text: this.textSel };
+      top.time = this.now();
+      top.fallback ||= !!splice.fallback;
+    } else this.push({ id: this.nextId++, label: cmd.label, origin, steps: splice.steps, inverse, before, after: { paths: this.selection, text: this.textSel }, time: this.now(), fallback: !!splice.fallback, open: false });
     this.emit({ kind: 'do', origin, label: cmd.label, steps: splice.steps, version: this._version, remap: cmd.remap });
     for (const fn of this.selListeners) fn({ paths: this.selection, origin });
     return true;
@@ -196,6 +208,8 @@ export class EditorModel {
 
   get canUndo() { return this.undoStack.length > 0; }
   get canRedo() { return this.redoStack.length > 0; }
+  /** the last undo step's id (what `apply` may join) */
+  get undoId() { return this.undoStack[this.undoStack.length - 1]?.id; }
   get undoLabel() { return this.undoStack[this.undoStack.length - 1]?.label; }
   get redoLabel() { return this.redoStack[this.redoStack.length - 1]?.label; }
 

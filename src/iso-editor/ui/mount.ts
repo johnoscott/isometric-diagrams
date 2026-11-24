@@ -69,7 +69,7 @@ export interface ShellFeatures {
   plan?: { planPanel(el: HTMLElement, o: { has(name: string): boolean; select(name: string): boolean }): { paint(extra: unknown, has: boolean): void } };
 }
 /** what the shell calls on a canvas */
-export interface ShellCanvas { render(model: unknown, data: unknown): Promise<void>; setTheme(t: 'light' | 'dark'): void; fit(): void; focus(): void; dispose(): void }
+export interface ShellCanvas { render(model: unknown, data: unknown): Promise<void>; setTheme(t: 'light' | 'dark'): void; fit(): void; /** (0.12.5) the next drawing is fitted, whatever the person did with the view before */ fitNext?(): void; focus(): void; dispose(): void }
 /** what the domain gives the mounted editor */
 export interface EditorSetup<R, X, A extends object> {
   kit: MountKit<R, X>;
@@ -184,7 +184,8 @@ export interface EditorState<R = unknown, X = unknown> {
   checks: number;
 }
 export interface Editor {
-  getText(): string; setText(text: string): void; setReadOnly(ro: boolean): void; setTheme(t: Theme): void;
+  /** `fit` (0.12.5): it is another document, so its drawing is fitted once drawn (default: the view stays where it is) */
+  getText(): string; setText(text: string, o?: { fit?: boolean }): void; setReadOnly(ro: boolean): void; setTheme(t: Theme): void;
   addFeatures(names: readonly string[]): Promise<void>; fit(): void; dispose(): void;
 }
 
@@ -651,7 +652,7 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
   return {
     internal,
     getText: () => doc.text,
-    setText(text: string) { hideBanner(); doc.load(text); doc.markClean(); paintTitle(); paintHistory(); },
+    setText(text: string, o: { fit?: boolean } = {}) { hideBanner(); if (o.fit && !disposed) canvas.fitNext?.(); doc.load(text); doc.markClean(); paintTitle(); paintHistory(); },
     setReadOnly,
     setTheme,
     addFeatures,
