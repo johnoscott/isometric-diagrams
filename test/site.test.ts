@@ -10,14 +10,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { buildSite, CSP, REPO, NPM, CLOUD_EDITOR, GALLERY } from '../scripts/build-site.ts';
+import { launch } from './adapters/page-driver.ts';
 import { ISODIAG_SERVICES } from '../site-src/isodiag-services.ts';
 // @ts-ignore plain JS helper
-import { chromePath, headless } from '../scripts/chrome.mjs';
+import { chromePath } from '../scripts/chrome.mjs';
 
 let chrome: string | undefined;
 try { chrome = chromePath(); } catch { /* no Chrome: the browser part skips */ }
@@ -70,15 +71,11 @@ test('in Chrome, from a sub-path with no headers: every page light and dark clea
   });
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/isometric-diagrams/`;
-  const flags: string[] = headless();
-  const profile = flags.find(f => f.startsWith('--user-data-dir='))!.slice('--user-data-dir='.length);
-  const proc = spawn(chrome!, [...flags, '--remote-debugging-port=0', '--window-size=1280,900', 'about:blank'], { stdio: 'ignore' });
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-  let ws: WebSocket | undefined;
+  let ws: WebSocket | undefined, proc: ChildProcess | undefined;
   try {
-    let port = 0;
-    for (let i = 0; i < 200 && !port; i++) { await sleep(50); try { port = Number(readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]); } catch { /* not yet */ } }
-    assert.ok(port, 'Chrome gave a DevTools port');
+    const started = await launch(chrome!, '1280,900'), port = started.port;
+    proc = started.proc;
     const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json() as { type: string; webSocketDebuggerUrl: string }[]).find(t => t.type === 'page')!;
     const sock = ws = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((r, j) => { sock.onopen = r; sock.onerror = j; });
@@ -179,7 +176,7 @@ test('in Chrome, from a sub-path with no headers: every page light and dark clea
     assert.deepEqual(outside, [], 'no request outside the site');
   } finally {
     ws?.close();
-    proc.kill();
+    proc?.kill();
     server.close();
   }
 });

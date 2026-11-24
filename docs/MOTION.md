@@ -136,6 +136,91 @@ const doc = objects.motion()
 `variants` switches to one, and `enter`'s fade crossfades. The box stays as it is, so nothing is laid out again. In a state it is
 `variants: { id: { look: 0 to 1 } }`.
 
+## On a page: `<isometric-diagram>`
+
+One script, with the compiler, the theme and the player in it. It fetches and stores nothing, evaluates nothing and adds no style
+element, so it runs under `script-src 'self'` alone (118 KB gzipped).
+
+```html
+<script type="module" src="isometric-diagram.js"></script>
+<isometric-diagram controls autoplay="visible" loop label="How a question is answered">
+  <script type="text/yaml">
+    isodiag: 1
+    scenes:
+      - id: ask
+        title: A question and its answer
+        nodes:
+          - { id: client, asset: person, label: Client }
+          - { id: api, asset: server, label: API, right-of: client, gap: 3 }
+        routes:
+          - { id: q, from: client, to: api, kind: send }
+        motion:
+          isomotion: 1
+          series:
+            - sequence: { name: ask, duration: 3s, say: { title: The question }, children: [{ travel: [q], loop: true }] }
+  </script>
+</isometric-diagram>
+```
+
+It is in the package as `isometric-diagram.js`, and `import '@johnoscott/isometric-engine/player'` defines it. Write the text in a
+`<script type="text/yaml">`, or straight in the element with `&` and `<` escaped. It plays the scene's `motion`, or else its `steps`;
+a drawing with neither is drawn.
+
+| Attribute | |
+|---|---|
+| `controls` | Play, Back, Next, Reset, the ambient switch, a scrubber, the beats as dots by chapter, the commentary and a text list of the beats. Without it, the drawing alone. |
+| `autoplay` | Plays at once. `autoplay="visible"`: when most of it is in view; one on a page plays at a time, and a reader's pause is kept. |
+| `loop`, `rate` | Begins again at its end; how fast. |
+| `ambient` | `on` or `off`: the ants, and the tokens and pulses that loop (default: the document's). |
+| `mode` | `light` or `dark` (default: the reader's). |
+| `scene` | Which scene, by its id (default: the first). |
+| `treatment` | `mono`: black and white, in either mode; `none`: in colour, whatever the drawing says. |
+| `label` | What a screen reader calls it. |
+| `reduced-motion` | `ignore` (the default: motion plays) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
+| `links` | It follows the page's `#step=3`, `#t=0.5` (how far into the step) and `#still` (one picture, no controls). |
+
+Its properties are `source`, `theme`, `motion` (a document as data) and `transport`. Its events are `beat` (`detail.beat`, `detail.how`),
+`play`, `pause`, `end`, `loop`, `isometric-ready` and `isometric-error` (a fault is also said in its place, in words). Arrow keys step; on
+the player itself, Space plays and pauses.
+
+A reader without the script sees what is in the element besides the text. `isodiag build PAGE.html -o OUT.html` writes a still there, for
+each element whose text is in a `<script type="text/yaml">`, in its mode and treatment; run again, it replaces the stills it wrote.
+
+## Black and white
+
+`treatment: 'mono'` (with `resolveVars`; `renderSvg`'s and the element's too, and `treatment: mono` in the drawing's own file) paints a
+self-contained drawing in black and white, light or dark: the same shapes, ids and words, so its motion is the same.
+
+- Each colour role becomes one of four greys, its three faces kept apart; roles on the same grey are told apart by a pattern (`hatch`,
+  `hatch-wide`, `dots`), in the order of their names. When there are more than can be, `rendered.warnings` names them.
+- Each kind of connector has a dash and a weight of its own, all in ink; ants march in it.
+- A ground (what is drawn on) has its pattern on its side only, so that what is written on it can be read.
+- Dark inverts by role: what was nearest the paper is nearest it again. `rendered.mono` is the table used.
+
+`mono: { roles: { server: { step: 2, pattern: 'dots' } }, kinds: { send: { dash: [8, 3], width: 3 } } }` is a host's own table, over ours.
+The page `isodiag build FILE.yaml` writes is in colour.
+
+## A clock of your own: the transport
+
+A Timeline has no clock. `transport` is one: headless, for an app, an editor's preview or a player of your own.
+
+```js
+import { transport } from '@johnoscott/isometric-engine/transport';
+
+const tr = transport(timeline, { loop: false });
+tr.on('time', () => paint(svg, tr.state(), scene.rendered));
+tr.on('beat', (beat, how) => narrate(beat.say));    // each beat as it begins; after a seek, the one landed in
+tr.play(); tr.pause(); tr.seek(1500); tr.seekBeat('data'); tr.next(); tr.rate = 0.5;
+tr.ambient = false;                                 // what loops stops where it is; on again, it goes on from there
+tr.rebind(bindMotion(scene2, doc2));                // the place is kept by beat, and how far in it
+```
+
+Paused, what loops goes on, until `ambient` is off. `active = false` stops both clocks for what nobody can see. `clock` takes one of your own
+(`{ now, next, cancel }`), for tests or a host that has frames already. `paint`'s third argument, the scene's `rendered`, gives what
+a state adds (tokens, rings) a self-contained drawing's own colours; `{ styles: 'cssom' }` as its fourth sets styles without
+style attributes, for a page whose CSP forbids them. `motionSource(scene)` is what `bindMotion` needs of a drawing, as JSON, for a page
+that has the drawing and no compiler.
+
 ## Animating the SVG yourself
 
 Every part of a thing is in a wrapper of its own, with no transform and no class: `<g data-item=ID data-part=…>`

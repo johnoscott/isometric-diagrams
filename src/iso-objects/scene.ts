@@ -1,5 +1,6 @@
 // One scene → one SVG string. Pure: no DOM, so it runs the same in Node and in the browser.
 
+import type { MonoLook } from '../iso-core/mono.ts';
 import { type Attrs, type Box, type P2, Kernel, FONTS, S, tag, iso, pt, n1, esc, textWidth } from '../iso-core/kernel.ts';
 import { drawCloud } from './assets.ts';
 import { type KindCatalog, regionKind, nodeKindOr } from './kinds.ts';
@@ -27,6 +28,8 @@ export interface RenderedScene {
   warnings: RenderWarning[];
   /** (0.15.0) a self-contained drawing's own colours, for what a state adds to it (a token's rim and fill) */
   inks?: { surface: string; control: string; kinds?: Record<string, string> };
+  /** (0.16.0) its black and white table, when it is in that treatment */
+  mono?: MonoLook;
   /** the drawing with every thing that has a look of this name in it, as SVG text (what a switch takes the thing's parts from);
    *  none when nothing declares one */
   variants?: Record<string, string>;

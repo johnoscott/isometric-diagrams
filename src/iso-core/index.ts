@@ -25,3 +25,4 @@ export type { SvgNode } from './svg-dom.ts';
 export { VEl, vdoc, serialize } from './vdom.ts';
 export type { VNode } from './vdom.ts';
 export { createHash, sha256Hex } from './shims/crypto.ts';
+export { MONO, greyOf, contrast, monoOf, type MonoLook, type MonoTable, type MonoPattern } from './mono.ts';

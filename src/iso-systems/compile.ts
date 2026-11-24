@@ -4,10 +4,13 @@ import { parse, type Parsed } from '../iso-core/parse.ts';
 import { validateSchema } from './validate.ts';
 import type { Diag } from '../iso-core/errors.ts';
 import { place } from '../iso-objects/place.ts';
-import { extendTheme, loadTheme } from '../iso-core/theme.ts';
+import { extendTheme, loadTheme, type Theme } from '../iso-core/theme.ts';
 import type { RawDiagram } from '../iso-objects/types.ts';
 import { compileRaw, type Compiled } from '../iso-objects/compile.ts';
 import { resolveSvg, type ThemeMode } from '../iso-objects/resolve.ts';
+import { monoOfDrawing, paintMono } from '../iso-objects/mono-paint.ts';
+import type { MonoTable } from '../iso-core/mono.ts';
+import type { CompiledScene } from '../iso-objects/compile.ts';
 import { bindMotion } from '../iso-objects/timeline.ts';
 import type { MotionDoc } from '../iso-objects/motion-doc.ts';
 import { antsOf } from '../iso-objects/ants.ts';
@@ -24,6 +27,10 @@ export interface CompileOptions {
   /** (0.15.0) self-contained drawings: each scene's SVG has its colours and text styles on its elements, in `mode`: no
    *  stylesheet, no custom properties, no hsl() or color-mix() (svgAt's frames too) */
   resolveVars?: boolean;
+  /** (0.16.0) a self-contained drawing in black and white, in either mode: greys, patterns and line rhythms, and no hue */
+  treatment?: 'mono' | 'none';
+  /** a host's own table, over the treatment's */
+  mono?: MonoTable;
   /** a file with an error draws nothing: `scenes` is empty (true), or it throws ('throw'). Default: what could be laid
    *  out is in `scenes` all the same, with `ok` false */
   strict?: boolean | 'throw';
@@ -40,14 +47,34 @@ export function compile(source: string, themeText: string, opts: CompileOptions 
   if (!c.ok && opts.strict === 'throw') throw new CompileError(c.diags);
   if (!c.ok && opts.strict) c.scenes = [];
   if (opts.stepMs !== undefined) for (const s of c.scenes) for (const st of s.steps.steps) st.duration = opts.stepMs;
+  if (opts.treatment !== undefined && opts.treatment !== 'mono' && opts.treatment !== 'none') throw new Error(`treatment: there is "mono" (and "none"), and no ${JSON.stringify(opts.treatment)}`);
+  const treatment = (opts.treatment ?? c.doc?.treatment) === 'mono';
+  if (opts.treatment === 'mono' && !opts.resolveVars) throw new Error('treatment: a self-contained drawing\'s (resolveVars)');
+  const theme = c.theme;
   if (opts.resolveVars) for (const s of c.scenes) {
-    const o = { mode: opts.mode ?? 'light', theme: c.theme!, css: drawingCss(systems) + MARKS_CSS + GRID_CSS } as const;
+    const mode = opts.mode ?? 'light', css = drawingCss(systems) + MARKS_CSS + GRID_CSS;
+    if (treatment) { toMono(s, theme!, mode, css, opts.mono); continue; }
+    const o = { mode, theme: c.theme!, css } as const;
     s.rendered.svg = resolveSvg(s.rendered.svg, o);
     if (s.rendered.variants) s.rendered.variants = Object.fromEntries(Object.entries(s.rendered.variants).map(([k, v]) => [k, resolveSvg(v, o)]));
     s.rendered.inks = { surface: c.theme![o.mode].surface ?? c.theme!.light.surface, control: c.theme![o.mode].control ?? c.theme!.light.control,
       kinds: Object.fromEntries(Object.entries(c.theme!.kinds).map(([k, v]) => [k, c.theme![o.mode][v.color] ?? v.color])) };
   }
+  // its connectors march in their own rhythms
+  if (opts.resolveVars && treatment && theme) c.theme = { ...theme, kinds: Object.fromEntries(Object.entries(theme.kinds).map(([k, v]) => { const d = c.scenes.map(s => s.rendered.mono?.kinds[k]?.dash).find(x => x && x.length > 1); return [k, d ? { ...v, ants: [d[0], d[1]] as [number, number] } : v]; })) };
   return c;
+}
+
+/** a scene in black and white: its drawing and its looks alike, by one table */
+function toMono(s: CompiledScene, theme: Theme, mode: ThemeMode, css: string, own?: MonoTable) {
+  const all = [s.rendered.svg, ...Object.values(s.rendered.variants ?? {})];
+  const m = monoOfDrawing(all.join(''), theme, mode, [...s.routes.map(r => r.kind), ...s.steps.kindsUsed], own);
+  const draw = (svg: string) => paintMono(resolveSvg(svg, { mode, theme: m.theme, css: css + m.css }), m.look, s.id);
+  s.rendered.svg = draw(s.rendered.svg);
+  if (s.rendered.variants) s.rendered.variants = Object.fromEntries(Object.entries(s.rendered.variants).map(([k, v]) => [k, draw(v)]));
+  s.rendered.inks = { surface: m.look.paper, control: m.look.ink, kinds: Object.fromEntries(Object.keys(theme.kinds).map(k => [k, m.look.ink])) };
+  s.rendered.mono = m.look;
+  for (const w of m.look.warnings) s.rendered.warnings.push({ path: '', message: `black and white: ${w}` });
 }
 
 function compileAll(source: string, themeText: string, opts: { snap?: number }): Compiled {

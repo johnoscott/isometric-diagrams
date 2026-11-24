@@ -59,6 +59,7 @@ scenes:
 | `grid` | | `{ snap, show, step }` for every scene. See [grid](#grid). |
 | `assemble` | | `true` builds every scene piece by piece when it comes into view. See [assemble](#assemble). |
 | `theme` | | `default`, or a path to a theme file relative to this file. |
+| `treatment` | | `mono`: a self-contained drawing of it is painted in black and white. See [MOTION.md](MOTION.md#black-and-white). |
 | `roles` | | Extra colour roles: `name: { h, s, top?, tint? }`. See [ASSETS.md](ASSETS.md#colour-roles). |
 | `kinds` | | Extra flow kinds, or new legend text for the standard ones. See [kinds](#kinds-and-the-legend). |
 | `scenes` | required | One or more scenes. |
@@ -83,7 +84,7 @@ paragraphs.
 | `dim` | | What a step dims: `flows` (default: routes, their labels and marks) or `all` (nodes, regions and badges too). |
 | `badges` | | `true` puts a numbered badge for each step on the diagram. |
 | `grid`, `assemble` | | As at the top of the file, for this scene only. |
-| `motion` | | The scene's motion document: a timeline of beats. See [MOTION.md](MOTION.md#a-motion-document). |
+| `motion` | | The scene's motion document: a timeline of beats, which its page plays in place of its steps. See [MOTION.md](MOTION.md#a-motion-document). |
 | `ants` | | Its connectors march, showing which way they flow: `true`, a list of route ids, or `{ ids, speed, dash }`. In `renderSvg`'s stills and in a timeline's frames. |
 | `after` | | Markdown under the scene's figure. |
 
@@ -313,7 +314,7 @@ The whole intro takes about 1.5 to 2.5 seconds. Parts that appear at a later ste
 plays it again in any scene, with or without `assemble: true`. Pressing Play, ‹ › or a step dot during the intro
 finishes it at once.
 
-Reduced motion and `#still` skip the intro and draw everything in place. For pictures, `#assemble&at=MS` freezes the
+**Motion off** (below) and `#still` skip the intro and draw everything in place. For pictures, `#assemble&at=MS` freezes the
 intro at a moment in milliseconds. `examples/grid-assemble.yaml` uses both features.
 
 ## Kinds and the legend
@@ -348,7 +349,8 @@ own, copy `themes/default.yaml`, change values, and set `theme: my-theme.yaml`.
 
 Each scene with steps gets a player: ‹ ▶ ›, step dots, the caption, the command and a progress bar. Every scene gets
 **Grid** and **Assemble** buttons. Arrow keys step when the figure has focus. Only the scene most in view animates.
-With reduced motion, the whole diagram is lit and the text list of steps is open. The address can carry:
+Motion plays, also for a reader whose machine asks for less motion; they get a **Motion off** button, which lights the whole diagram, stops
+everything and opens the text list of steps. Pressed again, it plays from the first step. The address can carry:
 
 | Flag | |
 |---|---|
@@ -357,7 +359,7 @@ With reduced motion, the whole diagram is lit and the text list of steps is open
 | `#theme=light`, `#theme=dark` | Pick a theme. |
 | `#grid` | Show the floor grid. |
 | `#assemble`, `#assemble&at=MS` | Play the intro, or freeze it at a moment. |
-| `#motion` | Ignore the reduced-motion setting. |
+| `#motion` | No **Motion off** button. |
 
 ## YAML traps
 

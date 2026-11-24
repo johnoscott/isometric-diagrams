@@ -1,5 +1,5 @@
 // Grid snapping, and the assemble intro: start offsets (at build time), and in Chrome: parts start outside the
-// canvas, end in place, and reduced motion skips the intro.
+// canvas, end in place, and Motion off ends the intro.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,11 +130,11 @@ test('in Chrome: after the intro, every part is in place and the step player run
   assert.deepEqual(JSON.parse(out), { anims: 0, moved: [], pre: false, focus: true, playing: true });
 });
 
-test('in Chrome: reduced motion skips the intro and draws everything in place', { skip: chrome ? false : 'no Chrome' }, () => {
+test('in Chrome: Motion off (a reader who asked for less motion has the button) ends the intro and draws everything in place', { skip: chrome ? false : 'no Chrome' }, () => {
   // Count only animations made by script (the intro uses the Web Animations API). CSS transitions (opacity fades when
   // a step's classes change) are also in getAnimations(), and whether one is still running at this moment is timing;
   // counting them made this test flaky. Displacement is checked directly as well.
-  const out = probe('', `const svg=document.querySelector('svg');
+  const out = probe('', `const svg=document.querySelector('svg'); document.querySelector('[data-a=motion]').click();
     const moved=${PIECES}.filter(e=>{const t=getComputedStyle(e).transform;return t!=='none'&&t!=='matrix(1, 0, 0, 1, 0, 0)'}).length;
     return JSON.stringify({anims:document.getAnimations().filter(a=>a.constructor===Animation).length,moved,pre:svg.classList.contains('pre-assemble'),all:svg.classList.contains('all'),btn:document.querySelector('[data-a=assemble]').disabled});`,
     ['--force-prefers-reduced-motion'], 3000);

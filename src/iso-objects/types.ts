@@ -60,6 +60,8 @@ export interface RawDiagram {
   isodiag: 1; title?: string; lede?: string; pills?: string[]; theme?: string;
   roles?: Record<string, RawRole>; kinds?: Record<string, RawKind>; after?: string; footer?: string;
   grid?: GridDef; assemble?: boolean;
+  /** how a self-contained drawing of it is painted, where the host doesn't say */
+  treatment?: 'mono';
   scenes: RawScene[];
 }
 

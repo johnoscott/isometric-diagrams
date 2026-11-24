@@ -26,6 +26,7 @@
     "grid": { "$ref": "#/$defs/grid" },
     "assemble": { "type": "boolean", "description": "draw each scene by flying its parts in from the nearest edge, then play" },
     "footer": { "type": "string" },
+    "treatment": { "enum": ["mono"], "description": "How a self-contained drawing (renderSvg, <isometric-diagram>) is painted: mono, black and white. A host may say otherwise. The page isodiag build writes is in colour." },
     "scenes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/scene" } }
   },
   "$defs": {

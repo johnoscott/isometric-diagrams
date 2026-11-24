@@ -2,6 +2,19 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.16.0 — the player, and black and white
+
+- **`<isometric-diagram>`** (`isometric-diagram.js`, and `@johnoscott/isometric-engine/player`): a drawing's text in a page, drawn and played, with its controls,
+  commentary, keys and a text list of its steps. One script (118 KB gzipped); nothing is fetched or stored; a CSP of `script-src 'self'` is enough.
+- **`@johnoscott/isometric-engine/transport`**: the clock for a Timeline, headless: play, seek, rate, loop, beats, the ambient switch, `rebind`.
+- **Black and white**: `treatment: 'mono'`, light and dark, for self-contained drawings (`compile`, `renderSvg`, the element, or `treatment: mono` in a file):
+  the same drawing, told apart by greys, patterns and line rhythms.
+- The page `isodiag build` writes plays a scene's own `motion`, and plays for a reader who asked their machine for less motion, with a **Motion off** button.
+  `isodiag build PAGE.html` writes a still inside each `<isometric-diagram>`, for readers without its script.
+- Fixed: `paint` on a self-contained drawing has the drawing's own colours for rings and tokens, given the scene's `rendered` (0.15.0's Known); a thing dropped on a
+  taken spot, which the layout places out of view, is brought into view.
+- **Known**: the page `isodiag build FILE.yaml` writes is in colour, whatever its file says. The element's strict CSP was tried in Chrome only.
+
 ## 0.15.0 — motion
 
 - **Motion documents**: beats with commentary, show and hide, focus, highlight, levels, looks, tokens, ants, lift, camera, in a scene's

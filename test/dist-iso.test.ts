@@ -314,6 +314,18 @@ test('the package\'s modules (0.9.0): its sources and their JavaScript, and exac
   assert.equal(execFileSync(process.execPath, ['run.mjs'], { cwd: app, encoding: 'utf8' }).trim(), JSON.stringify(['/boxes/a', { a: 1 }, 'object']));
 });
 
+test('/transport and /player (0.16.0): the transport alone; <isometric-diagram>, one script of L0–L2, the systems pack and no editor, that Node can import', async () => {
+  await bundles();
+  const pkg = JSON.parse(readFileSync(join(OUT, 'package.json'), 'utf8')) as { exports: Record<string, { default: string } | string>; sideEffects: string[] };
+  assert.equal(pkg.exports['./isometric-diagram.js'], './isometric-diagram.js'); assert.ok(pkg.sideEffects.includes('./isometric-diagram.js'), 'loading it defines the element: a bundler must keep it');
+  const { playerIso } = await import('../scripts/build-iso.ts');
+  const b = await playerIso(mkdtempSync(join(tmpdir(), 'iso-player-'))), src = Object.keys(b.metafile.inputs).filter(i => i.startsWith('src/'));
+  assert.deepEqual(src.filter(i => !/^src\/(iso-core|iso-objects|iso-viewer|iso-systems|player)\//.test(i)), []);
+  console.log(`# isometric-diagram.js: ${b.bytes} bytes, ${b.gzip} gzipped`);
+  const P = await import(pathToFileURL(join(OUT, 'isometric-diagram.js')).href), T = await import(pathToFileURL(join(OUT, 'js/iso-viewer/transport.js')).href);
+  assert.deepEqual([typeof P.IsometricDiagram, typeof P.mountPlayer, typeof P.PLAY_CSS, typeof T.transport], ['function', 'function', 'string', 'function']);
+});
+
 // 0.12.2: a fresh TypeScript host with nothing but the package: an import of every subpath type-checks, strict, under
 // bundler and NodeNext resolution (before, the modules' types were .ts sources, checked as the host's own code: 41
 // errors inside the package). With the packages the declarations name installed, it needs no skipLibCheck either.

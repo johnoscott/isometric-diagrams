@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { compile, CompileError } from '../src/iso-systems/compile.ts';
 import { resolveSvg } from '../src/iso-objects/resolve.ts';
 import { GRID_CSS } from '../src/iso-objects/css.ts';
@@ -96,7 +96,8 @@ test('golden frames: each style at 35% and 70%, for two drawings', () => {
   const snap = new URL('./snapshots/motion.json', import.meta.url);
   const got: Record<string, string> = {};
   for (const [f, s] of SCENES.slice(0, 2)) for (const [name, p] of plans(s)) for (const x of [0.35, 0.7]) got[`${f} ${name} ${x}`] = createHash('sha256').update(p.frame(p.duration * x)).digest('hex').slice(0, 16);
-  if (process.env.UPDATE_SNAPSHOTS || !existsSync(snap)) { writeFileSync(snap, JSON.stringify(got, null, 1) + '\n'); return; }
+  // (never made by a run that finds none: it would compare nothing)
+  if (process.env.UPDATE_SNAPSHOTS) { writeFileSync(snap, JSON.stringify(got, null, 1) + '\n'); return; }
   assert.deepEqual(got, JSON.parse(readFileSync(snap, 'utf8')));
 });
 
@@ -193,6 +194,31 @@ test('in Chrome: paint() gives exactly what svgAt() writes, seeking in any order
     await ev(`document.body.innerHTML = '<svg></svg>'; await tick(100);`);
     const blank = await shot();
     for (const [name, p] of plans(s)) { await ev(`document.body.replaceChildren(B.live(${JSON.stringify(p.frame(p.kind === 'assemble' ? 0 : p.duration))})); await tick(30);`); assert.equal(await shot(), blank, `${name}: its empty frame draws nothing`); }
+  }, '800,600');
+});
+
+test('in Chrome: on a self-contained drawing too, light and dark, paint() gives exactly what svgAt() writes: its own colours for tokens, pulses and rings', { skip: chrome ? false : 'no Chrome', timeout: 180000 }, async () => {
+  const js = (await bundlePage('test/adapters/motion-page.ts')).outputFiles![0].contents;
+  await drivePage(chrome!, js, '__motion', async ({ ev, until }) => {
+    await until(`document.title === 'ready'`, 'the page');
+    for (const mode of ['light', 'dark'] as const) {
+      const s = compile(read(FILES[0]), THEME, { mode, resolveVars: true, strict: 'throw' }).scenes[0], route = s.routes[0].id, kind = s.routes[0].kind;
+      const t = assemble(s, { labels: 'type', connectors: 'draw', pulses: true });
+      const states: SceneState[] = [
+        { tokens: [{ route, at: 0.5 }, { route, at: 0.2, kind }, { route, at: 0.7, color: '#123456' }] },
+        { pulses: [{ x: 1, y: 2, rx: 3, ry: 4, opacity: 0.5 }] },
+        { outlines: [{ id: 'a', points: [[0, 0], [9, 0], [9, 9]] }, { id: 'b', points: [[0, 0], [9, 0], [9, 9]], opacity: 0.4, color: '#654321' }] },
+        { routes: { [route]: { ants: { dash: [6, 4], offset: 3 } } } }, ...[0.3, 0.8, 0.97].map(x => t.at(t.duration * x)), {},
+      ];
+      const cases = states.map(st => ({ st, svg: svgAt(s, st) }));
+      // the two are the same only if neither leaves a colour to the page
+      for (const c of cases) assert.doesNotMatch(c.svg, /var\(|currentColor/);
+      const rendered = { svg: s.rendered.svg, inks: s.rendered.inks };
+      const bad = await ev<string[]>(`const g = B.live(${JSON.stringify(s.rendered.svg)}), out = []; document.body.replaceChildren(g); const r = ${JSON.stringify(rendered)};
+        for (const c of ${JSON.stringify(cases).replace(/</g, '\\u003c')}) for (const twice of [0, 1]) { B.paint(g, c.st, r); if (!g.isEqualNode(B.live(c.svg))) out.push(JSON.stringify(c.st).slice(0, 120)); }
+        return out;`);
+      assert.deepEqual(bad, [], mode);
+    }
   }, '800,600');
 });
 

@@ -17,7 +17,7 @@ export interface AntsOptions {
   speed?: number;
   dash?: [number, number];
   /** the connectors' dashes, by kind: the theme's `kinds` (a dashed kind marches with its own dash) */
-  kinds?: Record<string, { dash?: 'solid' | 'dashed' | 'dotted' }>;
+  kinds?: Record<string, { dash?: 'solid' | 'dashed' | 'dotted'; ants?: [number, number] }>;
   /** kinds whose connectors stand still (default: blocked, planned) */
   still?: string[];
 }
@@ -28,7 +28,7 @@ export const ANTS_CSS = `
 `;
 /** the dash a connector marches with, or undefined when it stands still */
 export function antDash(kind: string, o: Pick<AntsOptions, 'dash' | 'kinds' | 'still'> = {}): [number, number] | undefined {
-  return (o.still ?? ANT_STILL).includes(kind) ? undefined : o.dash ?? ANT_DASH[o.kinds?.[kind]?.dash ?? 'solid'];
+  return (o.still ?? ANT_STILL).includes(kind) ? undefined : o.dash ?? o.kinds?.[kind]?.ants ?? ANT_DASH[o.kinds?.[kind]?.dash ?? 'solid'];
 }
 
 /** what a scene's `ants:` in the file asks for, as options; undefined: none */

@@ -39,7 +39,7 @@ export const mayImport = (from: Layer, to: Layer) =>
 
 /** The apps: the programs built on the layers (the CLI, the proof sheet). They may use any layer, the generic ones
  *  (L0–L3) only through their public modules; no layer may import them. */
-export const APPS = ['src/cli', 'src/proof'];
+export const APPS = ['src/cli', 'src/proof', 'src/player'];
 export const appOf = (rel: string) => APPS.find(d => rel.startsWith(d + '/'));
 /** every source under src/ that is in neither a layer nor an app (R1 S8: none) */
 export const unplaced = () => filesOf('src').filter(f => !layerOf(f) && !appOf(f));
@@ -118,10 +118,11 @@ export function checkImports(files: { file: string; text: string }[], readIndex?
 export const DENIED = ['agent', 'sandbox', 'fence', 'room', 'manager', 'worker', 'persist', 'space', 'bot', 'brief'];
 /** Ask is ordinary English in prose ("a search asks for"): it is denied capitalised, and inside any identifier */
 export const DENIED_PROSE_CAPITAL = ['ask'];
-/** The two exceptions (LAYERS.md §6.2). A new one needs a review. Each is removed from the text before it is read. */
+/** The three exceptions (LAYERS.md §6.2). A new one needs a review. Each is removed from the text before it is read. */
 export const EXCEPTIONS: { re: RegExp; why: string }[] = [
   { re: /white-space|space-(?:between|around|evenly)|\bspace[- ](?:key|drag)\b|\bspaceKey\w*|(['"])Space\1/gi, why: 'CSS keywords, and the Space key (the canvas pans with it)' },
   { re: /\bgetWorker\w*|\beditor\.worker\b|\bWorker\b/g, why: 'the Monaco web worker (the Worker API)' },
+  { re: /\buserSpaceOnUse\b/g, why: 'SVG\'s keyword (pattern and gradient units)' },
 ];
 
 const FORMS = (stem: string) => new RegExp(`^${stem}(?:s|es|d|ed|ing)?$`, 'i');

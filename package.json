@@ -2,7 +2,7 @@
   "name": "isometric-diagrams",
   "private": true,
   "license": "MIT",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "type": "module",
   "description": "A generic isometric diagram engine: layers for drawing, viewing and editing diagrams in 3D and 2D, and the isodiag/1 YAML format.",
   "engines": {
@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings --test test/validate.test.ts test/marks.test.ts test/layout.test.ts test/routes.test.ts test/repro.test.ts test/page.test.ts test/docs.test.ts test/proof.test.ts test/layers.test.ts test/layers-neutral.test.ts test/plain-skin.test.ts test/flat.test.ts test/board.test.ts test/motion.test.ts test/timeline.test.ts test/fitted.test.ts test/make-way.test.ts && node --experimental-strip-types --no-warnings --test --test-concurrency=1 test/render.test.ts test/grid-assemble.test.ts test/focus.test.ts test/ants-chrome.test.ts test/timeline-chrome.test.ts test/baseline.test.ts test/boxes.test.ts test/drag-feel.test.ts test/dual-view.test.ts test/flat-perf.test.ts test/dist-iso.test.ts test/editor-guide.test.ts test/site.test.ts",
+    "test": "node --experimental-strip-types --no-warnings --test test/validate.test.ts test/marks.test.ts test/layout.test.ts test/routes.test.ts test/repro.test.ts test/page.test.ts test/docs.test.ts test/proof.test.ts test/layers.test.ts test/layers-neutral.test.ts test/plain-skin.test.ts test/flat.test.ts test/board.test.ts test/motion.test.ts test/timeline.test.ts test/transport.test.ts test/mono.test.ts test/mono-paint.test.ts test/stills.test.ts test/check-change.test.ts test/fitted.test.ts test/make-way.test.ts && node --experimental-strip-types --no-warnings --test --test-concurrency=1 test/render.test.ts test/grid-assemble.test.ts test/focus.test.ts test/ants-chrome.test.ts test/timeline-chrome.test.ts test/player.test.ts test/page-player.test.ts test/isometric-diagram.test.ts test/baseline.test.ts test/boxes.test.ts test/drag-feel.test.ts test/dual-view.test.ts test/flat-perf.test.ts test/dist-iso.test.ts test/editor-guide.test.ts test/site.test.ts",
     "check": "node bin/isodiag.mjs check",
     "build": "node bin/isodiag.mjs build",
     "dev": "node bin/isodiag.mjs dev",

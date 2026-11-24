@@ -19,11 +19,15 @@ test('not denied: other words that contain them, and ask in plain prose', () => 
   assert.deepEqual(words('robot bottom briefly roomy agentive spacer a search asks for the floor; ask the host'), []);
 });
 
-test('the two exceptions, and nothing else around them', () => {
-  assert.equal(EXCEPTIONS.length, 2);
+test('the three exceptions, and nothing else around them', () => {
+  assert.equal(EXCEPTIONS.length, 3);
   assert.deepEqual(words(`white-space:nowrap;justify-content:space-between;gap:space-around;space-evenly; a space-drag pans; the space key; spaceKeyDown; e.code === 'Space'`), []);
   assert.deepEqual(words(`new Worker(url); getWorkerUrl(); getWorker(); 'monaco-editor/editor/editor.worker.js'`), []);
   assert.deepEqual(words('the space is drawn; a worker session'), ['space', 'worker']);
+  // SVG's keyword as a whole token, and no other: the rest of its line is read as ever
+  assert.deepEqual(words('patternUnits="userSpaceOnUse"'), []);
+  assert.deepEqual(words('patternUnits="userSpaceOnUse" in the space of a Space'), ['space', 'Space']);
+  assert.deepEqual(words('userSpace userSpaceOnUser myUserSpaceOnUse userSpaceOn').length, 4);
 });
 
 test('every generic layer holds no denied word (R1 S8: hard, every one of them present)', () => {

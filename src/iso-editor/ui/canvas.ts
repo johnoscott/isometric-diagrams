@@ -328,6 +328,8 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     empty.hidden = true;
     layer?.drawn?.();
     if (pendingReveal && reveal(pendingReveal)) pendingReveal = undefined;
+    // once, on the first drawing after its own drop; another drag forgets it (its drawings are trials, and the pointer is on them)
+    if (pendingNudge) { if (!drag) nudge(pendingNudge); pendingNudge = undefined; }
     paintNav();
     paintOverlay();
     if (from && from.svg !== s) {
@@ -1162,7 +1164,8 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const cmd = pins.length ? seqCmd(`${f.plan.label} at [${m.at.join(', ')}]${wayWords(g, keep)}`, [f.plan.add, pinsCmd(pins, '')]) : f.plan.add;
     if (g.invalid) unshift(g);
     if (!run(doc, { ...cmd, select: [f.path] }, 'canvas', opts.note)) { lastKey = ''; unshift(g); await draw(g.origCd!); return; }
-    if (g.invalid) opts.note(`${f.name} added; that spot is taken, so the layout placed it`);
+    // the layout may have placed it out of view: shown, once it is drawn there, so that its name is asked above it
+    if (g.invalid) { opts.note(`${f.name} added; that spot is taken, so the layout placed it`); pendingNudge = f.path; }
     doc.select([f.path], 'canvas');
     // its name, in the inline field above it; the drop and the name are one undo step
     rename(f.path, { joins: doc.undoId, at: lastPin });
@@ -1609,6 +1612,16 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     return true;
   }
   let pendingReveal: Path[] | undefined;
+  /** what is cut off by the canvas's edge, just into view: as far as it takes, and nothing when none of it is cut off */
+  function nudge(p: Path) {
+    const b = boxFor(p), v = V.view;
+    if (!v || !b) return;
+    if (b.w > v.w || b.h > v.h) { reveal([p]); return; }
+    const m = 12 / scale(), by = (a: number, n: number, va: number, vn: number) => (a < va ? a - va - m : a + n > va + vn ? a + n - va - vn + m : 0);
+    const dx = by(b.x, b.w, v.x, v.w), dy = by(b.y, b.h, v.y, v.h);
+    if (dx || dy) { V.view = { ...v, x: v.x + dx, y: v.y + dy }; applyView(); }
+  }
+  let pendingNudge: Path | undefined;
   ifEvents();
   doc.onSelect(c => {
     paintOverlay();

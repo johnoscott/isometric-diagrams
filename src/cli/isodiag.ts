@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { compile } from '../iso-systems/compile.ts';
 import { formatDiags } from '../iso-core/errors.ts';
 import { renderPage } from '../iso-viewer/page.ts';
+import { stillsIn } from './stills.ts';
 import { playerScript } from '../iso-viewer/bundle.ts';
 import { renderProof } from '../proof/proof.ts';
 
@@ -27,6 +28,7 @@ function usage(): never {
   console.error(`usage:
   isodiag check FILE.yaml [--strict]       validate and lay out; warnings fail with --strict
   isodiag build FILE.yaml [-o OUT.html]    write a standalone HTML page
+  isodiag build PAGE.html [-o OUT.html]    write the page with a still inside each <isometric-diagram>, for readers without its script
   isodiag proof FILE.yaml [-o OUT.html] [--with-intro]
                                            a proof sheet: every object and its copy, every step as a still with its YAML
   isodiag dev FILE.yaml [--port 4173]      serve it on 127.0.0.1 and reload on save
@@ -40,6 +42,15 @@ function main(argv: string[]) {
   if (cmd === 'dev') {
     const pi = rest.indexOf('--port');
     import('./dev.ts').then(m => m.dev(file, pi >= 0 ? Number(rest[pi + 1]) : undefined));
+    return;
+  }
+  if (cmd === 'build' && /\.html?$/i.test(file)) {
+    const oi = rest.indexOf('-o'), out = oi >= 0 ? rest[oi + 1] : file.replace(/\.html?$/i, '') + '.built.html';
+    const r = stillsIn(readFileSync(file, 'utf8'), themeText(undefined, file));
+    for (const p of r.problems) console.error(`${basename(file)}: ${p}`);
+    if (r.problems.length) { console.error(`${basename(file)}: not written, ${r.problems.length} of its diagrams can't be drawn`); process.exit(1); }
+    writeFileSync(out, r.html);
+    console.error(`wrote ${out}: ${r.drawn} still${r.drawn === 1 ? '' : 's'}`);
     return;
   }
   const strict = rest.includes('--strict');

@@ -2,34 +2,37 @@
 // It reads the scene data from <script type="application/json" id="diagram-steps"> and the rendered SVG.
 //
 // Hash flags (for screenshots and links): #theme=light|dark, #still (no motion: tokens frozen mid-route),
-// #scene=ID&step=N (open a scene at a step), #t=0.6 (where frozen tokens sit, 0..1), #motion (ignore reduced motion),
+// #scene=ID&step=N (open a scene at a step), #t=0.6 (where frozen tokens sit, 0..1), #motion (no Motion off button),
 // #grid (show the floor grid), #assemble (play the assemble intro) and #assemble&at=MS (freeze it at that moment).
 
-import { focusView } from '../iso-objects/focus.ts';
-import { paint, planOf, type MotionModel } from '../iso-objects/motion.ts';
+//
+// Motion plays, also for a reader who asked their machine for less (docs/design/MOTION.md, 6.2): they get a Motion off button in each figure.
+//
+// One clock: a transport (transport.ts) over the scene's Timeline, for the steps, their tokens, pulses and camera, and another over the
+// assemble intro's plan. What a step dims, hides and lights is the page's stylesheet's, by classes, when its beat begins.
+
+import { paint, planOf, type SceneState } from '../iso-objects/motion.ts';
+import { bindMotion, type MotionSource, type Timeline } from '../iso-objects/timeline.ts';
+import type { MotionDoc } from '../iso-objects/motion-doc.ts';
+import { transport } from './transport.ts';
 
 interface Token { route: string; kind: string; color: string }
 interface Step {
   n: number; num: number; kind: string; color: string; heading: string; caption: string; command: string;
   phases: Token[][]; pulses: [number, number, number, number][]; lit: string[]; duration: number;
-  focus?: [number, number, number, number];
 }
 interface SceneData {
   id: string; loop: boolean; dim: 'flows' | 'all'; steps: Step[]; vis: Record<string, boolean[]>;
-  assemble: boolean; grid: boolean; motion: MotionModel;
+  assemble: boolean; grid: boolean; source: MotionSource;
+  /** the steps as a motion document, or the scene's own */
+  doc?: MotionDoc;
+  /** the scene's own motion: everything is the Timeline's, what is dimmed and hidden too */
+  own?: boolean;
 }
 interface Data { scenes: SceneData[] }
 
-const NS = 'http://www.w3.org/2000/svg';
-const TRAVEL = 1150;
-
-function svgEl(tag: string, attrs: Record<string, string | number>, parent: Element): SVGElement {
-  const e = document.createElementNS(NS, tag);
-  for (const k in attrs) e.setAttribute(k, String(attrs[k]));
-  parent.appendChild(e);
-  return e;
-}
 const ease = (f: number) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+const none: Timeline = { ok: true, diags: [], duration: 0, beats: [], markers: {}, ambient: 'on', loops: false, at: () => ({}), cues: () => undefined, beatAt: () => undefined, startOf: () => undefined };
 
 function init() {
   const dataEl = document.getElementById('diagram-steps');
@@ -37,8 +40,9 @@ function init() {
   const data = JSON.parse(dataEl.textContent || '{}') as Data;
   const hash = location.hash;
   const still = /still/.test(hash);
-  const reduceMedia = matchMedia('(prefers-reduced-motion: reduce)').matches && !/motion/.test(hash);
-  const reduce = still || reduceMedia;
+  const asked = matchMedia('(prefers-reduced-motion: reduce)').matches && !still && !/motion/.test(hash);
+  /** nothing moves: a still page, or Motion off pressed */
+  let reduce = still;
   const frozenT = Math.max(0, Math.min(1, Number((/[#&]t=([\d.]+)/.exec(hash) || [])[1] ?? 0.6)));
   const wantScene = (/[#&]scene=([\w-]+)/.exec(hash) || [])[1];
   const wantStep = Number((/[#&]step=?(\d+)/.exec(hash) || [])[1] || 0);
@@ -50,7 +54,8 @@ function init() {
   // #scene=ID opens the page at that scene (screenshots use #still, which keeps the page at the top)
   if (wantScene && !still) document.getElementById('scene-' + wantScene)?.scrollIntoView({ block: 'start' });
 
-  const runners: { fig: Element; setActive(on: boolean): void }[] = [];
+  const runners: { fig: Element; setActive(on: boolean): void; setMotion(): void }[] = [];
+  const offBtns: HTMLButtonElement[] = [];
   for (const sd of data.scenes) {
     const sec = document.getElementById('scene-' + sd.id);
     if (sec) runners.push(makeRunner(sec, sd));
@@ -59,7 +64,6 @@ function init() {
   function makeRunner(sec: HTMLElement, sd: SceneData) {
     const STEPS = sd.steps, N = STEPS.length;
     const svg = sec.querySelector('svg')!, fig = sec.querySelector('.figure')!;
-    const anim = svg.querySelector('.g-anim')!;
     const q = <T extends Element>(s: string) => sec.querySelector(s) as T | null;
     const num = q<HTMLElement>('.cap-h .num'), hEl = q<HTMLElement>('.cap-h .h'), cnt = q<HTMLElement>('.cap-h .cnt');
     const capT = q<HTMLElement>('.cap-t'), capC = q<HTMLElement>('.cap-c'), prog = q<HTMLElement>('.prog i'), dots = q<HTMLElement>('.dots');
@@ -71,12 +75,13 @@ function init() {
     const visEls = new Map<string, SVGElement[]>();
     for (const e of idEls) if (sd.vis[e.dataset.id!]) { const l = visEls.get(e.dataset.id!) ?? []; l.push(e); visEls.set(e.dataset.id!, l); }
     for (const e of hlEls) { const id = e.dataset.hl!; if (sd.vis[id] && !e.dataset.id) { const l = visEls.get(id) ?? []; l.push(e); visEls.set(id, l); } }
-    const flowPath = (id: string) => svg.querySelector<SVGPathElement>(`[data-hl="${CSS.escape(id)}"] path.flow`);
     if (sd.dim === 'all') svg.classList.add('dim-all');
 
-    let cur = 0, playing = false, userPaused = false, active = false, timer = 0, raf = 0, groups = 0, t0 = 0;
-    let assembling = false, assembled = false, introTimer = 0, introDone: (() => void) | undefined;
-    let tokens: { path: SVGPathElement; len: number; gi: number; stop: boolean; c: SVGElement }[] = [];
+    const bound = sd.doc ? bindMotion(sd.source, sd.doc) : none, tl = bound.ok ? bound : none;
+    const tr = transport(tl, { loop: sd.loop });
+    tr.active = false;
+    let cur = 0, userPaused = false, active = false, stepping = false;
+    let assembling = false, assembled = false;
 
     // ---- grid ----
     const setGrid = (on: boolean) => { svg.classList.toggle('show-grid', on); gridBtn?.setAttribute('aria-pressed', String(on)); };
@@ -86,164 +91,158 @@ function init() {
     STEPS.forEach((s, i) => {
       const b = document.createElement('button');
       b.className = 'dot'; b.type = 'button'; b.setAttribute('aria-label', `Step ${s.num}: ${s.heading}`);
-      b.addEventListener('click', () => { userPause(); finishAssemble(); show(i); });
+      b.addEventListener('click', () => { userPause(); finishAssemble(); show(i, true); });
       dots?.appendChild(b);
     });
 
-    function clearAnim() { anim.textContent = ''; tokens = []; if (raf) cancelAnimationFrame(raf); raf = 0; }
-    function tick(now: number) {
-      const per = TRAVEL * groups + 700, tt = (now - t0) % per;
-      for (const tk of tokens) {
-        // frozen: every phase's token sits at the same point, so one picture shows them all
-        const f = reduce ? frozenT : Math.max(0, Math.min(1, (tt - tk.gi * TRAVEL) / TRAVEL));
-        let e = ease(f);
-        if (tk.stop) e = f < 0.7 ? f / 0.7 : 1 - ((f - 0.7) / 0.3) * 0.25;   // a blocked token stalls and falls back
-        const p = tk.path.getPointAtLength(Math.max(0, Math.min(1, e)) * tk.len);
-        tk.c.setAttribute('cx', String(p.x)); tk.c.setAttribute('cy', String(p.y));
-        tk.c.style.opacity = reduce ? '1' : f <= 0 || f >= 1 ? '0' : '1';
-      }
-      if (!reduce && active) raf = requestAnimationFrame(tick);
+    // ---- what is drawn now ----
+    const inkOf = new Map(STEPS.flatMap(s => s.phases.flat().map(t => [t.kind, t.color] as const)));
+    /** the Timeline's state as the page draws it: its tokens and pulses in the step's colours; the rest is its classes' */
+    function drawn(): SceneState {
+      const S: SceneState = reduce ? frozen() : tr.state(), s = STEPS[cur];
+      if (sd.own || !s) return S;
+      const out: SceneState = {};
+      if (S.camera && !svg.classList.contains('all')) out.camera = S.camera;
+      if (S.tokens) out.tokens = S.tokens.map(k => ({ ...k, color: k.color ?? (k.kind === undefined ? undefined : inkOf.get(k.kind)) }));
+      // (each ring grows from a third of its size to half as much again, and fades)
+      if (reduce) { if (s.pulses.length) out.pulses = s.pulses.map(([x, y, rx, ry]) => ({ x, y, rx, ry, opacity: 0.85, color: s.color })); }
+      else if (S.pulses) out.pulses = s.pulses.flatMap(([x, y, rx, ry], k) => { const p = S.pulses![k]; if (!p) return []; const f = 1 - Math.pow(p.opacity ?? 1, 2), z = 0.35 + 1.15 * f; return [{ x, y, rx: rx * z, ry: ry * z, opacity: 0.95 * (1 - f), color: s.color }]; });
+      return out;
     }
-    // ---- focus: ease the viewBox to a step's focus box (keeping the drawing's proportions), and back ----
-    const FULL = svg.getAttribute('viewBox')!.split(/\s+/).map(Number);
-    let view = FULL.slice(), zoomTimer = 0;
-    const viewFor = (s: Step) => focusView(FULL, s.focus);
-    function zoomTo(target: number[]) {
-      clearTimeout(zoomTimer);
-      if (target.every((v, k) => Math.abs(v - view[k]) < 0.5)) return;
-      const from = view.slice(), t0z = performance.now(), D = reduce ? 0 : 900;
-      // a timer, not a frame callback, so it also finishes where no frames are drawn
-      const step = () => {
-        const f = D ? Math.min(1, (performance.now() - t0z) / D) : 1, e = ease(f);
-        view = from.map((v, k) => v + (target[k] - v) * e);
-        svg.setAttribute('viewBox', view.map(v => v.toFixed(1)).join(' '));
-        if (f < 1) zoomTimer = window.setTimeout(step, 16);
-      };
-      step();
+    /** frozen: every phase's token at the same point, so one picture shows them all; the camera where the step leaves it */
+    function frozen(): SceneState {
+      const s = STEPS[cur], b = tl.beats[cur];
+      if (!s || !b) return {};
+      const S = tl.at(Math.max(b.start, b.end - 1), { ambient: 'off' });
+      if (sd.own) return S;
+      const at = (kind: string) => (kind === 'blocked' ? (frozenT < 0.7 ? frozenT / 0.7 : 1 - ((frozenT - 0.7) / 0.3) * 0.25) : ease(frozenT));
+      return { ...(S.camera ? { camera: S.camera } : {}), tokens: s.phases.flat().map(t => ({ route: t.route, at: at(t.kind), kind: t.kind })) };
     }
+    const draw = () => {
+      if (assembling) return;
+      paint(svg, drawn());
+      if (prog && N) prog.style.width = (going() ? (tl.cues(tr.time)?.progress ?? 0) * 100 : ((cur + 1) / N) * 100) + '%';
+    };
+    const going = () => tr.playing && !stepping;
 
-    function show(i: number) {
-      if (!N) return;
-      clearAnim();
-      cur = i;
+    /** the page at a step: what is lit, dimmed and hidden, the words; nothing moves by this */
+    function look(i: number) {
       const s = STEPS[i], n = s.n;
-      zoomTo(svg.classList.contains("all") ? FULL : viewFor(s));
+      cur = i;
       const lit = new Set(s.lit);
-      svg.classList.add('focus');
-      for (const e of hlEls) e.classList.toggle('hl', e.dataset.hl!.split(' ').some(x => lit.has(x)));
-      if (sd.dim === 'all') for (const e of idEls) if (e.hasAttribute('data-dim')) e.classList.toggle('hl', lit.has(e.dataset.id!));
+      if (!sd.own) {
+        svg.classList.add('focus');
+        for (const e of hlEls) e.classList.toggle('hl', e.dataset.hl!.split(' ').some(x => lit.has(x)));
+        if (sd.dim === 'all') for (const e of idEls) if (e.hasAttribute('data-dim')) e.classList.toggle('hl', lit.has(e.dataset.id!));
+        for (const [id, els] of visEls) { const v = sd.vis[id][i]; for (const e of els) e.classList.toggle('pre', !v); }
+      }
       for (const e of stepEls) e.classList.toggle('on', e.dataset.step === String(n));
       svg.querySelectorAll<SVGElement>('[data-badge]').forEach(b => b.classList.toggle('on', b.dataset.badge === String(n)));
-      for (const [id, els] of visEls) { const v = sd.vis[id][i]; for (const e of els) e.classList.toggle('pre', !v); }
-      for (const [x, y, rx, ry] of s.pulses) svgEl('ellipse', { cx: x, cy: y, rx, ry, class: 'pulse', style: `stroke:${s.color}` }, anim);
-      groups = s.phases.length;
-      s.phases.forEach((ph, gi) => ph.forEach(tk => {
-        const path = flowPath(tk.route);
-        if (!path) return;
-        tokens.push({ path, len: path.getTotalLength(), gi, stop: tk.kind === 'blocked', c: svgEl('circle', { r: 7, class: 'tok', style: `fill:${tk.color}` }, anim) });
-      }));
-      t0 = performance.now(); tick(t0);
-      if (!reduce && active && !raf) raf = requestAnimationFrame(tick);
       num!.textContent = String(s.num); num!.style.background = s.color;
       hEl!.textContent = s.heading; cnt!.textContent = `${i + 1} / ${N}`;
       capT!.innerHTML = s.caption; capC!.textContent = s.command;
       prog!.style.setProperty('--c', s.color);
       [...dots!.children].forEach((d, j) => { d.classList.toggle('on', j === i); d.classList.toggle('done', j < i); });
-      restartProg();
     }
-    function restartProg() {
-      if (!prog) return;
-      prog.style.transition = 'none';
-      prog.style.width = playing ? '0%' : ((cur + 1) / N * 100) + '%';
-      if (playing) { void prog.offsetWidth; prog.style.transition = `width ${STEPS[cur].duration}ms linear`; prog.style.width = '100%'; }
-    }
-    function schedule() {
-      clearTimeout(timer);
-      if (!playing) return;
-      timer = window.setTimeout(() => {
-        if (cur === N - 1 && !sd.loop) { stop(); return; }
-        show((cur + 1) % N); schedule();
-      }, STEPS[cur].duration);
+    /** to a step's start; `through`: and through it, to a stop in it */
+    function show(i: number, through = false) {
+      const b = tl.beats[i];
+      if (!N || !b) return;
+      tr.pause();
+      look(i);
+      tr.seek(b.start, { join: true });
+      if (through && !reduce && active) { stepping = true; tr.play({ until: Math.max(b.start + 1, b.end - 1) }); setBtn(); }
+      draw();
     }
     function setBtn() {
       if (!playBtn) return;
-      playBtn.textContent = playing ? '❚❚ Pause' : '▶ Play';
-      playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
-      capBox?.setAttribute('aria-live', playing ? 'off' : 'polite');
+      playBtn.disabled = reduce;
+      if (reduce) { playBtn.textContent = 'Motion off'; return; }
+      const on = going();
+      playBtn.textContent = on ? '❚❚ Pause' : '▶ Play';
+      playBtn.setAttribute('aria-label', on ? 'Pause' : 'Play');
+      capBox?.setAttribute('aria-live', on ? 'off' : 'polite');
     }
-    function play() { if (reduce || !N || assembling) return; playing = true; setBtn(); restartProg(); schedule(); }
-    function stop() { playing = false; clearTimeout(timer); setBtn(); restartProg(); }
+    function play() { if (reduce || !N || assembling) return; if (stepping) tr.pause(); stepping = false; tr.play(); setBtn(); draw(); }
+    function stop() { tr.pause(); }
     function userPause() { userPaused = true; stop(); }
+    tr.on('time', draw);
+    tr.on('beat', b => { if (b.index !== cur) look(b.index); });
+    tr.on('pause', () => { stepping = false; setBtn(); draw(); });
 
-    // ---- assemble: the motion core's plan (the same a video is made from), painted as time goes by ----
-    const plan = planOf(sd.motion, 'assemble');
-    function finishAssemble() { if (assembling) introDone?.(); }
+    // ---- assemble: the motion core's plan (the same a video is made from), on a transport of its own ----
+    const plan = planOf(sd.source.model, 'assemble');
+    let intro: ReturnType<typeof transport> | undefined;
+    function finishAssemble() {
+      if (!assembling || !intro) return;
+      intro.dispose(); intro = undefined;
+      assembling = false; assembled = true;
+      paint(svg, {});
+      if (N) show(cur);
+      if (active && !userPaused) play();
+    }
     function assemble(freezeAt?: number) {
-      clearTimeout(introTimer);
-      introDone = undefined;
+      intro?.dispose(); intro = undefined;
       stop();
       if (N) show(cur);          // set what is visible at this step; focus comes back at the end
-      clearAnim();
       svg.classList.remove('focus', 'pre-assemble', 'all');
       assembling = true;
       if (freezeAt !== undefined) { paint(svg, plan.at(freezeAt)); return; }
-      const start = performance.now();
-      introDone = () => {
-        clearTimeout(introTimer);
-        introDone = undefined;
-        paint(svg, {});
-        assembling = false; assembled = true;
-        if (N) show(cur);
-        if (active && !userPaused) play();
-      };
-      // a timer, not a frame callback, so it also finishes where no frames are drawn
-      const step = () => {
-        const t = performance.now() - start;
-        if (t >= plan.duration) { introDone?.(); return; }
-        paint(svg, plan.at(t));
-        introTimer = window.setTimeout(step, 16);
-      };
-      step();
+      const run = intro = transport({ ...none, duration: plan.duration, at: t => plan.at(t) });
+      run.on('time', t => paint(svg, plan.at(t)));
+      run.on('end', finishAssemble);
+      paint(svg, plan.at(0));
+      run.play();
     }
     asmBtn?.addEventListener('click', () => { userPaused = false; assemble(); });
 
     function setActive(on: boolean) {
       if (on === active) return;
       active = on;
-      if (on) {
-        if (!reduce) { t0 = performance.now(); raf = requestAnimationFrame(tick); }
-        if (!userPaused) play();
-      } else { stop(); if (raf) cancelAnimationFrame(raf); raf = 0; }
+      tr.active = on && !reduce;
+      if (on) { if (!userPaused) play(); } else stop();
     }
     playBtn?.addEventListener('click', () => {
-      if (playing) userPause();
-      else { userPaused = false; finishAssemble(); if (cur === N - 1) show(0); play(); }
+      if (going()) userPause();
+      else { userPaused = false; finishAssemble(); if (cur === N - 1 && !going()) show(0); play(); }
     });
-    q('[data-a=next]')?.addEventListener('click', () => { userPause(); finishAssemble(); show(Math.min(N - 1, cur + 1)); });
-    q('[data-a=prev]')?.addEventListener('click', () => { userPause(); finishAssemble(); show(Math.max(0, cur - 1)); });
+    q('[data-a=next]')?.addEventListener('click', () => { userPause(); finishAssemble(); show(Math.min(N - 1, cur + 1), true); });
+    q('[data-a=prev]')?.addEventListener('click', () => { userPause(); finishAssemble(); show(Math.max(0, cur - 1), true); });
     fig.addEventListener('keydown', e => {
       const k = (e as KeyboardEvent).key;
       if (!N) return;
-      if (k === 'ArrowRight') { e.preventDefault(); userPause(); finishAssemble(); show(Math.min(N - 1, cur + 1)); }
-      if (k === 'ArrowLeft') { e.preventDefault(); userPause(); finishAssemble(); show(Math.max(0, cur - 1)); }
+      if (k === 'ArrowRight') { e.preventDefault(); userPause(); finishAssemble(); show(Math.min(N - 1, cur + 1), true); }
+      if (k === 'ArrowLeft') { e.preventDefault(); userPause(); finishAssemble(); show(Math.max(0, cur - 1), true); }
     });
     svg.querySelectorAll<SVGElement>('.badge').forEach(b => {
-      const go = () => { userPause(); finishAssemble(); show(Number(b.dataset.go) - 1); };
+      const go = () => { userPause(); finishAssemble(); show(Number(b.dataset.go) - 1, true); };
       b.addEventListener('click', go);
       b.addEventListener('keydown', e => { const k = (e as KeyboardEvent).key; if (k === 'Enter' || k === ' ') { e.preventDefault(); go(); } });
     });
 
     const forced = wantStep && (!wantScene || wantScene === sd.id) ? Math.min(N, wantStep) - 1 : -1;
     const frozenAssemble = wantAssemble && assembleAt !== undefined && (!wantScene || wantScene === sd.id);
-    if (reduce && forced < 0 && !still && !frozenAssemble) {
-      // reduced motion: the whole diagram, everything lit, the step list open, no assembly
-      if (N) { svg.classList.add('all'); show(N - 1); }
-      if (playBtn) { playBtn.disabled = true; playBtn.textContent = 'Motion off'; }
-      if (asmBtn) asmBtn.disabled = true;
-      sec.querySelector('details.steps')?.setAttribute('open', '');
-    } else {
-      if (N) show(forced >= 0 ? forced : 0);
-      if (reduce && playBtn) { playBtn.disabled = true; playBtn.textContent = 'Motion off'; }
+    if (N) show(forced >= 0 ? forced : 0);
+    setBtn();
+    /** off: the whole diagram, everything lit, the step list open, no intro; on again: from the first step */
+    function setMotion() {
+      svg.classList.remove('pre-assemble');
+      if (reduce) { assembled = true; finishAssemble(); stop(); }
+      svg.classList.toggle('all', reduce && N > 0);
+      tr.active = active && !reduce;
+      if (asmBtn) asmBtn.disabled = reduce;
+      if (reduce) sec.querySelector('details.steps')?.setAttribute('open', '');
+      if (N) show(reduce ? N - 1 : 0);
+      setBtn();
+      if (!reduce && active && !userPaused) play();
+    }
+    const tools = q<HTMLElement>('.tools');
+    if (asked && tools) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pbtn small'; b.dataset.a = 'motion'; b.textContent = 'Motion off'; b.title = 'Draw everything in place, with nothing moving';
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => { reduce = !reduce; for (const x of offBtns) x.setAttribute('aria-pressed', String(reduce)); for (const r of runners) r.setMotion(); });
+      offBtns.push(b); tools.appendChild(b);
     }
     if (frozenAssemble) assemble(Number(assembleAt));
     else if ((sd.assemble || wantAssemble) && !reduce && !(window as unknown as { __diagramNoIntro?: boolean }).__diagramNoIntro) {
@@ -267,11 +266,11 @@ function init() {
       addEventListener('scroll', check, { passive: true });
       setTimeout(check, 60);
     }
-    return { fig, setActive };
+    return { fig, setActive, setMotion };
   }
 
   // only the most visible scene animates
-  if (!reduce) {
+  if (!still) {
     const ratio = new Map<Element, number>();
     const pick = () => {
       let best: typeof runners[number] | undefined, br = 0;

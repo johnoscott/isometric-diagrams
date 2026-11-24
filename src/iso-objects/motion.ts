@@ -469,7 +469,7 @@ function insides(svg: string): Map<string, [number, number]> {
   }
   return out;
 }
-type Looks = Pick<CompiledScene['rendered'], 'svg' | 'variants' | 'looks'>;
+type Looks = Pick<CompiledScene['rendered'], 'svg' | 'variants' | 'looks' | 'inks'>;
 const lookCache = new WeakMap<object, Map<string, Map<string, string>>>();
 /** a look's parts of a thing: id and part → what is inside, where it isn't as in the still */
 function lookParts(r: Looks, name: string): Map<string, string> {
@@ -543,7 +543,7 @@ type Kept = { attrs: Map<Element, Map<string, string | null>>; texts: Map<Text, 
 const keptOf = new WeakMap<Element, Kept>();
 /** The same on a live drawing (a scene's own <svg>). Idempotent, in any order: what the last state changed is put back
  *  first, so the same state gives the same DOM; an empty state gives the still back. */
-export function paint(svg: SVGSVGElement, S: SceneState, rendered?: Looks): void {
+export function paint(svg: SVGSVGElement, S: SceneState, rendered?: Looks, o: { styles?: 'attribute' | 'cssom' } = {}): void {
   const was = keptOf.get(svg);
   if (was) {
     for (const [el, kids] of was.mixed) el.replaceChildren(...kids);
@@ -558,7 +558,8 @@ export function paint(svg: SVGSVGElement, S: SceneState, rendered?: Looks): void
   keptOf.set(svg, kept);
   const set = (el: Element, k: string, v: string | null) => {
     const m = kept.attrs.get(el) ?? new Map<string, string | null>();
-    if (!m.has(k)) m.set(k, el.getAttribute(k));
+    // (a style Chrome has just taken away reads as '': there is none)
+    if (!m.has(k)) m.set(k, k === 'style' ? el.getAttribute(k) || null : el.getAttribute(k));
     kept.attrs.set(el, m);
     if (v === null) el.removeAttribute(k); else el.setAttribute(k, v);
   };
@@ -598,10 +599,10 @@ export function paint(svg: SVGSVGElement, S: SceneState, rendered?: Looks): void
       }
     }
     const path = w.path && el.querySelector('path.flow');
-    if (path && w.path) { if (w.path.d !== undefined) set(path, 'd', w.path.d); if (w.path.style !== undefined) set(path, 'style', w.path.style); if (!w.path.head) set(path, 'marker-end', null); }
+    if (path && w.path) { if (w.path.d !== undefined) set(path, 'd', w.path.d); if (w.path.style !== undefined) { if (o.styles === 'cssom') { set(path, 'style', null); (path as SVGPathElement).style.cssText = w.path.style; } else set(path, 'style', w.path.style); } if (!w.path.head) set(path, 'marker-end', null); }
   }
   const anim = layer('anim');
-  if (anim) for (const [n, at] of overlay(S, pathOf)) make(n, at, anim);
+  if (anim) for (const [n, at] of overlay(S, pathOf, rendered?.inks)) make(n, at, anim);
 }
 
 // ---------- a compiled scene's plans ----------

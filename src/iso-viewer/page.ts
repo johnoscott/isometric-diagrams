@@ -1,6 +1,7 @@
 // The HTML page around the scenes: header, one section per scene, theme toggle. One file, no network.
 
-import { motionModel } from '../iso-objects/motion.ts';
+import { bindMotion, motionOfSteps, motionSource } from '../iso-objects/timeline.ts';
+import type { StepData } from '../iso-objects/steps.ts';
 import { esc } from '../iso-core/kernel.ts';
 import type { Compiled } from '../iso-objects/compile.ts';
 import { themeCss } from '../iso-core/theme.ts';
@@ -26,14 +27,29 @@ const paras = (s: string | undefined) => (s ?? '').split(/\n\s*\n/).filter(Boole
 
 export interface PageOpts { runtime?: string; extraHead?: string; extraBody?: string }
 
+/** a scene's own motion, where it has any that binds: what its page plays, in place of its steps */
+const ownMotion = (c: Compiled, s: CompiledScene) => !!s.motion && bindMotion(s, s.motion, { kinds: c.theme!.kinds }).ok;
+/** what the page steps through: the scene's steps, or the beats of its own motion */
+function stepsOf(c: Compiled, s: CompiledScene): StepData[] {
+  if (!ownMotion(c, s)) return s.steps.steps;
+  return bindMotion(s, s.motion!, { kinds: c.theme!.kinds }).beats.map(b => ({
+    n: b.index + 1, num: b.index + 1, kind: 'control', color: b.say?.color ?? colorRef(c.theme!, c.theme!.kinds.control?.color ?? 'control'),
+    heading: b.say?.title ?? b.name, caption: b.say?.text ?? '', command: b.say?.code ?? '', phases: [], pulses: [], lit: [], duration: b.end - b.start,
+  }));
+}
+
 /** The data the player runs on, for every scene with steps. */
 export function stepData(c: Compiled): string {
   return JSON.stringify({
-    scenes: c.scenes.map(s => ({
-      id: s.id, loop: s.raw.loop ?? true, dim: s.raw.dim ?? 'flows', vis: s.steps.vis,
-      steps: s.steps.steps.map(st => ({ ...st, caption: md(st.caption) })),
-      assemble: s.assemble, grid: !!s.grid.show, motion: motionModel(s),
-    })),
+    scenes: c.scenes.map(s => {
+      const own = ownMotion(c, s), steps = stepsOf(c, s), doc = own ? s.motion : s.steps.steps.length ? motionOfSteps(s) : undefined;
+      return {
+        id: s.id, loop: s.raw.loop ?? true, dim: s.raw.dim ?? 'flows', vis: s.steps.vis,
+        // (where a step's view goes is its document's camera)
+        steps: steps.map(({ focus: _, ...st }) => ({ ...st, caption: md(st.caption) })),
+        assemble: s.assemble, grid: !!s.grid.show, source: motionSource(s), ...(doc ? { doc } : {}), ...(own ? { own } : {}),
+      };
+    }),
   });
 }
 
@@ -58,8 +74,8 @@ export function legend(c: Compiled, s: CompiledScene): string {
   return items.join('');
 }
 
-function player(s: CompiledScene): string {
-  const st = s.steps.steps;
+function player(c: Compiled, s: CompiledScene): string {
+  const st = stepsOf(c, s);
   const tools = `<div class="tools">
         <button class="pbtn small" type="button" data-a="grid" aria-pressed="${s.grid.show ? 'true' : 'false'}" title="Show the floor grid">Grid</button>
         <button class="pbtn small" type="button" data-a="assemble" title="Draw the diagram again, piece by piece">Assemble</button>
@@ -83,8 +99,8 @@ function player(s: CompiledScene): string {
     </div>`;
 }
 
-function stepList(s: CompiledScene): string {
-  const st = s.steps.steps;
+function stepList(c: Compiled, s: CompiledScene): string {
+  const st = stepsOf(c, s);
   if (!st.length) return '';
   return `<details class="steps"><summary>All ${st.length} steps as text</summary><ol>${st.map(x =>
     `<li value="${x.num}"><b>${esc(x.heading)}.</b> ${md(x.caption)}${x.command ? `<br><code>${esc(x.command)}</code>` : ''}</li>`).join('')}</ol></details>`;
@@ -99,10 +115,10 @@ export function renderPage(c: Compiled, opts: PageOpts = {}): string {
   ${paras(s.raw.caption)}
   <div class="figure" tabindex="-1">
     <div class="scroller">${s.grid.show ? s.rendered.svg.replace('<svg ', '<svg class="show-grid" ') : s.rendered.svg}</div>
-    ${player(s)}
+    ${player(c, s)}
     <div class="legend">${legend(c, s)}</div>
   </div>
-  ${stepList(s)}
+  ${stepList(c, s)}
   ${s.raw.after ? `<div class="after">${paras(s.raw.after)}</div>` : ''}
 </section>`).join('\n');
   return `<!doctype html>

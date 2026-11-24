@@ -12,7 +12,8 @@ export interface Theme {
   name: string;
   light: Record<string, string>;
   dark: Record<string, string>;
-  kinds: Record<string, { color: string; dash: 'solid' | 'dashed' | 'dotted'; legend: string }>;
+  /** ants: the dash its connectors march with, where it isn't its dash's own */
+  kinds: Record<string, { color: string; dash: 'solid' | 'dashed' | 'dotted'; legend: string; ants?: [number, number] }>;
   roles: Record<string, RawRole>;
 }
 

@@ -11,7 +11,8 @@ import { parse } from 'yaml';
 import { compile } from '../src/iso-systems/compile.ts';
 import { Ajv2020, AJV_OPTIONS } from '../src/iso-core/compile-schema.ts';
 import { bindMotion, motionOfSteps, type Timeline } from '../src/iso-objects/timeline.ts';
-import { checkMotion, curveAt, easeOf, msOf, springAt, MOTION_SCHEMA, type MotionDoc } from '../src/iso-objects/motion-doc.ts';
+import { checkMotion, curveAt, easeOf, msOf, springAt, type MotionDoc } from '../src/iso-objects/motion-doc.ts';
+import { MOTION_SCHEMA } from '../src/iso-objects/motion-schema.ts';
 import { svgAt, assemble } from '../src/iso-objects/motion.ts';
 import { motion } from '../src/iso-objects/motion-builder.ts';
 import { withAnts } from '../src/iso-objects/ants.ts';
@@ -255,7 +256,11 @@ test('every drawing\'s own steps are a document: the same things there at each s
     assert.deepEqual(tl.diags, [], `${f} ${s.id}`); assert.equal(tl.duration, s.steps.steps.reduce((a, x) => a + x.duration, 0));
     s.steps.steps.forEach((st, i) => {
       const t = tl.startOf(`step-${st.n}`)! + st.duration * 0.6, cue = tl.cues(t)!;
-      for (const [id, v] of Object.entries(s.steps.vis)) { if (!s.layout.byId.has(id) && !s.rendered.paths[id]) continue; assert.equal(opacity(tl, id, t), v[i] ? 1 : 0, `${f} ${s.id} step ${i + 1}: ${id}`); }
+      // there or not, and dimmed or not, as the page's stylesheet has it: a connector no step lights at .12; with `dim: all`, a thing too, at .14
+      for (const id of [...s.layout.byId.keys(), ...Object.keys(s.rendered.paths)]) {
+        const there = s.steps.vis[id]?.[i] ?? true, lit = st.lit.includes(id), all = s.raw.dim === 'all', want = !there ? 0 : lit ? 1 : all ? 0.14 : s.rendered.paths[id] ? 0.12 : 1;
+        assert.equal(opacity(tl, id, t), want, `${f} ${s.id} step ${i + 1}: ${id}`);
+      }
       assert.equal(cue.say!.title, st.heading); assert.equal(cue.index, i);
     });
     n++;
@@ -420,6 +425,12 @@ test('ants in the file: the still marches by itself, a frame has their offsets, 
   assert.ok(compile(src('    ants: 3\n'), THEME).diags.some(x => x.severity === 'error'), 'the schema refuses nonsense');
 });
 
+test('docs/MOTION.md: the element\'s own drawing compiles, binds and plays', () => {
+  const md = readFileSync(new URL('../docs/MOTION.md', import.meta.url), 'utf8'), text = /<script type="text\/yaml">\n([\s\S]*?)<\/script>/.exec(md)![1].replace(/^ {4}/gm, '').trimEnd() + '\n';
+  const s = compiled(text).scenes[0], tl = bindMotion(s, s.motion!);
+  assert.deepEqual(tl.diags, []); assert.equal(tl.duration, 3000); assert.equal(tl.loops, true); assert.equal(tl.at(600).tokens?.length, 1);
+});
+
 test('docs/MOTION.md: the document in it compiles, binds and plays; the one made in code is checked against it', () => {
   const md = readFileSync(new URL('../docs/MOTION.md', import.meta.url), 'utf8'), yaml = /```yaml\n(# file: story\.yaml\n[\s\S]*?)```/.exec(md)![1];
   const c = compiled(yaml), s = c.scenes[0], tl = bindMotion(s, s.motion!, { kinds: c.theme!.kinds }); assert.deepEqual(tl.diags, []);
@@ -434,7 +445,7 @@ test('/motion (0.15.0): the package\'s subpath carries plans, documents, the Tim
   const M = await import('../src/iso-objects/motion-entry.ts') as Record<string, unknown>, O = await import('../src/iso-objects/index.ts') as Record<string, unknown>;
   for (const n of ['assemble', 'disassemble', 'svgAt', 'paint', 'bindMotion', 'motionOfSteps', 'motion', 'MOTION_SCHEMA', 'checkMotion', 'springAt', 'withAnts', 'ANTS_CSS', 'drawLooks']) { assert.ok(n in M, n); assert.equal(M[n], O[n], n); }
   // everything of motion's that objects has, /motion has
-  const own = ['motion', 'timeline', 'motion-doc', 'motion-builder', 'ants', 'looks'], src = readFileSync(new URL('../src/iso-objects/index.ts', import.meta.url), 'utf8');
+  const own = ['motion', 'timeline', 'motion-doc', 'motion-schema', 'motion-builder', 'ants', 'looks'], src = readFileSync(new URL('../src/iso-objects/index.ts', import.meta.url), 'utf8');
   const names = [...src.matchAll(/^export \{ ([^}]*) \} from '\.\/([\w-]+)\.ts';/gm)].filter(m => own.includes(m[2])).flatMap(m => m[1].split(', ').map(x => x.split(' as ').at(-1)!));
   assert.ok(names.length > 30); assert.deepEqual(names.filter(n => !(n in M)), []);
 });

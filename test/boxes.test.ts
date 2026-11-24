@@ -623,10 +623,16 @@ test('boxes/1 in Chrome (0.12.5): the inline name field, after a drop and for a 
     const type = (t: string) => cdp('Input.insertText', { text: t });
     const field = () => ev<{ value: string; sel: string; focus: boolean; x: number; bottom: number; why: string; invalid: string | null } | null>(`const i = document.querySelector('.rename-field input'); if (!i) return null; const r = i.getBoundingClientRect();
       return { value: i.value, sel: i.value.slice(i.selectionStart, i.selectionEnd), focus: document.activeElement === i, x: r.left + r.width / 2, bottom: r.bottom, why: document.querySelector('.rename-error').textContent, invalid: i.getAttribute('aria-invalid') };`);
-    const drop = async (fx = 0.7, fy = 0.9) => {
+    const view = () => ev<string>(`const s = I.canvas.stage.getBoundingClientRect(), v = I.canvas.view; return [s.left, s.top, s.width, s.height, v.x, v.y, v.w, v.h].map(n => n.toFixed(1)).join(' ');`);
+    const drop = async (fx = 0.7, fy = 0.9, taken = false) => {
+      // the view settled: where it is dropped is measured on it
+      let before = ''; for (let k = 0, same = 0; k < 60 && same < 3; k++) { const now = await view(); same = now === before ? same + 1 : 0; before = now; await ev(`await tick(40);`); }
       const [x0, y0, x1, y1] = await ev<number[]>(`const b = document.querySelector('.palette .pal-item[data-entry="0"]').getBoundingClientRect(), s = I.canvas.stage.getBoundingClientRect(); return [b.left + 8, b.top + 8, s.left + s.width * ${fx}, s.top + s.height * ${fy}];`);
       await mouse('mousePressed', x0, y0); for (let i = 1; i <= 6; i++) await mouse('mouseMoved', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await mouse('mouseReleased', x1, y1);
       await until(`document.querySelector('.rename-field') && document.querySelector('.iso-canvas svg.scene [data-id="box-1"]')`, 'dropped, drawn, its name asked');
+      // it is where it was dropped, not where the layout put it (a taken spot: then the field can be at the stage's edge, and no wait helps)
+      const note = await ev<string>(`return document.querySelector('#se-note')?.textContent ?? '';`);
+      if (!taken) assert.doesNotMatch(note, /spot is taken/, `dropped at ${x1},${y1}; stage and view before: ${before}; after: ${await view()}; ${await ev<string>(`return E.getText();`)}`);
     };
     const undone = async (why: string) => { await ev(`I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`); await until(`E.getText() === ${JSON.stringify(TEXT)}`, why); };
     const boxOf = (id: string) => ev<{ x: number; top: number }>(`const rs = [...document.querySelectorAll('.iso-canvas svg.scene [data-id="${id}"]')].filter(e => !e.closest('.overlay')).map(e => e.getBoundingClientRect()).filter(r => r.width); const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right)); return { x: (l + rr) / 2, top: Math.min(...rs.map(r => r.top)) };`);
@@ -638,6 +644,24 @@ test('boxes/1 in Chrome (0.12.5): the inline name field, after a drop and for a 
       // and it stays there
       await ev(`await tick(400);`); assert.equal(await ev(`return !!${good};`), true, `${why}: ${JSON.stringify(await ev(`return ${look};`))}`);
     };
+
+    // dropped on a taken spot: the layout places it, here half out of view: the view goes to it, and its name is asked above it
+    const inside = () => ev<boolean>(`const s = I.canvas.stage.getBoundingClientRect(); return [...document.querySelectorAll('.iso-canvas svg.scene [data-id="box-1"]')].filter(e => !e.closest('.overlay')).map(e => e.getBoundingClientRect()).filter(r => r.width).every(r => r.left >= s.left && r.right <= s.right && r.top >= s.top && r.bottom <= s.bottom);`);
+    const home = await view();
+    await drop(0.6, 0.6, true);
+    await until(`/spot is taken/.test(document.querySelector('#se-note').textContent)`, 'the layout placed it');
+    await above('box-1', 'placed by the layout'); assert.equal(await inside(), true); assert.notEqual(await view(), home, 'the view went to it');
+    await key('Escape'); await undone('undone, and the view fitted again');
+    await ev(`I.canvas.fit(); await tick(60);`);
+    // (one the layout places in view moves nothing)
+    const fitted = await view();
+    await drop(0.5, 0.5, true); await until(`/spot is taken/.test(document.querySelector('#se-note').textContent)`, 'placed, in view'); await above('box-1', 'placed, in view');
+    assert.equal(await inside(), true); const seen = await view();
+    await key('Escape'); await undone('undone again, as it was'); await ev(`I.canvas.fit(); await tick(60);`);
+    assert.equal(seen, fitted, 'and one placed in view moves nothing');
+    await ev(`document.querySelector('#se-note').textContent = '';`);
+    // and one dropped where it was asked, at the very edge, is left there: the view never moves for it
+    { const was = await view(); await drop(0.97, 0.9); await ev(`await tick(300);`); assert.equal(await inside(), false, 'half out of view'); assert.equal(await view(), was, 'a drop where it was asked moves nothing'); await key('Escape'); await undone('undone once more'); }
 
     // dropped: the field, focused, the generated name selected, above the box; typed, Enter: named, one undo step
     await drop();

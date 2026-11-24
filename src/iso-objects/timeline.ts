@@ -7,7 +7,8 @@ import { didYouMean } from '../iso-core/errors.ts';
 import type { CompiledScene } from './compile.ts';
 import { ANT_SPEED, antDash, antsOf } from './ants.ts';
 import { silhouette, type Rect } from './labels.ts';
-import { motionModel, planOf, type ItemState, type LabelState, type MotionPlan, type RouteState, type SceneState } from './motion.ts';
+import { motionModel, planOf, type ItemState, type MotionModel, type LabelState, type MotionPlan, type RouteState, type SceneState } from './motion.ts';
+import { focusView } from './focus.ts';
 import { checkMotion, curveAt, easeOf, msOf, readMs, springAt, type Focus, type MotionDiag, type MotionDoc, type MotionNode, type Say, type Sequence, type SeriesItem, type Transition } from './motion-doc.ts';
 
 export interface BeatInfo { name: string; index: number; start: number; end: number; say?: Say }
@@ -18,6 +19,10 @@ export interface Timeline {
   readonly duration: number;
   readonly beats: BeatInfo[];
   readonly markers: Record<string, number>;
+  /** the document's own `ambient`: what at(ms) does with none given */
+  readonly ambient: 'on' | 'off';
+  /** whether anything in it runs on the ambient clock (ants, looping tokens and pulses): a host with none needs no frames while paused */
+  readonly loops: boolean;
   /** what the drawing looks like at ms. `ambient`: the ambient clock's time (default: the same; a host that stopped it passes the time it
    *  stopped at, and what loops stands where it was), or 'off': it never ran, and each loop stands at its start */
   at(ms: number, o?: { ambient?: number | 'off' }): SceneState;
@@ -27,7 +32,7 @@ export interface Timeline {
 }
 export interface BindOptions {
   /** the connectors' dashes, by kind: the theme's `kinds` (a dashed kind marches with its own dash) */
-  kinds?: Record<string, { dash?: 'solid' | 'dashed' | 'dotted' }>;
+  kinds?: Record<string, { dash?: 'solid' | 'dashed' | 'dotted'; ants?: [number, number] }>;
   /** kinds whose connectors stand still (default: blocked, planned) */
   still?: string[];
 }
@@ -84,16 +89,40 @@ class Sum {
   }
 }
 
-export function bindMotion(scene: CompiledScene, doc: MotionDoc, opts: BindOptions = {}): Timeline {
-  const diags = checkMotion(doc), m = motionModel(scene), fps = doc.fps, fileAnts = antsOf(scene.raw);
-  const none = (): Timeline => ({ ok: false, diags, duration: 0, beats: [], markers: {}, at: () => ({}), cues: () => undefined, beatAt: () => undefined, startOf: () => undefined });
+/** What binding needs to know of a drawing, as plain JSON: for a page that has the drawing and no compiler. */
+export interface MotionSource {
+  model: MotionModel;
+  /** each connector's kind */
+  kinds: Record<string, string>;
+  /** each thing's outline */
+  outlines: Record<string, [number, number][]>;
+  /** the looks each thing declares */
+  looks?: Record<string, string[]>;
+  ants?: ReturnType<typeof antsOf>;
+  /** the notes on nothing (JSON keeps no undefined) */
+  free?: string[];
+}
+export function motionSource(scene: CompiledScene): MotionSource {
+  const ants = antsOf(scene.raw), looks = scene.rendered.looks, model = motionModel(scene), free = Object.keys(model.notes).filter(n => model.notes[n] === undefined);
+  return {
+    model, kinds: Object.fromEntries(scene.routes.map(r => [r.id, r.kind])),
+    outlines: Object.fromEntries(scene.layout.items.map(p => [p.id, silhouette(p.box).map(q => [r2(q[0]), r2(q[1])] as [number, number])])),
+    ...(looks && Object.keys(looks).length ? { looks } : {}), ...(ants ? { ants } : {}), ...(free.length ? { free } : {}),
+  };
+}
+
+export function bindMotion(drawing: CompiledScene | MotionSource, doc: MotionDoc, opts: BindOptions = {}): Timeline {
+  const src = 'model' in drawing ? drawing : motionSource(drawing);
+  const m: MotionModel = src.free ? { ...src.model, notes: { ...src.model.notes, ...Object.fromEntries(src.free.map(n => [n, undefined])) } } : src.model;
+  const diags = checkMotion(doc), fps = doc.fps, fileAnts = src.ants;
+  const none = (): Timeline => ({ ok: false, diags, duration: 0, beats: [], markers: {}, ambient: 'on', loops: false, at: () => ({}), cues: () => undefined, beatAt: () => undefined, startOf: () => undefined });
   if (diags.length) return none();
   const err = (path: string, message: string, hint?: string) => { diags.push({ severity: 'error', path, message, ...(hint ? { hint } : {}) }); };
   const ms = (t: unknown, otherwise: number) => (t === undefined ? otherwise : msOf(t, fps)!);
 
   // ---------- what is in the drawing ----------
   const pieces = new Map(m.pieces.map(p => [p.id, p])), routes = new Set(m.routes.map(r => r.id)), notes = new Set(Object.keys(m.notes));
-  const kindOf = new Map(scene.routes.map(r => [r.id, r.kind]));
+  const kindOf = new Map(Object.entries(src.kinds));
   const all = [...pieces.keys(), ...routes, ...notes];
   const known = new Set(all);
   /** what moves and fades with a thing or a connector: its own label, and the notes on it */
@@ -103,7 +132,7 @@ export function bindMotion(scene: CompiledScene, doc: MotionDoc, opts: BindOptio
   const words = { any: 'thing, connector or note', thing: 'thing', route: 'connector' };
   const need = (id: string, path: string, kind: keyof typeof what = 'any') => { if (!what[kind].has(id)) { const d = didYouMean(id, what[kind]); err(path, `no ${words[kind]} "${id}" in this drawing`, d ? `did you mean "${d}"?` : undefined); } };
   const needAll = (v: string[] | undefined, path: string, kind: keyof typeof what = 'any') => v?.forEach((id, i) => need(id, `${path}/${i}`, kind));
-  const outline = new Map(scene.layout.items.map(p => [p.id, silhouette(p.box).map(q => [r2(q[0]), r2(q[1])] as [number, number])]));
+  const outline = new Map(Object.entries(src.outlines));
 
   // ---------- how long things are ----------
   const plans = new Map<object, MotionPlan>();
@@ -222,7 +251,7 @@ export function bindMotion(scene: CompiledScene, doc: MotionDoc, opts: BindOptio
     for (const id of Object.keys(s.levels ?? {})) if (id !== '*') need(id, `${path}/levels/${id}`);
     for (const [id, name] of Object.entries(s.variants ?? {})) {
       need(id, `${path}/variants/${id}`, 'thing');
-      const have = scene.rendered.looks?.[id] ?? [];
+      const have = src.looks?.[id] ?? [];
       if (pieces.has(id) && name !== '' && !have.includes(name)) { const d = didYouMean(name, have); err(`${path}/variants/${id}`, have.length ? `${id} has no look "${name}" (it has ${have.join(', ')})` : `${id} declares no looks (variants: in the diagram)`, d ? `did you mean "${d}"?` : undefined); }
     }
     if (Array.isArray(s.ants)) needAll(s.ants, `${path}/ants`, 'route');
@@ -329,10 +358,12 @@ export function bindMotion(scene: CompiledScene, doc: MotionDoc, opts: BindOptio
       const one = ms(n.each, 1150), hold = ms(n.hold, n.loop ? 700 : 0), period = n.travel.length * one + hold;
       const q = n.loop ? turned(a - from, period, c) : lt, i = Math.floor(q / one);
       if (i >= n.travel.length) return;
-      const f = easeOf(n.easing, one, 'ease-in-out')((q - i * one) / one), group = n.travel[i];
-      for (const x of Array.isArray(group) ? group : [group]) { const [id, kind] = x.split(':'); if (c.shown(id)) c.sum.tokens.push({ route: id, at: r4(f), ...(kind ? { kind } : {}) }); }
+      const part = (q - i * one) / one, f = easeOf(n.easing, one, 'ease-in-out')(part), group = n.travel[i];
+      for (const x of Array.isArray(group) ? group : [group]) { const [id, kind] = x.split(':'); if (c.shown(id)) c.sum.tokens.push({ route: id, at: r4((kind ?? kindOf.get(id)) === 'blocked' ? stalled(part) : f), ...(kind ? { kind } : {}) }); }
     }
   }
+  /** a blocked token gets most of the way, stalls and falls back a little, as the page's steps have it */
+  const stalled = (f: number) => (f < 0.7 ? f / 0.7 : 1 - ((f - 0.7) / 0.3) * 0.25);
   /** where in its turn a loop is: with the ambient off, at its start */
   const turned = (x: number, period: number, c: Ctx) => (c.off ? 0 : ((x % period) + period) % period);
   const ring = (id: string, amount: number, sum: Sum) => { if (r4(amount) > 0 && outline.has(id)) sum.outlines.push({ id, points: outline.get(id)!, ...(r4(amount) < 1 ? { opacity: r4(amount) } : {}) }); };
@@ -404,9 +435,19 @@ export function bindMotion(scene: CompiledScene, doc: MotionDoc, opts: BindOptio
     return sum.state(cam && cam.some((v, i) => Math.abs(v - fit[i]) > 0.005) ? cam : undefined);
   }
 
+  // whether anything anywhere is the ambient clock's
+  const moving = (n: unknown): boolean => {
+    if (!n || typeof n !== 'object') return false;
+    if (Array.isArray(n)) return n.some(moving);
+    const o = n as Record<string, unknown>;
+    if (o.ants !== undefined && o.ants !== false) return true;
+    if (o.loop === true && ('travel' in o || 'pulse' in o)) return true;
+    return Object.values(o).some(moving);
+  };
+  const loops = fileAnts !== undefined || moving(doc.series) || moving(doc.layers);
   const beatAt = (t: number) => { const k = beatIndex(Math.max(0, Math.min(duration, t))); return k < 0 ? undefined : beats[k]; };
   return {
-    ok: true, diags, duration, beats, markers, at, beatAt,
+    ok: true, diags, duration, beats, markers, ambient: doc.ambient ?? 'on', loops, at, beatAt,
     startOf: n => starts.get(n) ?? beats.find(b => b.name === n)?.start,
     cues(t) {
       const b = beatAt(t);
@@ -424,18 +465,27 @@ function settleMs(c: { mass?: number; damping?: number; stiffness?: number }): n
 
 /** A drawing's own steps as a motion document, so that every drawing with steps has a timeline. */
 export function motionOfSteps(scene: CompiledScene): MotionDoc {
-  const { steps, vis } = scene.steps;
+  const { steps, vis } = scene.steps, full = scene.rendered.viewBox;
+  let zoomed = false;
+  const m = motionModel(scene), ids = new Set([...m.pieces.map(p => p.id), ...m.routes.map(r => r.id), ...Object.keys(m.notes)]), has = (id: string) => ids.has(id);
+  // (a note on nothing is no connector's)
+  const free = Object.keys(m.notes).filter(n => m.notes[n] === undefined);
   const series: SeriesItem[] = steps.map((st, i) => {
     const show: string[] = [], hide: string[] = [];
     // (an id first shown is hidden until then, and one first hidden is there until then: so only the changes are said)
     for (const [id, v] of Object.entries(vis)) { if (i === 0 ? !v.includes(true) : v[i - 1] && !v[i]) hide.push(id); else if (i > 0 ? v[i] && !v[i - 1] : false) show.push(id); }
     const children: MotionNode[] = [];
-    if (st.phases.length) children.push({ travel: st.phases.map(g => (g.length === 1 ? g[0].route : g.map(t => t.route))), each: 1150, hold: 700, loop: true });
+    const token = (t: { route: string; kind: string }) => `${t.route}:${t.kind}`;
+    if (st.phases.length) children.push({ travel: st.phases.map(g => (g.length === 1 ? token(g[0]) : g.map(token))), each: 1150, hold: 700, loop: true });
     const pulse = ((scene.raw.steps ?? [])[i] as { pulse?: string[] } | undefined)?.pulse?.filter(id => scene.layout.byId.has(id)) ?? [];
     if (pulse.length) children.push({ pulse, loop: true });
+    // a step's focus is where the camera goes, and back out with the first step that has none
+    if (st.focus) { const [x, y, w, h] = focusView(full, st.focus).map(r2); children.push({ camera: { focus: [x, y, w, h] }, duration: 900, easing: 'ease-in-out' }); zoomed = true; } else if (zoomed) { children.push({ camera: 'fit', duration: 900, easing: 'ease-in-out' }); zoomed = false; }
     const s: Sequence = { name: `step-${st.n}`, duration: st.duration, say: { title: st.heading, ...(st.caption ? { text: st.caption } : {}), ...(st.command ? { code: st.command } : {}) } };
     if (show.length) s.show = show;
     if (hide.length) s.hide = hide;
+    // what a step doesn't touch dims, as on its page: the connectors and notes, or everything (the scene's `dim`)
+    s.focus = scene.raw.dim === 'all' ? { lit: st.lit.filter(has), scope: 'all', level: 0.14 } : { lit: st.lit.filter(has), scope: 'links', level: 0.12, ...(free.length ? { always: free } : {}) };
     if (children.length) s.children = children;
     return { sequence: s };
   });

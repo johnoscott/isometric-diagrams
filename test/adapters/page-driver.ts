@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, mkdtempSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep, extname } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:http';
 import { build } from 'esbuild';
 import { precompiledFor } from '../../scripts/precompile.ts';
@@ -30,6 +30,21 @@ export interface Driver {
   cdp(method: string, params?: object): Promise<{ result?: { value?: unknown }; data?: string; [k: string]: unknown }>;
 }
 
+/** Chrome, and its DevTools port. One that starts and never opens its port (a busy runner): another, on a profile of its own, three at most. */
+export async function launch(chrome: string, size: string): Promise<{ proc: ChildProcess; port: number }> {
+  for (let n = 1; n <= 3; n++) {
+    const flags: string[] = headless(), profile = flags.find(f => f.startsWith('--user-data-dir='))!.slice('--user-data-dir='.length);
+    const proc = spawn(chrome, [...flags, '--remote-debugging-port=0', `--window-size=${size}`, 'about:blank'], { stdio: 'ignore' });
+    let over = false, port = 0;
+    proc.on('exit', () => { over = true; }); proc.on('error', () => { over = true; });
+    for (let i = 0; i < 200 && !port && !over; i++) { await new Promise(r => setTimeout(r, 50)); try { port = Number(readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]); } catch { /* not yet */ } }
+    if (port) return { proc, port };
+    proc.kill();
+    console.error(`# Chrome ${n} of 3 ${over ? 'ended' : 'gave no DevTools port in 10 s'}`);
+  }
+  throw new Error('Chrome gave no DevTools port, three times');
+}
+
 /** page: index.html of its own (default: one that loads page.js), and its CSP (null: none) */
 export async function drivePage(chrome: string, js: Uint8Array, handle: string, run: (d: Driver) => Promise<void>, size = '1280,860', page: { html?: string; csp?: string | null } = {}): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'adapter-page-'));
@@ -43,15 +58,12 @@ export async function drivePage(chrome: string, js: Uint8Array, handle: string, 
   });
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/`;
-  const flags: string[] = headless();
-  const profile = flags.find(f => f.startsWith('--user-data-dir='))!.slice('--user-data-dir='.length);
-  const proc = spawn(chrome, [...flags, '--remote-debugging-port=0', `--window-size=${size}`, 'about:blank'], { stdio: 'ignore' });
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-  let ws: WebSocket | undefined;
+  let ws: WebSocket | undefined, proc: ChildProcess | undefined;
   try {
-    let port = 0;
-    for (let i = 0; i < 200 && !port; i++) { await sleep(50); try { port = Number(readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]); } catch { /* not yet */ } }
-    if (!port) throw new Error('Chrome gave no DevTools port');
+    const started = await launch(chrome, size);
+    proc = started.proc;
+    const port = started.port;
     const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json() as { type: string; webSocketDebuggerUrl: string }[]).find(t => t.type === 'page')!;
     const sock = ws = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((r, j) => { sock.onopen = r; sock.onerror = j; });
@@ -75,7 +87,7 @@ export async function drivePage(chrome: string, js: Uint8Array, handle: string, 
     await run({ ev, until, cdp: cdp as Driver['cdp'] });
   } finally {
     ws?.close();
-    proc.kill();
+    proc?.kill();
     server.close();
   }
 }

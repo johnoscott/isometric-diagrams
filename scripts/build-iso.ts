@@ -70,8 +70,23 @@ export async function buildIso(out = join(ROOT, 'dist-iso'), registry: Registry 
     writeFileSync(join(out, file.replace('.js', '.meta.json')), JSON.stringify(r.metafile, null, 1));
     res.push({ file, bytes: js.length, gzip: gzipSync(js, { level: 9 }).length, metafile: r.metafile });
   }
+  await playerIso(out);
   packageIso(out, registry);
   return res;
+}
+
+/** (0.16.0) isometric-diagram.js: <isometric-diagram>, defined by loading it (src/player, an app on L0–L2 and the systems pack),
+ *  the theme in it and the schema as code: one script, for any page */
+export const PLAYER_FILE = 'isometric-diagram.js';
+export async function playerIso(out: string): Promise<IsoBuild> {
+  const r = await build({
+    entryPoints: [join(ROOT, 'src/player/isometric-diagram.ts')], absWorkingDir: ROOT, bundle: true, format: 'esm', target: 'es2022', platform: 'browser', minify: true, write: false,
+    outfile: join(out, PLAYER_FILE), metafile: true, logLevel: 'error', legalComments: 'none', loader: { '.yaml': 'text' }, plugins: [precompiledFor(['../src/iso-systems/schema.json'])],
+  });
+  const js = r.outputFiles[0].contents, unsafe = INLINE_UNSAFE.exec(Buffer.from(js).toString('utf8'));
+  if (unsafe) throw new Error(`${PLAYER_FILE} holds "${unsafe[0]}" at ${unsafe.index}: not safe to inline in an HTML page`);
+  writeFileSync(join(out, PLAYER_FILE), js);
+  return { file: PLAYER_FILE, bytes: js.length, gzip: gzipSync(js, { level: 9 }).length, metafile: r.metafile };
 }
 
 // ---- the package (0.5.1): types, assets and a package.json, so a project outside this repo can depend on dist-iso ----
@@ -86,7 +101,7 @@ export const ASSETS: Record<string, string | string[]> = {
 };
 export const PACKAGE = '@johnoscott/isometric-engine';
 /** what the package holds (its package.json "files"): the bundles, their declarations, the assets, the notices */
-export const PACKAGE_FILES = ['LICENSE', 'iso-render.js', 'iso-render.d.ts', 'iso-editor.js', 'iso-editor.d.ts', 'iso-systems.js', 'iso-systems.d.ts', 'types/', 'assets/', 'LICENSES/', 'README.md', 'EDITOR-GUIDE.md', 'src/', 'js/'];
+export const PACKAGE_FILES = ['LICENSE', 'iso-render.js', 'iso-render.d.ts', 'iso-editor.js', 'iso-editor.d.ts', 'iso-systems.js', 'iso-systems.d.ts', 'isometric-diagram.js', 'types/', 'assets/', 'LICENSES/', 'README.md', 'EDITOR-GUIDE.md', 'src/', 'js/'];
 /** the third-party code the bundles carry, and its licence (MIT and ISC want their notice kept with the code) */
 const NOTICES: Record<string, string> = {
   'LICENSES/yaml.txt': 'LICENSES/yaml.txt', 'LICENSES/lucide-static.txt': 'LICENSES/lucide-static.txt',
@@ -105,7 +120,9 @@ function typesIso(out: string) {
     // 0.12.2: every public module's declarations (its subpath's types), not only what an index reaches
     ...SOURCE_LAYERS.flatMap(l => [...publicOf(l)].filter(m => m.endsWith('.ts') && m !== 'index.ts').sort().map(m => `${l.dir}/${m}`)),
     // (0.15.0) /motion's
-    'src/iso-objects/motion-entry.ts'],
+    'src/iso-objects/motion-entry.ts',
+    // (0.16.0) /player's
+    'src/player/isometric-diagram.ts', 'src/player/text.d.ts'],
   { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? files(join(d, e.name)) : [join(d, e.name)]));
   const DROP = NODE_ONLY.map(r => new RegExp(r.source.replace('\\.ts', '\\.(ts|js)')));
@@ -179,7 +196,7 @@ function packageIso(out: string, registry: Registry) {
     // 0.9.0: MIT (LICENSE, the repository's own); the code it bundles keeps its own licences (LICENSES/)
     license: 'MIT', type: 'module',
     // the bundles have no side effects; the modules (src/, js/) are bundled by a host as this repo bundles its own sources
-    sideEffects: ['./src/**', './js/**'],
+    sideEffects: ['./src/**', './js/**', './isometric-diagram.js'],
     // 0.10.0: the public repository and its site
     repository: { type: 'git', url: 'git+https://github.com/johnoscott/isometric-diagrams.git' },
     homepage: 'https://johnoscott.github.io/isometric-diagrams/',
@@ -188,7 +205,10 @@ function packageIso(out: string, registry: Registry) {
     files: PACKAGE_FILES,
     exports: { './render': exp('iso-render.js'), './editor': exp('iso-editor.js'), './systems': exp('iso-systems.js'),
       // 0.15.0: motion (plans, documents, the Timeline, svgAt, paint): the modules and what they need, not a bundle of their own
-      './motion': { types: './types/iso-objects/motion-entry.d.ts', source: './src/iso-objects/motion-entry.ts', default: './js/iso-objects/motion-entry.js' }, ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },
+      './motion': { types: './types/iso-objects/motion-entry.d.ts', source: './src/iso-objects/motion-entry.ts', default: './js/iso-objects/motion-entry.js' },
+      // 0.16.0: the transport (one module), and the player: <isometric-diagram>, as a module and as a script's own name
+      './transport': { types: './types/iso-viewer/transport.d.ts', source: './src/iso-viewer/transport.ts', default: './js/iso-viewer/transport.js' },
+      './player': { types: './types/player/isometric-diagram.d.ts', default: `./${PLAYER_FILE}` }, [`./${PLAYER_FILE}`]: `./${PLAYER_FILE}`, ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },
     // no dependencies of any kind: the code bundles what it runs (yaml). Only /editor's declarations name other packages'
     // types (yaml's, and Monaco's for the optional text pane); a host type-checking against /editor installs them itself.
     // (0.7.1: as optional peers they were installed anyway from the registry, which drops peerDependenciesMeta, and
