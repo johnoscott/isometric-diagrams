@@ -176,7 +176,7 @@ a drawing with neither is drawn.
 | `scene` | Which scene, by its id (default: the first). |
 | `treatment` | `mono`: black and white, in either mode; `none`: in colour, whatever the drawing says. |
 | `label` | What a screen reader calls it. |
-| `reduced-motion` | `ignore` (the default: motion plays, and a reader who asked for less has a **Motion off** button, with or without `controls`: everything is in place and lit, nothing moves, and the steps are open as text; pressed again, from the first step) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
+| `reduced-motion` | `ignore` (the default: motion plays, and a reader who asked for less has a **Motion off** button, with or without `controls`: everything is in place and lit, nothing moves, and the steps are open as text; and the page's own `transport.play()` does nothing; pressed again, it plays from the first step, unless the reader had paused it) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
 | `links` | It follows the page's `#step=3`, `#t=0.5` (how far into the step) and `#still` (one picture, no controls). |
 
 Its properties are `source`, `theme`, `motion` (a document as data) and `transport`. Its events are `beat` (`detail.beat`, `detail.how`),

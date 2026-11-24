@@ -73,6 +73,9 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   if (o.timeline && !o.timeline.ok) throw new Error(`the motion has faults: ${o.timeline.diags.map(d => `${d.path}: ${d.message}`).join('; ')}`);
   let scene = o.scene, svg = svgOf(scene.rendered.svg), frozen: number | undefined, stepTo: number | undefined, userPaused = false, gone = false;
   const tr = transport(o.timeline ?? NOTHING, { loop: o.loop, rate: o.rate, ambient: o.ambient, clock: o.clock });
+  // off means off, whoever asks: the host's play() and toggle() too, which leave it as it is
+  const go = tr.play;
+  tr.play = p => { if (!off) go(p); };
   const controls = o.controls ?? true;
   const asked = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, calm = asked && o.reducedMotion === 'respect';
   /** off: the reader pressed Motion off, and nothing moves, whoever asks it to */
@@ -189,7 +192,7 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   /** the reader did it: an autoplay doesn't start again by itself */
   function byHand(f: () => void) { wake(); userPaused = true; f(); buttons(); show(); }
   function stop() { stepTo = undefined; tr.pause(); }
-  /** off: everything in place and lit, nothing moving, the steps open as text; on again: from the first step, playing if it began by itself */
+  /** off: everything in place and lit, nothing moving, the steps open as text; on again: it plays from the first step, unless the reader had paused it (or stepped it) by hand */
   function setOff(v: boolean) {
     if (gone || v === off) return;
     off = v; resting = v; told = undefined;
@@ -199,7 +202,7 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
     if (off) list.open = true;
     marks(tr.beat);
     buttons(); show();
-    if (!off && o.autoplay === true && !userPaused) tr.play();
+    if (!off && !userPaused && o.autoplay !== 'visible') tr.play();
     pick();
   }
   function step(i: number) {

@@ -149,8 +149,9 @@ test('a reader who asked for less motion: it plays the same, with a Motion off b
   assert.deepEqual(off, { pressed: 'true', play: true, playing: false, at: true, list: true, dim: 0, anim: 0, n: '14 / 14' });
   // nothing moves: not by time, not by Space, not by the host
   const html = 'return B.q(".iso-play-stage").innerHTML;', was = await d.ev<string>(html);
-  await d.ev('B.go(900, 3); B.q(".iso-play").dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); B.go(900); B.player.transport.play(); B.go(900);');
-  assert.ok(await d.ev<string>(html) === was, 'the same picture'); await d.ev('B.player.transport.pause();');
+  await d.ev('B.go(900, 3); B.q(".iso-play").dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); B.go(900); const tr = B.player.transport; tr.play(); B.go(900); tr.toggle(); B.go(900);');
+  assert.ok(await d.ev<string>(html) === was, 'the same picture');
+  assert.deepEqual(await d.ev('const tr = B.player.transport, p = B.q(".play"); return { playing: tr.playing, end: tr.time === tr.duration, label: p.getAttribute("aria-label"), text: p.textContent, off: p.disabled, root: B.q(".iso-play").dataset.playing };'), { playing: false, end: true, label: 'Play', text: '▶', off: true, root: 'false' }, 'and the transport and the button are left alone');
   // its steps are still the reader's: each as it is when it is over, with no way there
   await press(d, '.iso-play-btn.again'); assert.equal((await d.state()).t, 0);
   await press(d, '.iso-play-btn.next'); const t = (await d.state()).t; await d.ev('B.go(500, 4);'); assert.equal((await d.state()).t, t); assert.match(await d.ev<string>('return B.q(".iso-play-count").textContent;'), /^2 /);
@@ -162,6 +163,13 @@ test('a reader who asked for less motion: it plays the same, with a Motion off b
   // off and on at once, with no step between: it plays again by itself, as it began
   await d.ev('B.mount({ autoplay: true }); B.go(300);'); await press(d, '.iso-play-btn.still'); await press(d, '.iso-play-btn.still'); await d.ev('B.go(60);');
   assert.equal((await d.state()).t, 60);
+  // one that does not begin by itself plays from the first step too; not one its reader had paused
+  await d.ev('B.mount({}); B.go(300);'); assert.equal((await d.state()).t, 0); await press(d, '.iso-play-btn.still'); await press(d, '.iso-play-btn.still'); await d.ev('B.go(60);');
+  assert.equal((await d.state()).t, 60);
+  await d.ev('B.mount({ autoplay: true }); B.go(300);'); await press(d, '.iso-play-btn.play'); await press(d, '.iso-play-btn.still'); await press(d, '.iso-play-btn.still'); await d.ev('B.go(60);');
+  assert.equal((await d.state()).t, 0); assert.equal(await d.ev('return B.player.transport.playing;'), false);
+  // and the host\'s play() is its own again
+  await d.ev('B.player.transport.play(); B.go(40);'); assert.equal((await d.state()).t, 40);
 }));
 
 test('Motion off: with no controls where it could move by itself; not for a still drawing, with respect, or for anybody else', opts, page(async d => {

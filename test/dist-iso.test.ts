@@ -354,6 +354,8 @@ export const Root = () => <Composition id="Story" component={Story} defaultProps
 export const n: number = isometricTiming({ spring: { damping: 200 } }).getDurationInFrames({ fps: 30 });
 export const c = isometricPresentation({ exiting: 'stay' }).component, f: string = isometricFonts({ url: 'a.ttf' }).family;
 // what Remotion's Composition asks of its props once its command line is installed (zod comes with it, and its types with that)
+// (its limit: Remotion's own constraints are written out here, as they are in 4.0.546, since its command line, with its renderer and bundler,
+// isn't installed in this repository. A change of theirs can get past this; the sample's npm run check, with the command line installed, would show it)
 export const rec: Record<string, unknown> = p;
 export const loose: (q: Record<string, unknown> & DrawingProps) => unknown = Story;
 type Meta<T extends Record<string, unknown>> = (o: { props: T }) => unknown;

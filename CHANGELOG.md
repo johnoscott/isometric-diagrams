@@ -2,6 +2,11 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.17.2 — Motion off, whoever asks
+
+- While **Motion off** is on, a host's `transport.play()` does nothing: the drawing, the time and the Play button stay as they are.
+- On again, it plays from the first step, whether or not it began by itself; a reader's own pause is kept.
+
 ## 0.17.1 — fixes from the first video
 
 - `assemble` and `disassemble` in a beat that says its own length threw; they play, wherever a beat may have them.

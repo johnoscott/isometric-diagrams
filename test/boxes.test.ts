@@ -333,6 +333,8 @@ test('boxes/1 in Chrome (0.10.1): a palette drop onto a container nests the new 
     const dropBox = (where: string) => `${where}; const btn = document.querySelector('.palette .pal-item[data-entry="0"]');
       const r0 = btn.getBoundingClientRect(), P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 11 }));
       P(btn, 'pointerdown', r0.left + 5, r0.top + 5); for (let i = 1; i <= 6; i++) { P(btn, 'pointermove', r0.left + 5 + (at.x - r0.left - 5) * i / 6, r0.top + 5 + (at.y - r0.top - 5) * i / 6); await tick(20); }
+      const shelf = () => { const b = document.querySelector('.iso-canvas svg.scene.flat [data-id="shelf"] rect')?.getBoundingClientRect(); return b && [b.left, b.top, b.right, b.bottom].map(Math.round); };
+      B.saw = { at, was: B.was, now: shelf(), mode: I.canvas.mode, zoom: I.canvas.zoom, scenes: document.querySelectorAll('.iso-canvas svg.scene').length, under: document.elementsFromPoint(at.x, at.y).slice(0, 5).map(e => e.tagName + '.' + (e.getAttribute('class') ?? '') + '#' + (e.closest('[data-id]')?.dataset.id ?? '')), drawn: [...new Set([...document.querySelectorAll('.iso-canvas svg.scene [data-id]')].map(e => e.dataset.id))] };
       P(btn, 'pointerup', at.x, at.y); await tick(); document.querySelector('.rename-field input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await tick();`;
     // onto the floor zone: in it, and not pinned
     await ev(dropBox(onFloor));
@@ -350,9 +352,11 @@ test('boxes/1 in Chrome (0.10.1): a palette drop onto a container nests the new 
     // in 2D: onto the shelf's panel, in the shelf
     await ev(`document.querySelector('.view-seg [data-v="2d"]').click();`);
     await until(`I.canvas.mode === '2d' && document.querySelectorAll('.iso-canvas svg.scene').length === 1 && !document.querySelector('.dual-morph') && document.querySelector('.iso-canvas svg.scene.flat [data-id="shelf"]')`, 'the 2D view');
-    await ev(dropBox(`const r = document.querySelector('.iso-canvas svg.scene.flat [data-id="shelf"] rect').getBoundingClientRect(); const at = { x: r.left + 6, y: r.bottom - 6 }`));
+    await ev(dropBox(`const r = document.querySelector('.iso-canvas svg.scene.flat [data-id="shelf"] rect').getBoundingClientRect(); B.was = [r.left, r.top, r.right, r.bottom].map(Math.round); const at = { x: r.left + 6, y: r.bottom - 6 }`));
     await until(`/\\n  box-1:/.test(E.getText())`, 'added in 2D');
-    assert.equal(parsed(await ev<string>(`return E.getText();`)).boxes['box-1'].in, 'shelf');
+    // (it has landed outside on a slow machine, and not on any of ours: what it saw then, in the message)
+    const saw = JSON.stringify({ box: parsed(await ev<string>(`return E.getText();`)).boxes['box-1'], ...await ev<object>(`return B.saw;`) });
+    assert.equal(parsed(await ev<string>(`return E.getText();`)).boxes['box-1'].in, 'shelf', saw);
     await undo();
     const bad = await ev<{ violations: string[]; errors: string[] }>(`return { violations: B.violations, errors: B.errors };`);
     assert.deepEqual(bad, { violations: [], errors: [] });
