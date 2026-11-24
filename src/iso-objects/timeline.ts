@@ -184,7 +184,7 @@ export function bindMotion(drawing: CompiledScene | MotionSource, doc: MotionDoc
     items.forEach((it, i) => {
       if ('transition' in it) {
         const t = it.transition, g = t.timing;
-        const length = t.presentation === 'none' ? 0 : 'linear' in g ? ms(g.linear, 0) : ms(g.spring.duration, settleMs(g.spring));
+        const length = t.presentation === 'none' ? 0 : transitionMs(g, fps);
         into = { t, length };
         return;
       }
@@ -301,7 +301,7 @@ export function bindMotion(drawing: CompiledScene | MotionSource, doc: MotionDoc
   /** how much of beat k has come in at T (1: all of it) */
   const entered = (k: number, T: number) => {
     const p = top.list[k], lt = T - p.start;
-    if (p.into && p.into.length > 0) { const g = p.into.t.timing; return 'spring' in g ? (lt >= p.into.length ? 1 : clamp(springAt(lt, { ...g.spring, overshootClamping: true }) / springAt(p.into.length, { ...g.spring, overshootClamping: true }))) : clamp(lt / p.into.length); }
+    if (p.into && p.into.length > 0) return transitionAt(p.into.t.timing, lt, p.into.length);
     const e = p.s.enter; if (!e) return 1;
     const over = ms(e.fade, 0);
     return over <= 0 ? 1 : easeOf(e.easing, over, 'ease')(clamp(lt / over));
@@ -456,6 +456,12 @@ export function bindMotion(drawing: CompiledScene | MotionSource, doc: MotionDoc
       return { beat: b.name, index: b.index, of: beats.length, progress: r4(clamp((T - b.start) / Math.max(1, b.end - b.start))), ...(b.say ? { say: b.say, ...(b.say.chapter !== undefined ? { chapter: b.say.chapter } : {}), ...(b.say.color !== undefined ? { color: b.say.color } : {}) } : {}) };
     },
   };
+}
+/** how long a transition is, ms, and how far it is in at t of them */
+export const transitionMs = (g: Transition['timing'], fps?: number): number => ('linear' in g ? msOf(g.linear, fps) ?? 0 : msOf(g.spring.duration, fps) ?? settleMs(g.spring));
+export function transitionAt(g: Transition['timing'], t: number, length: number): number {
+  if (length <= 0 || t >= length) return 1;
+  return 'spring' in g ? clamp(springAt(t, { ...g.spring, overshootClamping: true }) / springAt(length, { ...g.spring, overshootClamping: true })) : clamp(t / length);
 }
 /** how long a spring takes to come to rest, ms: its envelope under half a percent */
 function settleMs(c: { mass?: number; damping?: number; stiffness?: number }): number {

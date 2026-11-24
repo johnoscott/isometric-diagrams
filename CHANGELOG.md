@@ -2,6 +2,16 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.17.0 — drawings in Remotion videos
+
+- **`@johnoscott/isometric-engine/remotion`**: `<IsometricScene>`, `useIsometricCues`, `<IsometricSequences>`, `isometricMetadata`, and `isometricTiming` and `isometricPresentation` for a
+  `TransitionSeries`. A frame is drawn from its number alone. `react` and `remotion` are optional peers: without `/remotion`, installing the engine installs neither.
+  **Remotion isn't open source: using it needs Remotion's own licence.**
+- **`font: 'arimo'`** (`compile`'s `font: ARIMO`, from `modules/iso-core/arimo`): a self-contained drawing laid out with Arimo's widths. Never the default; the package has no font file.
+  `isometricFonts()` is what a font loader takes, for your own file.
+- `samples/remotion`: a small project, with Arimo (OFL 1.1) in it.
+- **Known**: no monospaced font is chosen: that text is the system's. Rendered video files aren't tested here. Remotion's older versions (before 4.0.546) aren't supported.
+
 ## 0.16.0 — the player, and black and white
 
 - **`<isometric-diagram>`** (`isometric-diagram.js`, and `@johnoscott/isometric-engine/player`): a drawing's text in a page, drawn and played, with its controls,

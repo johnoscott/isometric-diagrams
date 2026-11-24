@@ -71,6 +71,7 @@ export async function buildIso(out = join(ROOT, 'dist-iso'), registry: Registry 
     res.push({ file, bytes: js.length, gzip: gzipSync(js, { level: 9 }).length, metafile: r.metafile });
   }
   await playerIso(out);
+  await remotionIso(out);
   packageIso(out, registry);
   return res;
 }
@@ -89,6 +90,20 @@ export async function playerIso(out: string): Promise<IsoBuild> {
   return { file: PLAYER_FILE, bytes: js.length, gzip: gzipSync(js, { level: 9 }).length, metafile: r.metafile };
 }
 
+/** (0.17.0) iso-remotion.js: the drawing as Remotion components (src/remotion, an app on L0–L2 and the systems pack). React and Remotion are
+ *  the host's own, never in it */
+export const REMOTION_FILE = 'iso-remotion.js';
+export const REMOTION_PEERS = { react: '>=18', remotion: '>=4.0.546' };
+export async function remotionIso(out: string): Promise<IsoBuild> {
+  const r = await build({
+    entryPoints: [join(ROOT, 'src/remotion/entry.ts')], absWorkingDir: ROOT, bundle: true, format: 'esm', target: 'es2022', platform: 'browser', minify: true, write: false,
+    outfile: join(out, REMOTION_FILE), metafile: true, logLevel: 'error', legalComments: 'none', loader: { '.yaml': 'text' }, external: Object.keys(REMOTION_PEERS), plugins: [precompiledFor(['../src/iso-systems/schema.json'])],
+  });
+  const js = r.outputFiles[0].contents;
+  writeFileSync(join(out, REMOTION_FILE), js);
+  return { file: REMOTION_FILE, bytes: js.length, gzip: gzipSync(js, { level: 9 }).length, metafile: r.metafile };
+}
+
 // ---- the package (0.5.1): types, assets and a package.json, so a project outside this repo can depend on dist-iso ----
 
 /** the files a host needs beside the code: L3's plain skin and its shell's layout, and a theme to draw with */
@@ -101,7 +116,7 @@ export const ASSETS: Record<string, string | string[]> = {
 };
 export const PACKAGE = '@johnoscott/isometric-engine';
 /** what the package holds (its package.json "files"): the bundles, their declarations, the assets, the notices */
-export const PACKAGE_FILES = ['LICENSE', 'iso-render.js', 'iso-render.d.ts', 'iso-editor.js', 'iso-editor.d.ts', 'iso-systems.js', 'iso-systems.d.ts', 'isometric-diagram.js', 'types/', 'assets/', 'LICENSES/', 'README.md', 'EDITOR-GUIDE.md', 'src/', 'js/'];
+export const PACKAGE_FILES = ['LICENSE', 'iso-render.js', 'iso-render.d.ts', 'iso-editor.js', 'iso-editor.d.ts', 'iso-systems.js', 'iso-systems.d.ts', 'isometric-diagram.js', 'iso-remotion.js', 'types/', 'assets/', 'LICENSES/', 'README.md', 'EDITOR-GUIDE.md', 'src/', 'js/'];
 /** the third-party code the bundles carry, and its licence (MIT and ISC want their notice kept with the code) */
 const NOTICES: Record<string, string> = {
   'LICENSES/yaml.txt': 'LICENSES/yaml.txt', 'LICENSES/lucide-static.txt': 'LICENSES/lucide-static.txt',
@@ -122,7 +137,9 @@ function typesIso(out: string) {
     // (0.15.0) /motion's
     'src/iso-objects/motion-entry.ts',
     // (0.16.0) /player's
-    'src/player/isometric-diagram.ts', 'src/player/text.d.ts'],
+    'src/player/isometric-diagram.ts', 'src/player/text.d.ts',
+    // (0.17.0) /remotion's
+    'src/remotion/entry.ts'],
   { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? files(join(d, e.name)) : [join(d, e.name)]));
   const DROP = NODE_ONLY.map(r => new RegExp(r.source.replace('\\.ts', '\\.(ts|js)')));
@@ -208,8 +225,13 @@ function packageIso(out: string, registry: Registry) {
       './motion': { types: './types/iso-objects/motion-entry.d.ts', source: './src/iso-objects/motion-entry.ts', default: './js/iso-objects/motion-entry.js' },
       // 0.16.0: the transport (one module), and the player: <isometric-diagram>, as a module and as a script's own name
       './transport': { types: './types/iso-viewer/transport.d.ts', source: './src/iso-viewer/transport.ts', default: './js/iso-viewer/transport.js' },
-      './player': { types: './types/player/isometric-diagram.d.ts', default: `./${PLAYER_FILE}` }, [`./${PLAYER_FILE}`]: `./${PLAYER_FILE}`, ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },
-    // no dependencies of any kind: the code bundles what it runs (yaml). Only /editor's declarations name other packages'
+      './player': { types: './types/player/isometric-diagram.d.ts', default: `./${PLAYER_FILE}` }, [`./${PLAYER_FILE}`]: `./${PLAYER_FILE}`,
+      // 0.17.0: the drawing in a Remotion video; react and remotion are the host's own
+      './remotion': { types: './types/remotion/entry.d.ts', default: `./${REMOTION_FILE}` }, ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },
+    // 0.17.0: /remotion's two, optional, in the npmjs build only (npmjs keeps peerDependenciesMeta, GitHub Packages drops it, and they would
+    // be installed into every host)
+    ...(registry === 'npmjs' ? { peerDependencies: REMOTION_PEERS, peerDependenciesMeta: Object.fromEntries(Object.keys(REMOTION_PEERS).map(k => [k, { optional: true }])) } : {}),
+    // no other dependencies of any kind: the code bundles what it runs (yaml). Only /editor's declarations name other packages'
     // types (yaml's, and Monaco's for the optional text pane); a host type-checking against /editor installs them itself.
     // (0.7.1: as optional peers they were installed anyway from the registry, which drops peerDependenciesMeta, and
     // monaco-editor brought dompurify's advisories into hosts that only render.)
@@ -255,6 +277,8 @@ Use:
 - No dependencies: the bundles carry what they run. \`/editor\`'s declarations name \`yaml\`'s types and, for the optional
   Monaco text pane, \`monaco-editor\`'s: a host type-checking against \`/editor\` installs those itself (needed for /editor
   only), or uses \`skipLibCheck\`. \`/render\` and \`/systems\` need nothing else installed.
+- \`/remotion\` is for Remotion videos, and needs \`react\` and \`remotion\`, which you install (optional peers: installing the engine installs neither).
+  Remotion isn't open source: using it needs Remotion's own licence.
 - Inline-safe: no bundle holds \`<!--\`, \`<script\` or \`</script\`, so a page may inline one (or its own bundle of them)
   in \`<script type="module">…</script>\`, as a page opened from disk does.
 - Schemas: \`core\` compiles JSON Schemas with ajv at run time, which needs a CSP that allows it (or precompile them).

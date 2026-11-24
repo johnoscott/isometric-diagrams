@@ -221,6 +221,53 @@ a state adds (tokens, rings) a self-contained drawing's own colours; `{ styles: 
 style attributes, for a page whose CSP forbids them. `motionSource(scene)` is what `bindMotion` needs of a drawing, as JSON, for a page
 that has the drawing and no compiler.
 
+## In a Remotion video
+
+`@johnoscott/isometric-engine/remotion` draws a frame for each of Remotion's, from its number alone: in any order, in parallel, at any rate. It needs `react` (18 or
+later) and `remotion` (4.0.546 or later), which you install. They are optional peers: without `/remotion`, installing the engine installs neither.
+
+```tsx
+import { IsometricScene, isometricMetadata, DEFAULT_THEME, type DrawingProps } from '@johnoscott/isometric-engine/remotion';
+
+const Story = (p: DrawingProps) => <IsometricScene {...p} />;
+<Composition id="Story" component={Story} defaultProps={{ src, theme: DEFAULT_THEME, motion }} calculateMetadata={isometricMetadata({ fps: 30, width: 1920, height: 1080 })} />
+```
+
+- `<IsometricScene>` takes the drawing's text (`src`), a theme's text, and what it may have: `motion` (default: the scene's own, else its steps), `scene`, `mode`,
+  `treatment: 'mono'`, `font`, `ambient: 'off'`; and `width`, `height`, `style`, `className`, `prefix` (its ids' beginning). A fault in the drawing or its motion is thrown, with every one said.
+- `isometricMetadata` makes the video as long as the motion. `useIsometricCues(props)` is the commentary now, for a caption of yours. `<IsometricSequences>` is a Remotion
+  `Sequence` for each beat, by its name, with what you put beside it.
+- In a `TransitionSeries`: `isometricTiming({ spring: { damping: 200 } })` (or `{ linear: 400 }`, `'1.2s'`, `'12f'`) is a document's transition as a timing, and
+  `isometricPresentation()` its fade. Both scenes fade, as a drawing has no ground of its own; `{ exiting: 'stay' }` keeps the one going out.
+- With no React: `drawingOf(props)`, `frameSvg(drawing, frame, fps)`, `cueAt`, `framesOf`, `timeOf`, the same numbers (the module itself imports both).
+
+`samples/remotion` in the repository is a small project of its own.
+
+**Remotion isn't open source, and using it needs Remotion's own licence** (`remotion.dev/license`). Rendering is your own setup, with Remotion's renderer:
+
+- Passing `licenseKey: 'free-license'` to it makes Remotion report each render to remotion.pro. With no `licenseKey`, Remotion 4 sends nothing.
+- The first render downloads a Chrome, unless you give `browserExecutable`.
+
+A document's curves beside Remotion's functions (tested against 4.0.546): `interpolate` gives the same numbers, however it extends; a `spring` is the same at
+every frame; `linear`, `bounce` and `{ bezier }` are `Easing`'s. `ease`, `ease-in`, `ease-out` and `ease-in-out` are **CSS's**: Remotion's
+`Easing.ease` is our `ease-in`, and `Easing.inOut(Easing.quad)` is near our `ease-in-out` and is not it.
+
+**Text.** A drawing is laid out with the system font's widths as measured on a Mac, so another computer's letters may not fit them exactly. For a video, use a font you load:
+**Arimo** (OFL 1.1, close to Helvetica). It is not in the package; the sample has the file, unmodified, with its licence.
+
+```tsx
+loadFont(isometricFonts({ url: staticFile('Arimo-wght.ttf') }));     // @remotion/fonts; your own file or URL
+<IsometricScene {...p} font="arimo" />
+```
+
+- `font: 'arimo'` lays the text out with Arimo's widths and asks for `Arimo, Arial, Helvetica, sans-serif`; the SVG says `data-font="arimo"`. It is never the default. Choosing it can move things:
+  labels are narrower or wider, and the layout follows. The widths are in code too: `compile(src, theme, { resolveVars: true, font: ARIMO })`, from `modules/iso-core/arimo`.
+- Arimo's weights are 400 to 700, so what is 800 is drawn as 700.
+- **No monospaced font is chosen**: that text stays the system's, and can differ from one computer to another.
+
+How it is tested: the components are mounted with react-dom through Remotion's `Internals`, with `remotion` pinned exactly. A Remotion update may break those tests without
+breaking you; the fix is in the tests' harness. Rendered video files are not tested here.
+
 ## Animating the SVG yourself
 
 Every part of a thing is in a wrapper of its own, with no transform and no class: `<g data-item=ID data-part=…>`

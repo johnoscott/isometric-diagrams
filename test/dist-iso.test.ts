@@ -256,14 +256,19 @@ test('a host\'s own bundle of the package is safe to inline too (minified or not
 test('a host that only renders installs the package and nothing else, and type-checks against /render and /systems with nothing else installed (0.7.1)', { timeout: 180000 }, async () => {
   await bundles();
   const pkg = JSON.parse(readFileSync(join(OUT, 'package.json'), 'utf8'));
-  for (const k of ['dependencies', 'peerDependencies', 'peerDependenciesMeta', 'optionalDependencies']) assert.equal(pkg[k], undefined, `no ${k}`);
+  for (const k of ['dependencies', 'optionalDependencies']) assert.equal(pkg[k], undefined, `no ${k}`);
+  // (0.17.0) /remotion's two and no more, both optional, and only in the npmjs build (the owner's decision): below, neither is installed
+  assert.deepEqual([pkg.peerDependencies, pkg.peerDependenciesMeta], [{ react: '>=18', remotion: '>=4.0.546' }, { react: { optional: true }, remotion: { optional: true } }]);
   const app = mkdtempSync(join(tmpdir(), 'iso-render-only-'));
   const [packed] = JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', app], { cwd: OUT, encoding: 'utf8' })) as { filename: string }[];
   writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'host', private: true, type: 'module' }));
   execFileSync('npm', ['i', '--offline', '--no-audit', '--no-fund', '--ignore-scripts', `./${packed.filename}`], { cwd: app, encoding: 'utf8' });
   const tree = JSON.parse(execFileSync('npm', ['ls', '--all', '--json'], { cwd: app, encoding: 'utf8' })) as { dependencies: Record<string, { dependencies?: object }> };
   assert.deepEqual(Object.keys(tree.dependencies), [PACKAGE]);
-  assert.equal(tree.dependencies[PACKAGE].dependencies, undefined, 'it brings nothing');
+  // (npm ls names an optional peer that isn't installed, with nothing in it)
+  assert.deepEqual(tree.dependencies[PACKAGE].dependencies, { react: {}, remotion: {} }, 'it brings nothing');
+  assert.deepEqual(readdirSync(join(app, 'node_modules')).filter(d => !d.startsWith('.')), [PACKAGE.split('/')[0]], 'nothing on disk but it');
+  assert.deepEqual(readdirSync(join(app, 'node_modules', PACKAGE.split('/')[0])), [PACKAGE.split('/')[1]]);
   const R = await import(pathToFileURL(join(OUT, 'iso-render.js')).href), Y = await import(pathToFileURL(join(OUT, 'iso-systems.js')).href);
   const uses = [...Object.entries(R as Record<string, object>).flatMap(([ns, m]) => Object.keys(m).map(k => `void R.${ns}.${k};`)),
     ...Object.entries(Y as Record<string, object>).flatMap(([ns, m]) => Object.keys(m).map(k => `void Y.${ns}.${k};`))];
@@ -314,6 +319,55 @@ test('the package\'s modules (0.9.0): its sources and their JavaScript, and exac
   assert.equal(execFileSync(process.execPath, ['run.mjs'], { cwd: app, encoding: 'utf8' }).trim(), JSON.stringify(['/boxes/a', { a: 1 }, 'object']));
 });
 
+test('the GitHub Packages build has no dependency of any kind (it drops peerDependenciesMeta: an optional peer would be installed)', { timeout: 120000 }, async () => {
+  const out = mkdtempSync(join(tmpdir(), 'iso-github-'));
+  try {
+    await buildIso(out, 'github');
+    const pkg = JSON.parse(readFileSync(join(out, 'package.json'), 'utf8'));
+    for (const k of ['dependencies', 'peerDependencies', 'peerDependenciesMeta', 'optionalDependencies']) assert.equal(pkg[k], undefined, `no ${k}`);
+    assert.deepEqual(pkg.publishConfig, { registry: 'https://npm.pkg.github.com' });
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test('/remotion (0.17.0): its own layers, no React, Remotion or font in it, nothing else imported; a host with both type-checks and draws a frame', { timeout: 180000 }, async () => {
+  await bundles();
+  const { remotionIso } = await import('../scripts/build-iso.ts');
+  const b = await remotionIso(mkdtempSync(join(tmpdir(), 'iso-remotion-'))), inputs = Object.keys(b.metafile.inputs);
+  assert.deepEqual(inputs.filter(i => i.startsWith('src/') && !/^src\/(iso-core|iso-objects|iso-viewer|iso-systems|remotion)\//.test(i)), []);
+  assert.deepEqual([...new Set(inputs.filter(i => i.includes('node_modules/')).map(i => /node_modules\/((?:@[^/]+\/)?[^/]+)/.exec(i)![1]))].sort(), ['yaml'], 'yaml; the schema is code already');
+  const ext = Object.values(b.metafile.outputs).flatMap(o => o.imports.filter(i => i.external).map(i => i.path));
+  assert.deepEqual([...new Set(ext)].sort(), ['react', 'remotion']);
+  console.log(`# iso-remotion.js: ${b.bytes} bytes, ${b.gzip} gzipped`);
+  const [r] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: OUT, encoding: 'utf8' })) as { files: { path: string }[] }[];
+  assert.deepEqual(r.files.map(f => f.path).filter(p => /\.(ttf|otf|woff2?)$|OFL|sample/i.test(p)), [], 'no font');
+  // a host that has both
+  const app = mkdtempSync(join(tmpdir(), 'iso-video-')), nm = (d: string) => new URL(`../node_modules/${d}`, import.meta.url).pathname;
+  cpSync(OUT, join(app, 'node_modules', PACKAGE), { recursive: true });
+  mkdirSync(join(app, 'node_modules/@types'), { recursive: true });
+  for (const d of ['react', 'remotion', '@types/react', 'csstype']) symlinkSync(nm(d), join(app, 'node_modules', d));
+  writeFileSync(join(app, 'main.tsx'), `
+import { IsometricScene, IsometricSequences, useIsometricCues, isometricMetadata, isometricTiming, isometricPresentation, isometricFonts, DEFAULT_THEME, type DrawingProps } from '${PACKAGE}/remotion';
+import { Composition } from 'remotion';
+const p: DrawingProps = { src: '', theme: DEFAULT_THEME, font: 'arimo' };
+export const Story = (q: DrawingProps) => <><IsometricScene {...q} width={800} /><IsometricSequences {...q}>{b => <i>{b.name}</i>}</IsometricSequences><b>{useIsometricCues(q)?.say?.text}</b></>;
+export const Root = () => <Composition id="Story" component={Story} defaultProps={p} calculateMetadata={isometricMetadata({ fps: 30, width: 1920, height: 1080 })} />;
+export const n: number = isometricTiming({ spring: { damping: 200 } }).getDurationInFrames({ fps: 30 });
+export const c = isometricPresentation({ exiting: 'stay' }).component, f: string = isometricFonts({ url: 'a.ttf' }).family;
+// @ts-expect-error no such font
+export const bad: DrawingProps = { src: '', theme: '', font: 'helvetica' };
+`);
+  writeFileSync(join(app, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', jsx: 'react-jsx', strict: true, noEmit: true, skipLibCheck: true, lib: ['ES2022', 'DOM'], types: [] }, files: ['main.tsx'] }));
+  let out = '';
+  try { execFileSync(new URL('../node_modules/.bin/tsc', import.meta.url).pathname, ['-p', app], { cwd: app, encoding: 'utf8' }); }
+  catch (e) { out = String((e as { stdout?: string }).stdout ?? e); }
+  assert.equal(out, '', 'tsc over the video');
+  // its frames, in Node, are this repository's
+  const src = readFileSync(new URL('./fixtures/motion/stepped-build.yaml', import.meta.url), 'utf8'), { parse } = await import('yaml'), motion = parse(readFileSync(new URL('./fixtures/motion/stepped-build.motion.yaml', import.meta.url), 'utf8'));
+  const V = await import(pathToFileURL(join(app, 'node_modules', PACKAGE, 'iso-remotion.js')).href), H = await import('../src/remotion/frames.ts');
+  const p = { src, theme: V.DEFAULT_THEME, motion };
+  for (const o of [{}, { font: 'arimo' }, { treatment: 'mono' }]) assert.ok(V.frameSvg(V.drawingOf({ ...p, ...o }), 700, 30) === H.frameSvg(H.drawingOf({ ...p, ...o } as never), 700, 30), JSON.stringify(o));
+});
+
 test('/transport and /player (0.16.0): the transport alone; <isometric-diagram>, one script of L0–L2, the systems pack and no editor, that Node can import', async () => {
   await bundles();
   const pkg = JSON.parse(readFileSync(join(OUT, 'package.json'), 'utf8')) as { exports: Record<string, { default: string } | string>; sideEffects: string[] };
@@ -357,5 +411,12 @@ test('a fresh host type-checks an import of every subpath, strict, with nothing 
   assert.equal(check('bundler', 'ESNext', true), '', 'bundler, nothing else installed');
   assert.equal(check('nodenext', 'NodeNext', true), '', 'nodenext, nothing else installed');
   for (const dep of ['yaml', 'ajv', 'monaco-editor']) symlinkSync(new URL(`../node_modules/${dep}`, import.meta.url).pathname, join(app, 'node_modules', dep));
+  // /remotion's declarations name React's types: only who imports it needs them
+  const all = readFileSync(join(app, 'main.ts'), 'utf8'), k = typed.findIndex(([x]) => x === './remotion');
+  writeFileSync(join(app, 'main.ts'), all.split('\n').filter(l => !l.includes(`/remotion'`) && !l.startsWith(`export const u${k}:`)).join('\n'));
   assert.equal(check('bundler', 'ESNext', false), '', 'bundler, without skipLibCheck');
+  writeFileSync(join(app, 'main.ts'), all);
+  mkdirSync(join(app, 'node_modules/@types'), { recursive: true });
+  for (const dep of ['@types/react', 'csstype']) symlinkSync(new URL(`../node_modules/${dep}`, import.meta.url).pathname, join(app, 'node_modules', dep));
+  assert.equal(check('bundler', 'ESNext', false), '', 'and /remotion, given React\'s types');
 });

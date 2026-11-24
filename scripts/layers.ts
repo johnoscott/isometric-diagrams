@@ -24,8 +24,8 @@ export interface Layer {
 const DOMAIN_DATA = ['schema/', 'themes/', 'examples/'];
 export const LAYERS: Layer[] = [
   // compile-schema.ts makes an ajv validator when it loads, and schema-errors.ts uses it: entries of their own, never
-  // in index.ts (a bundle that never validates never carries ajv)
-  { name: 'iso-core', dir: 'src/iso-core', rank: 0, generic: true, entries: ['compile-schema.ts', 'schema-errors.ts'] },
+  // in index.ts (a bundle that never validates never carries ajv). arimo.ts is a font's widths: only who asks for it has them
+  { name: 'iso-core', dir: 'src/iso-core', rank: 0, generic: true, entries: ['compile-schema.ts', 'schema-errors.ts', 'arimo.ts'] },
   { name: 'iso-objects', dir: 'src/iso-objects', rank: 1, generic: true },
   { name: 'iso-viewer', dir: 'src/iso-viewer', rank: 2, generic: true },
   // ui/text.ts loads Monaco and sets up its thread when it loads: an entry of its own (the text feature imports it)
@@ -39,7 +39,7 @@ export const mayImport = (from: Layer, to: Layer) =>
 
 /** The apps: the programs built on the layers (the CLI, the proof sheet). They may use any layer, the generic ones
  *  (L0–L3) only through their public modules; no layer may import them. */
-export const APPS = ['src/cli', 'src/proof', 'src/player'];
+export const APPS = ['src/cli', 'src/proof', 'src/player', 'src/remotion'];
 export const appOf = (rel: string) => APPS.find(d => rel.startsWith(d + '/'));
 /** every source under src/ that is in neither a layer nor an app (R1 S8: none) */
 export const unplaced = () => filesOf('src').filter(f => !layerOf(f) && !appOf(f));

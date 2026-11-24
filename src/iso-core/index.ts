@@ -8,7 +8,7 @@
 // that never validates never carries ajv. shims/ are the browser's node:path and node:crypto, which the build aliases.
 
 // Named, not export *: with code splitting, esbuild keeps every module an export * reaches.
-export { S, C, iso, n1, pt, esc, tag, FONTS, textWidth, apply, matStr, faceFrame, Bounds, Kernel, center } from './kernel.ts';
+export { S, C, iso, n1, pt, esc, tag, FONTS, textWidth, withFont, apply, matStr, faceFrame, Bounds, Kernel, center } from './kernel.ts';
 export type { P2, P3, Box, Attrs, FontKey, Font, Mat, Face, TextRect } from './kernel.ts';
 export { termLines, envelope, bubble, fileLines, keyGlyph, socketGlyph, screenFaces, screenGlass, placeholderFace } from './glyphs.ts';
 export type { FacePainter } from './glyphs.ts';

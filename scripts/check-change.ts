@@ -26,6 +26,7 @@ export const TOUCHES: [RegExp, string[]][] = [
   [/^src\/(iso-core|iso-objects)\//, ['*']],
   [/^src\/iso-systems\//, ['motion', 'player', 'page-player', 'isometric-diagram', 'render', 'grid-assemble', 'focus', 'ants-chrome', 'timeline-chrome', 'boxes', 'dual-view']],
   [/^src\/iso-viewer\/(page|player|bundle|transport|play|dom)/, ['player', 'page-player', 'isometric-diagram', 'render', 'grid-assemble', 'focus']],
+  [/^src\/remotion\//, ['frames', 'remotion', 'remotion-mapping']],
   [/^src\/player\//, ['player', 'isometric-diagram', 'dist-iso']],
   [/^(themes|examples|corpus)\//, ['render', 'grid-assemble', 'focus']],
   [/^scripts\/(build-iso|precompile|layers)\./, ['dist-iso']],
@@ -33,6 +34,7 @@ export const TOUCHES: [RegExp, string[]][] = [
   [/^(test\/adapters\/page-driver|scripts\/chrome)\./, ['boxes', 'player', 'page-player', 'isometric-diagram', 'motion', 'site']],
   [/^test\/adapters\/boxes/, ['boxes', 'drag-feel', 'dual-view']],
   [/^test\/adapters\/player-page/, ['player']],
+  [/^test\/adapters\/remotion-page/, ['remotion']],
   [/^test\/adapters\/motion-page/, ['motion']],
 ];
 /** every test that drives Chrome, by what it is made of */

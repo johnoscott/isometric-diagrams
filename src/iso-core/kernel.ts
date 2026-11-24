@@ -48,8 +48,18 @@ export const FONTS = {
   badge: { key: 'sans800_11_5', size: 11.5 },
 } satisfies Record<string, Font>;
 
+/** Another font's widths, by its name: never the default, and a drawing laid out with it says so. What it has no table for is the default's. */
+export interface FontTable { name: string; /** its font-family, with what stands in for it */ sans: string; /** the mono text's, when it has one */ mono?: string; widths: Partial<Record<FontKey, Record<string, number>>> }
+let using: FontTable | undefined;
+/** runs `fn` (now: it may not wait for anything) with its text measured as that font's */
+export function withFont<T>(f: FontTable | undefined, fn: () => T): T {
+  const was = using;
+  using = f;
+  try { return fn(); } finally { using = was; }
+}
+
 export function textWidth(str: string, f: Font): number {
-  const table = metrics[f.key] as Record<string, number>;
+  const table = (using?.widths[f.key] ?? metrics[f.key]) as Record<string, number>;
   const avg = f.key.startsWith('mono') ? 0.6 : 0.58;
   let w = 0;
   for (const ch of str) w += table[ch] ?? avg;

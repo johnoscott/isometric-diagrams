@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { compile } from '../src/iso-systems/compile.ts';
 
 const THEME = readFileSync(new URL('../themes/default.yaml', import.meta.url), 'utf8');
@@ -20,9 +20,9 @@ for (const doc of ['docs/FORMAT.md', 'README.md']) {
 const RECORDS: Record<string, string> = {
   'CHANGELOG.md': 'each entry names the files as they were',
 };
-test('every src/ path the docs name exists (records of a moment excepted)', async () => {
+// (git says which files are the repository's own: an unpacked copy has no list)
+test('every src/ path the docs name exists (records of a moment excepted)', { skip: existsSync(new URL('../.git', import.meta.url)) ? false : 'not a git checkout' }, async () => {
   const { execFileSync } = await import('node:child_process');
-  const { existsSync } = await import('node:fs');
   const root = new URL('..', import.meta.url).pathname;
   const docs = execFileSync('git', ['ls-files', '*.md'], { cwd: root, encoding: 'utf8' }).split('\n').filter(f => f && !f.startsWith('vendor/') && !(f in RECORDS));
   assert.ok(docs.length >= 5, `${docs.length} docs`);

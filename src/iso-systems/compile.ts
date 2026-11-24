@@ -7,10 +7,11 @@ import { place } from '../iso-objects/place.ts';
 import { extendTheme, loadTheme, type Theme } from '../iso-core/theme.ts';
 import type { RawDiagram } from '../iso-objects/types.ts';
 import { compileRaw, type Compiled } from '../iso-objects/compile.ts';
-import { resolveSvg, type ThemeMode } from '../iso-objects/resolve.ts';
+import { FONT_STACKS, resolveSvg, type ThemeMode } from '../iso-objects/resolve.ts';
 import { monoOfDrawing, paintMono } from '../iso-objects/mono-paint.ts';
 import type { MonoTable } from '../iso-core/mono.ts';
 import type { CompiledScene } from '../iso-objects/compile.ts';
+import { withFont, type FontTable } from '../iso-core/kernel.ts';
 import { bindMotion } from '../iso-objects/timeline.ts';
 import type { MotionDoc } from '../iso-objects/motion-doc.ts';
 import { antsOf } from '../iso-objects/ants.ts';
@@ -31,6 +32,8 @@ export interface CompileOptions {
   treatment?: 'mono' | 'none';
   /** a host's own table, over the treatment's */
   mono?: MonoTable;
+  /** (0.17.0) a self-contained drawing laid out with another font's widths (Arimo's: modules/iso-core/arimo), and asking for it. The host loads the font */
+  font?: FontTable;
   /** a file with an error draws nothing: `scenes` is empty (true), or it throws ('throw'). Default: what could be laid
    *  out is in `scenes` all the same, with `ok` false */
   strict?: boolean | 'throw';
@@ -43,7 +46,8 @@ export class CompileError extends Error {
 }
 
 export function compile(source: string, themeText: string, opts: CompileOptions = {}): Compiled {
-  const c = compileAll(source, themeText, opts);
+  if (opts.font && !opts.resolveVars) throw new Error('font: a self-contained drawing\'s (resolveVars)');
+  const c = withFont(opts.font, () => compileAll(source, themeText, opts)), fonts = opts.font && { sans: opts.font.sans, mono: opts.font.mono ?? FONT_STACKS.mono };
   if (!c.ok && opts.strict === 'throw') throw new CompileError(c.diags);
   if (!c.ok && opts.strict) c.scenes = [];
   if (opts.stepMs !== undefined) for (const s of c.scenes) for (const st of s.steps.steps) st.duration = opts.stepMs;
@@ -53,23 +57,25 @@ export function compile(source: string, themeText: string, opts: CompileOptions 
   const theme = c.theme;
   if (opts.resolveVars) for (const s of c.scenes) {
     const mode = opts.mode ?? 'light', css = drawingCss(systems) + MARKS_CSS + GRID_CSS;
-    if (treatment) { toMono(s, theme!, mode, css, opts.mono); continue; }
-    const o = { mode, theme: c.theme!, css } as const;
+    if (treatment) { toMono(s, theme!, mode, css, opts.mono, fonts); continue; }
+    const o = { mode, theme: c.theme!, css, fonts } as const;
     s.rendered.svg = resolveSvg(s.rendered.svg, o);
     if (s.rendered.variants) s.rendered.variants = Object.fromEntries(Object.entries(s.rendered.variants).map(([k, v]) => [k, resolveSvg(v, o)]));
     s.rendered.inks = { surface: c.theme![o.mode].surface ?? c.theme!.light.surface, control: c.theme![o.mode].control ?? c.theme!.light.control,
       kinds: Object.fromEntries(Object.entries(c.theme!.kinds).map(([k, v]) => [k, c.theme![o.mode][v.color] ?? v.color])) };
   }
+  // it says which font it was laid out with (nothing: the default)
+  if (opts.font) for (const s of c.scenes) { const name = opts.font.name, mark = (svg: string) => svg.replace('<svg ', `<svg data-font="${name.replace(/[^\w-]/g, '')}" `); s.rendered.svg = mark(s.rendered.svg); if (s.rendered.variants) s.rendered.variants = Object.fromEntries(Object.entries(s.rendered.variants).map(([k, v]) => [k, mark(v)])); }
   // its connectors march in their own rhythms
   if (opts.resolveVars && treatment && theme) c.theme = { ...theme, kinds: Object.fromEntries(Object.entries(theme.kinds).map(([k, v]) => { const d = c.scenes.map(s => s.rendered.mono?.kinds[k]?.dash).find(x => x && x.length > 1); return [k, d ? { ...v, ants: [d[0], d[1]] as [number, number] } : v]; })) };
   return c;
 }
 
 /** a scene in black and white: its drawing and its looks alike, by one table */
-function toMono(s: CompiledScene, theme: Theme, mode: ThemeMode, css: string, own?: MonoTable) {
+function toMono(s: CompiledScene, theme: Theme, mode: ThemeMode, css: string, own?: MonoTable, fonts?: { sans: string; mono: string }) {
   const all = [s.rendered.svg, ...Object.values(s.rendered.variants ?? {})];
   const m = monoOfDrawing(all.join(''), theme, mode, [...s.routes.map(r => r.kind), ...s.steps.kindsUsed], own);
-  const draw = (svg: string) => paintMono(resolveSvg(svg, { mode, theme: m.theme, css: css + m.css }), m.look, s.id);
+  const draw = (svg: string) => paintMono(resolveSvg(svg, { mode, theme: m.theme, css: css + m.css, fonts }), m.look, s.id);
   s.rendered.svg = draw(s.rendered.svg);
   if (s.rendered.variants) s.rendered.variants = Object.fromEntries(Object.entries(s.rendered.variants).map(([k, v]) => [k, draw(v)]));
   s.rendered.inks = { surface: m.look.paper, control: m.look.ink, kinds: Object.fromEntries(Object.keys(theme.kinds).map(k => [k, m.look.ink])) };

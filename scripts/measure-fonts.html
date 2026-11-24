@@ -2,7 +2,9 @@
 // Measures per-character advance widths for the fonts isodiag draws with, at 100px, in this browser.
 // Run: node scripts/measure-fonts.mjs  (writes src/iso-core/metrics.json)
 // Measured at the size each is drawn at: system-ui (SF Pro) changes its optical size with the pixel size.
-const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', MONO = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+// (0.17.0) #FAMILY,URL: that font's sans alone, from its file (the system's has the rest), for a table by name.
+const [family, url] = decodeURIComponent(location.hash.slice(1)).split(',');
+const SANS = family ? `"${family}"` : 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', MONO = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
 const FONTS = {
   sans700_13: [700, 13, SANS], sans800_15: [800, 15, SANS], sans800_10_5: [800, 10.5, SANS], sans600_12: [600, 12, SANS],
   sans800_12: [800, 12, SANS], sans800_11_5: [800, 11.5, SANS], sans400_13: [400, 13, SANS],
@@ -11,8 +13,14 @@ const FONTS = {
 let chars = '';
 for (let c = 32; c < 127; c++) chars += String.fromCharCode(c);
 chars += '·→←↑↓’‘“”…–—✕×≈≤≥~é';
+if (family) for (const k in FONTS) if (k.startsWith('mono')) delete FONTS[k];
 const cv = document.createElement('canvas').getContext('2d');
 const out = {};
+(async () => {
+if (family) {
+  const face = new FontFace(family, `url("${url}")`, { weight: '400 700' });
+  document.fonts.add(await face.load());
+}
 for (const [k, [wt, px, fam]] of Object.entries(FONTS)) {
   cv.font = `${wt} ${px}px ${fam}`; const t = {};
   // em units, 4 decimals; measured over 20 copies so kerning-free advances average out rounding
@@ -20,4 +28,5 @@ for (const [k, [wt, px, fam]] of Object.entries(FONTS)) {
   out[k] = t;
 }
 document.getElementById('out').textContent = JSON.stringify(out);
+})();
 </script>
