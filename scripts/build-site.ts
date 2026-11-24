@@ -34,6 +34,7 @@ export const DOCS: [string, string, string, string][] = [
   ['docs/ASSETS.md', 'assets', 'Assets', 'Every node and region kind with a picture; colour roles; decorations.'],
   ['docs/EDITOR-GUIDE.md', 'editor-guide', 'Editor guide', 'Write an editor of your own on the engine: the adapter, the view, a page, its tests.'],
   ['docs/FLAT-VIEW.md', 'flat-view', 'The 2D view', 'The board layout, the 2D view, and the morph between 3D and 2D.'],
+  ['docs/MOTION.md', 'motion', 'Motion', 'Assemble and disassemble as functions of time: plans, states, frames, and drawings that carry their own colours.'],
   ['docs/LAYERS.md', 'layers', 'The layers', 'L0 core to L3 editor and the kind pack: what may import what, and the package.'],
 ];
 /** the gallery: every neutral drawing */

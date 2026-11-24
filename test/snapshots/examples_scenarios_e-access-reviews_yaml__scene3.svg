@@ -14,37 +14,58 @@
 </marker>
 </defs>
 <g class="g-base">
+<g data-item="api-area" data-part="block">
 <g class="blk k-slab" data-id="api-area" data-dim="1">
 <polygon points="-312.1,207.4 223.8,516.8 223.8,477.7 -312.1,168.3" class="lft"/>
 <polygon points="535.9,336.6 223.8,516.8 223.8,477.7 535.9,297.5" class="rgt"/>
 <polygon points="0,-11.9 535.9,297.5 223.8,477.7 -312.1,168.3" class="top"/>
 <path class="grid" d="M29.4,5L-282.7,185.2M58.9,22L-253.2,202.2M88.3,39L-223.8,219.2M117.8,56L-194.3,236.2M147.2,73L-164.9,253.2M176.7,90L-135.4,270.2M206.1,107L-106,287.2M235.6,124L-76.6,304.2M265,141L-47.1,321.2M294.4,158L-17.7,338.2M323.9,175L11.8,355.2M353.3,192L41.2,372.2M382.8,209L70.7,389.2M412.2,226L100.1,406.2M441.7,243L129.6,423.2M471.1,260L159,440.2M500.6,277L188.4,457.2M530,294L217.9,474.2M-29.4,5L506.5,314.4M-58.9,22L477,331.4M-88.3,39L447.6,348.4M-117.8,56L418.1,365.4M-147.2,73L388.7,382.4M-176.7,90L359.2,399.4M-206.1,107L329.8,416.4M-235.6,124L300.3,433.4M-265,141L270.9,450.4M-294.4,158L241.4,467.4"/>
 </g>
+</g>
+<g data-item="api-area" data-part="name">
 <g data-id="api-area" data-dim="1">
 <text transform="matrix(0.866 0.5 0 1 -294.4486 208.08)" class="slabname">Proxy · stream · inbox</text>
 </g>
 </g>
+</g>
 <g class="g-floor">
+<g data-route="r10" data-part="label">
 <text transform="matrix(0.866 0.5 -0.866 0.5 25.617 79.73)" class="floor mono t-reply" data-hl="r10">replica</text>
+</g>
+<g data-route="r11" data-part="label">
 <text transform="matrix(0.866 0.5 -0.866 0.5 219.9531 191.93)" class="floor mono t-send" data-hl="r11">bucket portal</text>
+</g>
+<g data-route="r12" data-part="label">
 <text transform="matrix(0.866 -0.5 0.866 0.5 62.3389 245.3086)" class="floor mono t-blocked" data-hl="r12">main console</text>
+</g>
+<g data-route="r13" data-part="label">
 <text transform="matrix(0.866 -0.5 0.866 0.5 78.309 266.2282)" class="floor mono t-control" data-hl="r13">cluster standby</text>
 </g>
+</g>
 <g class="g-flows">
+<g data-route="r10" data-part="line">
 <g data-hl="r10" data-id="r10">
 <path d="M10.3,78.7 L125.1,145" class="flow f-reply" marker-end="url(#ah-scene3-reply)"/>
 </g>
+</g>
+<g data-route="r11" data-part="line">
 <g data-hl="r11" data-id="r11">
 <path d="M204.6,190.9 L340.1,269.1 L348.9,264 L357.8,269.1" class="flow f-send" marker-end="url(#ah-scene3-send)"/>
 </g>
+</g>
+<g data-route="r12" data-part="line">
 <g data-hl="r12" data-id="r12">
 <path d="M125.1,190.9 L10.3,257.2" class="flow f-blocked" marker-end="url(#ah-scene3-blocked)"/>
 </g>
+</g>
+<g data-route="r13" data-part="line">
 <g data-hl="r13" data-id="r13">
 <path d="M340.1,279.3 L204.6,201.1 L33.9,299.7 L10.3,286.1" class="flow f-control" marker-end="url(#ah-scene3-control)"/>
 </g>
 </g>
+</g>
 <g class="g-blocks">
+<g data-item="index" data-part="block">
 <g class="blk k-file" data-id="index" data-dim="1">
 <polygon points="-61.8,64.6 -14.7,91.8 -14.7,71.4 -61.8,44.2" class="lft"/>
 <polygon points="32.4,64.6 -14.7,91.8 -14.7,71.4 32.4,44.2" class="rgt"/>
@@ -52,6 +73,8 @@
 <line x1="-23.6" y1="32.3" x2="5.9" y2="49.3" class="det"/>
 <line x1="-35.3" y1="39.1" x2="-14.7" y2="51" class="det"/>
 </g>
+</g>
+<g data-item="web" data-part="block">
 <g class="blk k-lead" data-id="web" data-dim="1">
 <polygon points="88.3,168.3 164.9,212.5 164.9,151.3 88.3,107.1" class="lft"/>
 <polygon points="241.4,168.3 164.9,212.5 164.9,151.3 241.4,107.1" class="rgt"/>
@@ -61,11 +84,15 @@
 <line x1="98.6" y1="154.7" x2="130.8" y2="173.2" class="det"/>
 <line x1="98.6" y1="166.9" x2="125.4" y2="182.4" class="det"/>
 </g>
+</g>
+<g data-item="report" data-part="block">
 <g class="blk k-folder" data-id="report" data-dim="1">
 <polygon points="-61.8,272 -14.7,299.2 -14.7,282.2 -61.8,255" class="lft"/>
 <polygon points="32.4,272 -14.7,299.2 -14.7,282.2 32.4,255" class="rgt"/>
 <polygon points="-14.7,227.8 32.4,255 -14.7,282.2 -61.8,255" class="top"/>
 </g>
+</g>
+<g data-item="ledger" data-part="block">
 <g class="blk k-work" data-id="ledger" data-dim="1">
 <polygon points="312.1,297.5 388.7,341.7 388.7,280.5 312.1,236.3" class="lft"/>
 <polygon points="465.2,297.5 388.7,341.7 388.7,280.5 465.2,236.3" class="rgt"/>
@@ -76,24 +103,33 @@
 <line x1="322.4" y1="296.1" x2="349.2" y2="311.6" class="det"/>
 </g>
 </g>
+</g>
 <g class="g-air">
 </g>
 <g class="g-labels">
+<g data-item="web" data-part="label">
 <g data-id="web" data-dim="1">
 <text x="164.9" y="14.9" class="lbl" text-anchor="middle">primary</text>
 <text x="164.9" y="28.9" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
 </g>
+</g>
+<g data-item="ledger" data-part="label">
 <g data-id="ledger" data-dim="1">
 <text x="388.7" y="168.1" class="lbl" text-anchor="middle">inbox</text>
 <text x="388.7" y="182.1" class="sub mono" text-anchor="middle">spare outbox tracer</text>
 </g>
+</g>
+<g data-item="report" data-part="label">
 <g data-id="report" data-dim="1">
 <text x="-14.7" y="203.8" class="lbl" text-anchor="middle">Primary runner</text>
 <text x="-14.7" y="217.8" class="sub mono" text-anchor="middle">orders replica client</text>
 </g>
+</g>
+<g data-item="index" data-part="label">
 <g data-id="index" data-dim="1">
 <text x="-14.7" y="-19" class="lbl" text-anchor="middle">report volume</text>
 <text x="-14.7" y="-5" class="sub mono" text-anchor="middle">bucket portal</text>
+</g>
 </g>
 </g>
 <g class="g-marks">

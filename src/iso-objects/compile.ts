@@ -9,10 +9,13 @@ import { routeAll, type Routed } from './route.ts';
 import { resolveSteps, type Steps } from './steps.ts';
 import { extendTheme, loadTheme } from '../iso-core/theme.ts';
 import { type KindCatalog, nodeKindOr } from './kinds.ts';
+import type { MotionDoc } from './motion-doc.ts';
 import type { GridDef, RawDiagram, RawNode, RawRegion, RawScene, Theme } from './types.ts';
 import { facePainter, iconPainter } from './assets.ts';
 
-export interface CompiledScene { id: string; raw: RawDiagram['scenes'][number]; layout: Layout; routes: Routed[]; steps: Steps; rendered: RenderedScene; grid: GridDef; assemble: boolean }
+export interface CompiledScene { id: string; raw: RawDiagram['scenes'][number]; layout: Layout; routes: Routed[]; steps: Steps; rendered: RenderedScene; grid: GridDef; assemble: boolean;
+  /** the file's `motion:` on this scene, checked against the drawing (a file with errors in it has none) */
+  motion?: MotionDoc }
 export interface Compiled {
   ok: boolean;
   /** the parsed source: positions and spans of every value, for the proof sheet */

@@ -25,6 +25,13 @@ export interface RenderedScene {
   paths: Record<string, string>;
   /** things drawn worse than asked, e.g. a route label shortened or dropped */
   warnings: RenderWarning[];
+  /** (0.15.0) a self-contained drawing's own colours, for what a state adds to it (a token's rim and fill) */
+  inks?: { surface: string; control: string; kinds?: Record<string, string> };
+  /** the drawing with every thing that has a look of this name in it, as SVG text (what a switch takes the thing's parts from);
+   *  none when nothing declares one */
+  variants?: Record<string, string>;
+  /** the looks each thing declares */
+  looks?: Record<string, string[]>;
   /** the assemble intro's timeline */
   assembly: Assembly;
   /** callout pills in screen px, per step, for layout tests */
@@ -33,6 +40,14 @@ export interface RenderedScene {
 export interface RenderWarning { path: string; message: string }
 
 interface Item { box: Box; svg: string }
+
+/** (0.15.0) A thing's parts in a layer, in a wrapper of their own: `<g data-item=ID data-part=…>` (block, wall-1…, gate,
+ *  name, label, note), a route's `<g data-route=ID data-part=…>` (line, with its arrowhead's marker; label). A wrapper has
+ *  no transform and no class: a host (and motion.ts) moves and fades wrappers, never what is inside them, whose texts
+ *  have transforms, and whose classes have opacities, of their own. One wrapper a part and a layer, not one a thing: its
+ *  block, walls and label are painted in different layers, among other things' (its data-id stays on every part of it;
+ *  data-item and data-part together are one wrapper's). */
+const wrap = (id: string, part: string, svg: string, what: 'item' | 'route' = 'item') => (svg ? tag('g', { [`data-${what}`]: id, 'data-part': part }, svg) : '');
 
 export interface SceneInput { scene: RawScene; layout: Layout; routes: Routed[]; steps: Steps; theme: Theme; id: string; gridStep?: number }
 
@@ -53,20 +68,20 @@ export function renderScene({ scene, layout, routes, steps, theme, id, gridStep 
   for (const r of ordered) L.base += drawFlatRegion(k, cat, r, visAttr(r.id), gridStep);
   for (const r of regions.filter(r => shapeOf(cat, r) === 'walled')) {
     for (const w of wallsOf(r)) obs.solids.push(silhouette(w));
-    for (const w of wallsOf(r)) L.blocks.push({ box: w, svg: tag('g', { class: `blk k-${regionRole(cat, r.region!)} wall${r.region!.ghost ? ' ghost' : ''}`, 'data-id': r.id, 'data-dim': '1', ...visAttr(r.id) }, k.blockFaces(w)) });
+    for (const [i, w] of wallsOf(r).entries()) L.blocks.push({ box: w, svg: wrap(r.id, `wall-${i + 1}`, tag('g', { class: `blk k-${regionRole(cat, r.region!)} wall${r.region!.ghost ? ' ghost' : ''}`, 'data-id': r.id, 'data-dim': '1', ...visAttr(r.id) }, k.blockFaces(w))) });
     const g = r.region!.gate;
     if (g && !g.node) {
       const b = gateBox(r, g.height ?? (r.region!.height ?? 0.8) + 0.3, 0.3, 0.3);
       obs.solids.push(silhouette(b));
-      L.blocks.push({ box: b, svg: tag('g', { class: 'blk k-gate', 'data-id': r.id, ...visAttr(r.id) }, k.blockFaces(b)) });
+      L.blocks.push({ box: b, svg: wrap(r.id, 'gate', tag('g', { class: 'blk k-gate', 'data-id': r.id, ...visAttr(r.id) }, k.blockFaces(b))) });
     }
     if (r.region!.label && (r.region!['label-style'] ?? 'face') !== 'none') {
-      L.labels += k.faceText(r.box.x0 + 0.3, r.box.y1, r.box.z0 + 0.13, r.region!.label, 'slabname sm fz', FONTS.sm, 'left', 'start', { 'data-id': r.id, ...visAttr(r.id) });
+      L.labels += wrap(r.id, 'name', k.faceText(r.box.x0 + 0.3, r.box.y1, r.box.z0 + 0.13, r.region!.label, 'slabname sm fz', FONTS.sm, 'left', 'start', { 'data-id': r.id, ...visAttr(r.id) }));
     }
   }
 
   // ---- tunnels: translucent tubes in the air layer ----
-  for (const r of regions.filter(r => shapeOf(cat, r) === 'tunnel')) L.air += drawTunnel(k, r, visAttr(r.id));
+  for (const r of regions.filter(r => shapeOf(cat, r) === 'tunnel')) L.air += wrap(r.id, 'block', drawTunnel(k, r, visAttr(r.id)));
 
   // ---- nodes ----
   const nodes = layout.items.filter(p => p.type === 'node');
@@ -74,7 +89,7 @@ export function renderScene({ scene, layout, routes, steps, theme, id, gridStep 
     const n = p.node!, a = nodeKindOr(cat, n.asset);
     const ghost = n.ghost || (n.deco ?? []).includes('ghost');
     const cls = ['blk', `k-${n.role ?? a.role}`, a.cls, ghost ? 'ghost' : ''].filter(Boolean).join(' ');
-    L.blocks.push({ box: p.box, svg: tag('g', { class: cls, 'data-id': p.id, 'data-dim': '1', ...visAttr(p.id) }, a.draw(k, p.box, n)) });
+    L.blocks.push({ box: p.box, svg: wrap(p.id, 'block', tag('g', { class: cls, 'data-id': p.id, 'data-dim': '1', ...visAttr(p.id) }, a.draw(k, p.box, n))) });
     obs.polys.push({ poly: silhouette(p.box), owner: p.id });
     obs.solids.push(silhouette(p.box));
   }
@@ -91,8 +106,8 @@ export function renderScene({ scene, layout, routes, steps, theme, id, gridStep 
     paths[r.id] = d;
     const arrow = r.raw.arrow !== false;
     if (arrow) markers.add(r.kind);
-    L.flows += tag('g', { 'data-hl': r.id, 'data-id': r.id, ...visAttr(r.id) },
-      tag('path', { d, class: `flow f-${r.kind}`, 'marker-end': arrow ? `url(#ah-${id}-${r.kind})` : undefined }));
+    L.flows += wrap(r.id, 'line', tag('g', { 'data-hl': r.id, 'data-id': r.id, ...visAttr(r.id) },
+      tag('path', { d, class: `flow f-${r.kind}`, 'marker-end': arrow ? `url(#ah-${id}-${r.kind})` : undefined })), 'route');
     obs.lines.push({ pts: scr, owner: r.id });
   }
   for (const kd of markers) {
@@ -105,13 +120,13 @@ export function renderScene({ scene, layout, routes, steps, theme, id, gridStep 
   // ---- node labels: biggest first, each clear of nodes, routes and the labels before it ----
   const labelled = nodes.filter(p => p.node!.label || p.node!.sub)
     .sort((a, b) => (b.box.x1 - b.box.x0) * (b.box.y1 - b.box.y0) - (a.box.x1 - a.box.x0) * (a.box.y1 - a.box.y0));
-  for (const p of labelled) L.labels += nodeLabel(k, cat, p, obs, visAttr(p.id));
+  for (const p of labelled) L.labels += wrap(p.id, 'label', nodeLabel(k, cat, p, obs, visAttr(p.id)));
 
   // ---- route labels and notes ----
   const warnings: RenderWarning[] = [];
   for (const r of routes) if (r.raw.label && r.points.length >= 2) {
     const out = routeLabel(k, r, obs, visAttr(r.id), layout);
-    L.floor += out.svg;
+    L.floor += wrap(r.id, 'label', out.svg, 'route');
     if (out.warning) warnings.push({ path: `${r.path}/label`, message: out.warning });
     if (obs.budget.over && !obs.budget.told) {
       obs.budget.told = true;
@@ -119,7 +134,7 @@ export function renderScene({ scene, layout, routes, steps, theme, id, gridStep 
     }
   }
   (scene.notes ?? []).forEach((note, i) => {
-    const s = drawNote(k, note, layout, routes, `${id}-note-${i}`);
+    const s = wrap(`${id}-note-${i}`, 'note', drawNote(k, note, layout, routes, `${id}-note-${i}`));
     if (note.floor) L.floor += s; else L.labels += s;
   });
 
@@ -180,6 +195,7 @@ function drawFlatRegion(k: Kernel, cat: KindCatalog, r: Placed, vis: Attrs, grid
   if (shape === 'cloud') s = tag('g', { class: `blk k-${role} cloud`, ...attrs }, drawCloud(k, b));
   else if (shape === 'zone') s = tag('g', { class: `zone k-${role}`, ...attrs }, k.poly([[b.x0, b.y0, b.z1], [b.x1, b.y0, b.z1], [b.x1, b.y1, b.z1], [b.x0, b.y1, b.z1]]));
   else s = tag('g', { class: `blk k-${role}${R.ghost ? ' ghost' : ''}`, ...attrs }, k.blockFaces(b) + gridLines(b, gridStep));
+  s = wrap(r.id, 'block', s);
   const style = R['label-style'] ?? rk?.labelStyle;
   if (R.label && style !== 'none') {
     if (style === 'face') {
@@ -187,13 +203,13 @@ function drawFlatRegion(k: Kernel, cat: KindCatalog, r: Placed, vis: Attrs, grid
       const h = b.z1 - b.z0, cap = (f: { size: number }) => (f.size * 0.73) / S, thin = shape === 'slab' && 0.28 + cap(FONTS.slabname) + 0.08 > h;
       const big = shape === 'slab' && !thin;
       const z = big ? b.z0 + 0.28 : thin ? b.z0 + Math.max(0.02, (h - cap(FONTS.sm)) / 2) : b.z0 + Math.min(0.1, h * 0.25);
-      s += tag('g', attrs, k.faceText(b.x0 + (big ? 0.6 : 0.3), b.y1, z, R.label, big ? 'slabname' : 'slabname sm', big ? FONTS.slabname : FONTS.sm, 'left', 'start'));
+      s += wrap(r.id, 'name', tag('g', attrs, k.faceText(b.x0 + (big ? 0.6 : 0.3), b.y1, z, R.label, big ? 'slabname' : 'slabname sm', big ? FONTS.slabname : FONTS.sm, 'left', 'start')));
     } else if (style === 'face-right') {
-      s += tag('g', attrs, k.faceText(b.x1, b.y0 + 0.6, b.z0 + Math.max(0.14, (b.z1 - b.z0) * 0.2), R.label, 'slabname', FONTS.slabname, 'right', 'end'));
+      s += wrap(r.id, 'name', tag('g', attrs, k.faceText(b.x1, b.y0 + 0.6, b.z0 + Math.max(0.14, (b.z1 - b.z0) * 0.2), R.label, 'slabname', FONTS.slabname, 'right', 'end')));
     } else {
       const m = shape === 'cloud' ? 'middle' : 'start';
       const x = shape === 'cloud' ? (b.x0 + b.x1) / 2 : b.x0 + 0.35, y = shape === 'cloud' ? (b.y0 + b.y1) / 2 : b.y1 - 0.35;
-      s += tag('g', attrs, k.floorText(x, y, b.z1 + 0.01, R.label, 'slabname sm', 'x', m));
+      s += wrap(r.id, 'name', tag('g', attrs, k.floorText(x, y, b.z1 + 0.01, R.label, 'slabname sm', 'x', m)));
     }
   }
   return s;

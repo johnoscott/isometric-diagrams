@@ -630,7 +630,14 @@ test('boxes/1 in Chrome (0.12.5): the inline name field, after a drop and for a 
     };
     const undone = async (why: string) => { await ev(`I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`); await until(`E.getText() === ${JSON.stringify(TEXT)}`, why); };
     const boxOf = (id: string) => ev<{ x: number; top: number }>(`const rs = [...document.querySelectorAll('.iso-canvas svg.scene [data-id="${id}"]')].filter(e => !e.closest('.overlay')).map(e => e.getBoundingClientRect()).filter(r => r.width); const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right)); return { x: (l + rr) / 2, top: Math.min(...rs.map(r => r.top)) };`);
-    const above = async (id: string, why: string) => { await ev(`await tick(120);`); const f = (await field())!, b = await boxOf(id); assert.ok(Math.abs(f.x - b.x) < 3 && Math.abs(b.top - 8 - f.bottom) < 3, `${why}: the field ${JSON.stringify(f)} above ${JSON.stringify(b)}`); };
+    // (both in one look, once they agree: the drawing a drop leaves is laid out again when the file is read, and the thing's label may take another side)
+    const above = async (id: string, why: string) => {
+      const look = `(() => { const f = document.querySelector('.rename-field input')?.getBoundingClientRect(), rs = [...document.querySelectorAll('.iso-canvas svg.scene [data-id="${id}"]')].filter(e => !e.closest('.overlay')).map(e => e.getBoundingClientRect()).filter(r => r.width); if (!f || !rs.length) return undefined; return { dx: f.left + f.width / 2 - (Math.min(...rs.map(r => r.left)) + Math.max(...rs.map(r => r.right))) / 2, gap: Math.min(...rs.map(r => r.top)) - f.bottom }; })()`;
+      const good = `(o => o && Math.abs(o.dx) < 3 && Math.abs(o.gap - 8) < 3)(${look})`;
+      await ev(`await tick(120);`); await until(good, `${why}: the field above ${id}`, 4000);
+      // and it stays there
+      await ev(`await tick(400);`); assert.equal(await ev(`return !!${good};`), true, `${why}: ${JSON.stringify(await ev(`return ${look};`))}`);
+    };
 
     // dropped: the field, focused, the generated name selected, above the box; typed, Enter: named, one undo step
     await drop();

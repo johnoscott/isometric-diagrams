@@ -1,0 +1,16 @@
+# Things with looks (variants:), for test/timeline.test.ts and test/timeline-chrome.test.ts.
+isodiag: 1
+title: looks
+scenes:
+  - id: v
+    title: looks
+    regions:
+      - id: vm
+        kind: vm
+        label: "THE VM"
+        variants: { asleep: { ghost: true }, deleted: { ghost: true, label: GONE } }
+        nodes:
+          - { id: root, asset: volume, label: Root, variants: { asleep: { role: grey }, off: { ghost: true, label: Root, sub: kept } } }
+          - { id: agent, asset: session, right-of: root, gap: 2, label: Agent, role: lead, variants: { asleep: { role: grey, sub: asleep } } }
+    nodes: [ { id: host, asset: server, right-of: vm, gap: 3, label: Host } ]
+    routes: [ { id: r1, from: host, to: agent, kind: send } ]

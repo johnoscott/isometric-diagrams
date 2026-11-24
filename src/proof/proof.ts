@@ -8,6 +8,8 @@ import { getAsset, NODE_ASSETS } from '../iso-systems/nodes.ts';
 import { regionKind } from '../iso-objects/kinds.ts';
 import type { Compiled, CompiledScene } from '../iso-systems/compile.ts';
 import { focusView } from '../iso-objects/focus.ts';
+import { alongPath, introSvg } from '../iso-objects/motion.ts';
+export { alongPath };
 import type { StepData } from '../iso-objects/steps.ts';
 import type { Placed, RawNote } from '../iso-objects/types.ts';
 import { PLAYER_CSS } from '../iso-objects/css.ts';
@@ -41,18 +43,6 @@ function retag(svg: string, extra: (a: Record<string, string>, name: string) => 
     Object.assign(a, x.set ?? {});
     return `<${name}${Object.entries(a).map(([k, v]) => ` ${k}="${v}"`).join('')}${selfClose ? '/' : ''}>`;
   });
-}
-
-/** A point a fraction of the way along an SVG polyline path ("M x,y L x,y …"). */
-export function alongPath(d: string, f: number): [number, number] {
-  const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(m => [Number(m[1]), Number(m[2])] as [number, number]);
-  const seg = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
-  let left = seg.reduce((a, b) => a + b, 0) * f;
-  for (let i = 0; i < seg.length; i++) {
-    if (left <= seg[i] && seg[i] > 0) { const t = left / seg[i]; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-    left -= seg[i];
-  }
-  return pts[pts.length - 1] ?? [0, 0];
 }
 
 const TOKEN_AT = 0.75;
@@ -92,33 +82,8 @@ function framed(svg: string, s: CompiledScene, st: StepData | undefined, idPrefi
   return svg.replace(/id="([^"]+)"/g, `id="${idPrefix}-$1"`).replace(/url\(#([^)]+)\)/g, `url(#${idPrefix}-$1)`);
 }
 
-/** A frame of the assemble intro at time t (ms): pieces part-way in from their edges, routes and labels not yet in. */
-export function introSvg(s: CompiledScene, t: number, idPrefix: string): string {
-  const A = s.rendered.assembly;
-  const ease = (f: number) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
-  const off = new Map(A.pieces.map(p => {
-    const f = Math.max(0, Math.min(1, (t - p.delay) / p.dur)), e = 1 - ease(f);
-    return [p.id, [p.dx * e, p.dy * e]] as const;
-  }));
-  const routeIn = new Map(A.routes.map(r => [r.id, t >= r.delay + r.dur * 0.5]));
-  const labelsIn = t >= A.labels.delay + A.labels.dur * 0.5;
-  const vis = s.steps.vis;
-  let layer = '';
-  const svg = retag(s.rendered.svg, (a, name) => {
-    if (name === 'g' && a.class?.startsWith('g-')) layer = a.class.slice(2);
-    const id = a['data-id'];
-    const cls: string[] = [];
-    if (id && vis[id] && !vis[id][0]) cls.push('pre');
-    if (layer === 'flows' && a['data-hl'] && !routeIn.get(a['data-hl'])) cls.push('pre');
-    if (name === 'g' && ['floor', 'labels', 'badges'].includes(a.class?.slice(2) ?? '') && !labelsIn) return { cls: ['pre'] };
-    if (id && (layer === 'base' || layer === 'blocks' || layer === 'air') && off.has(id)) {
-      const [dx, dy] = off.get(id)!;
-      if (Math.abs(dx) + Math.abs(dy) > 0.5) return { cls, set: { transform: `translate(${dx.toFixed(1)} ${dy.toFixed(1)})` } };
-    }
-    return { cls };
-  });
-  return framed(svg, s, undefined, idPrefix);
-}
+/** A frame of the assemble intro at time t (ms): the motion core's, as a static SVG. */
+const introFrame = (s: CompiledScene, t: number, idPrefix: string) => framed(introSvg(s, t), s, undefined, idPrefix);
 
 // ---- thumbnails ----
 
@@ -214,7 +179,7 @@ export function renderProof(c: Compiled, opts: ProofOpts = {}): string {
     const intro = opts.withIntro && s.raw.assemble !== false && s.rendered.assembly.pieces.length
       ? [0.2, 0.45, 0.75].map((f, k) => {
         const t = Math.round(s.rendered.assembly.total * f);
-        return frameCard(`${sid}·i${k + 1}`, `f-${sid}-i${k + 1}`, introSvg(s, t, `${sid}-i${k + 1}`), `Assemble intro, ${t} ms`, 'The pieces come in from their nearest edge.', '', undefined, undefined);
+        return frameCard(`${sid}·i${k + 1}`, `f-${sid}-i${k + 1}`, introFrame(s, t, `${sid}-i${k + 1}`), `Assemble intro, ${t} ms`, 'The pieces come in from their nearest edge.', '', undefined, undefined);
       }).join('') : '';
     const cards = s.steps.steps.map((st, i) => {
       const y = stepYaml(c, si, i);

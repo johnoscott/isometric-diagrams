@@ -78,6 +78,7 @@ register (`objects.registerMarks`).
 - [docs/ASSETS.md](docs/ASSETS.md): every node and region kind with a picture, colour roles and decorations.
 - [docs/EDITOR-GUIDE.md](docs/EDITOR-GUIDE.md): writing an editor of your own on the engine (shipped in the package).
 - [docs/FLAT-VIEW.md](docs/FLAT-VIEW.md): the 2D view, the board layout and the morph.
+- [docs/MOTION.md](docs/MOTION.md): motion as a function of time, for video and pages: documents and their Timeline, assemble and disassemble.
 - [CHANGELOG.md](CHANGELOG.md).
 
 ## Tests

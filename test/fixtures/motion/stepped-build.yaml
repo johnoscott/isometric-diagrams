@@ -1,0 +1,59 @@
+# A stepped build: the ids, the order and the focus of a hand-made page's build player (test/timeline.test.ts), on plain blocks.
+isodiag: 1
+title: Stepped build
+scenes:
+  - id: build
+    title: From nothing to running
+    nodes:
+      - { id: mac, asset: block, size: [1.6, 1.6, 0.8], at: [0.0, 0.0] }
+      - { id: host, asset: block, size: [1.6, 1.6, 0.8], at: [3.4, 0.0] }
+      - { id: host-l, asset: block, size: [1.6, 1.6, 0.8], at: [6.8, 0.0] }
+      - { id: relay, asset: block, size: [1.6, 1.6, 0.8], at: [10.2, 0.0] }
+      - { id: kernel, asset: block, size: [1.6, 1.6, 0.8], at: [13.6, 0.0] }
+      - { id: kernel-l, asset: block, size: [1.6, 1.6, 0.8], at: [17.0, 0.0] }
+      - { id: store, asset: block, size: [1.6, 1.6, 0.8], at: [20.4, 0.0] }
+      - { id: base, asset: block, size: [1.6, 1.6, 0.8], at: [23.8, 0.0] }
+      - { id: base-l, asset: block, size: [1.6, 1.6, 0.8], at: [0.0, 3.4] }
+      - { id: bakevm, asset: block, size: [1.6, 1.6, 0.8], at: [3.4, 3.4] }
+      - { id: bk-base, asset: block, size: [1.6, 1.6, 0.8], at: [6.8, 3.4] }
+      - { id: bk-dev, asset: block, size: [1.6, 1.6, 0.8], at: [10.2, 3.4] }
+      - { id: bk-agent, asset: block, size: [1.6, 1.6, 0.8], at: [13.6, 3.4] }
+      - { id: baked-l, asset: block, size: [1.6, 1.6, 0.8], at: [17.0, 3.4] }
+      - { id: sb-root, asset: block, size: [1.6, 1.6, 0.8], at: [20.4, 3.4] }
+      - { id: sb-state, asset: block, size: [1.6, 1.6, 0.8], at: [23.8, 3.4] }
+      - { id: store-l, asset: block, size: [1.6, 1.6, 0.8], at: [0.0, 6.8] }
+      - { id: proxy, asset: block, size: [1.6, 1.6, 0.8], at: [3.4, 6.8] }
+      - { id: vault, asset: block, size: [1.6, 1.6, 0.8], at: [6.8, 6.8] }
+      - { id: cloud, asset: block, size: [1.6, 1.6, 0.8], at: [10.2, 6.8] }
+      - { id: cloud-l, asset: block, size: [1.6, 1.6, 0.8], at: [13.6, 6.8] }
+      - { id: vm, asset: block, size: [1.6, 1.6, 0.8], at: [17.0, 6.8] }
+      - { id: vm-floor, asset: block, size: [1.6, 1.6, 0.8], at: [20.4, 6.8] }
+      - { id: vm-root, asset: block, size: [1.6, 1.6, 0.8], at: [23.8, 6.8] }
+      - { id: vm-state, asset: block, size: [1.6, 1.6, 0.8], at: [0.0, 10.2] }
+      - { id: vm-tools, asset: block, size: [1.6, 1.6, 0.8], at: [3.4, 10.2] }
+      - { id: folder, asset: block, size: [1.6, 1.6, 0.8], at: [6.8, 10.2] }
+      - { id: folder-l, asset: block, size: [1.6, 1.6, 0.8], at: [10.2, 10.2] }
+      - { id: vm-ws, asset: block, size: [1.6, 1.6, 0.8], at: [13.6, 10.2] }
+      - { id: vm-init, asset: block, size: [1.6, 1.6, 0.8], at: [17.0, 10.2] }
+      - { id: vm-agent, asset: block, size: [1.6, 1.6, 0.8], at: [20.4, 10.2] }
+      - { id: guestnet, asset: block, size: [1.6, 1.6, 0.8], at: [23.8, 10.2] }
+      - { id: belt, asset: block, size: [1.6, 1.6, 0.8], at: [0.0, 13.6] }
+      - { id: scr1, asset: block, size: [1.6, 1.6, 0.8], at: [3.4, 13.6] }
+      - { id: scr2, asset: block, size: [1.6, 1.6, 0.8], at: [6.8, 13.6] }
+      - { id: scr3, asset: block, size: [1.6, 1.6, 0.8], at: [10.2, 13.6] }
+      - { id: scr1-l, asset: block, size: [1.6, 1.6, 0.8], at: [13.6, 13.6] }
+      - { id: scr2-l, asset: block, size: [1.6, 1.6, 0.8], at: [17.0, 13.6] }
+      - { id: scr3-l, asset: block, size: [1.6, 1.6, 0.8], at: [20.4, 13.6] }
+      - { id: bridges-mac, asset: block, size: [1.6, 1.6, 0.8], at: [23.8, 13.6] }
+      - { id: bridges-l, asset: block, size: [1.6, 1.6, 0.8], at: [0.0, 17.0] }
+    routes:
+      - { id: clone, from: sb-root, to: vm-root, kind: planned }
+      - { id: net-in, from: guestnet, to: vm-agent, kind: send }
+      - { id: net, from: vm-agent, to: proxy, kind: send }
+      - { id: net2, from: proxy, to: cloud, kind: token }
+      - { id: sess, from: belt, to: vm-agent, kind: control }
+      - { id: sess2, from: scr1, to: belt, kind: control }
+      - { id: sess3, from: scr2, to: belt, kind: control }
+      - { id: sess4, from: scr3, to: belt, kind: control }
+      - { id: ws, from: folder, to: vm-ws, kind: reply }
+      - { id: bridge, from: bridges-mac, to: vm-agent, kind: user }

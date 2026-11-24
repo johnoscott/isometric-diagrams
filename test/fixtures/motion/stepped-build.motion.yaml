@@ -1,0 +1,105 @@
+# The motion document of stepped-build.yaml: 14 beats in 5 chapters, 3.2 s each, a .45 s fade in, ants from the eleventh.
+isomotion: 1
+series:
+  - sequence:
+      name: s1
+      duration: 3200
+      say: { chapter: Once per machine, title: "The machine and the host", text: "What this step does, in a sentence.", facts: [[Step, "1"]] }
+      show: [mac, host, host-l, relay]
+      highlight: [mac, host, host-l, relay]
+      enter: { fade: 450 }
+  - sequence:
+      name: s2
+      duration: 3200
+      say: { chapter: Once per machine, title: "The kernel", text: "What this step does, in a sentence.", facts: [[Step, "2"]] }
+      show: [kernel, kernel-l, store]
+      highlight: [kernel, kernel-l, store]
+      enter: { fade: 450 }
+  - sequence:
+      name: s3
+      duration: 3200
+      say: { chapter: Once per base, title: "The base", text: "What this step does, in a sentence.", facts: [[Step, "3"]] }
+      show: [base, base-l]
+      highlight: [base, base-l]
+      enter: { fade: 450 }
+  - sequence:
+      name: s4
+      duration: 3200
+      say: { chapter: Once per base, title: "The bake VM", text: "What this step does, in a sentence.", facts: [[Step, "4"]] }
+      show: [bakevm, bk-base, bk-dev]
+      highlight: [bakevm]
+      enter: { fade: 450 }
+  - sequence:
+      name: s5
+      duration: 3200
+      say: { chapter: Once per base, title: "The agent, from its recipe", text: "What this step does, in a sentence.", facts: [[Step, "5"]] }
+      show: [bk-agent, baked-l]
+      hide: [bakevm]
+      highlight: [bk-agent]
+      enter: { fade: 450 }
+  - sequence:
+      name: s6
+      duration: 3200
+      say: { chapter: When made, title: "Create: an instant copy", text: "What this step does, in a sentence.", facts: [[Step, "6"]] }
+      show: [sb-root, sb-state, store-l]
+      highlight: [sb-root, sb-state]
+      enter: { fade: 450 }
+  - sequence:
+      name: s7
+      duration: 3200
+      say: { chapter: Cold boot, title: "The network that holds the keys", text: "What this step does, in a sentence.", facts: [[Step, "7"]] }
+      show: [proxy, vault, cloud, cloud-l]
+      highlight: [proxy, vault]
+      enter: { fade: 450 }
+  - sequence:
+      name: s8
+      duration: 3200
+      say: { chapter: Cold boot, title: "The VM boots", text: "What this step does, in a sentence.", facts: [[Step, "8"]] }
+      show: [vm, vm-floor, vm-root, vm-state, clone]
+      highlight: [vm]
+      enter: { fade: 450 }
+  - sequence:
+      name: s9
+      duration: 3200
+      say: { chapter: Cold boot, title: "The guest is set up", text: "What this step does, in a sentence.", facts: [[Step, "9"]] }
+      show: [vm-tools]
+      highlight: [vm-tools]
+      enter: { fade: 450 }
+  - sequence:
+      name: s10
+      duration: 3200
+      say: { chapter: Cold boot, title: "The workspace", text: "What this step does, in a sentence.", facts: [[Step, "10"]] }
+      show: [folder, folder-l, ws, vm-ws]
+      highlight: [folder, vm-ws]
+      enter: { fade: 450 }
+  - sequence:
+      name: s11
+      duration: 3200
+      say: { chapter: Running, title: "The agent starts", text: "What this step does, in a sentence.", facts: [[Step, "11"]] }
+      show: [vm-init, vm-agent, guestnet, net-in, net, net2]
+      highlight: [vm-agent]
+      enter: { fade: 450 }
+      ants: true
+  - sequence:
+      name: s12
+      duration: 3200
+      say: { chapter: Running, title: "Wrapped around it: the sessions", text: "What this step does, in a sentence.", facts: [[Step, "12"]] }
+      show: [belt, sess, sess2, sess3, sess4, scr1, scr2, scr3, scr1-l, scr2-l, scr3-l]
+      highlight: [belt]
+      enter: { fade: 450 }
+      ants: true
+  - sequence:
+      name: s13
+      duration: 3200
+      say: { chapter: Running, title: "Wrapped around it: the network", text: "What this step does, in a sentence.", facts: [[Step, "13"]] }
+      highlight: [proxy, vault, cloud]
+      enter: { fade: 450 }
+      ants: true
+  - sequence:
+      name: s14
+      duration: 3200
+      say: { chapter: Running, title: "Wrapped around it: the bridges", text: "What this step does, in a sentence.", facts: [[Step, "14"]] }
+      show: [bridges-mac, bridges-l, bridge]
+      highlight: [bridges-mac]
+      enter: { fade: 450 }
+      ants: true

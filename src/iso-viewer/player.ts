@@ -6,6 +6,7 @@
 // #grid (show the floor grid), #assemble (play the assemble intro) and #assemble&at=MS (freeze it at that moment).
 
 import { focusView } from '../iso-objects/focus.ts';
+import { paint, planOf, type MotionModel } from '../iso-objects/motion.ts';
 
 interface Token { route: string; kind: string; color: string }
 interface Step {
@@ -13,17 +14,14 @@ interface Step {
   phases: Token[][]; pulses: [number, number, number, number][]; lit: string[]; duration: number;
   focus?: [number, number, number, number];
 }
-interface Piece { id: string; kind: 'region' | 'node'; dx: number; dy: number; delay: number; dur: number }
-interface Assembly { pieces: Piece[]; routes: { id: string; delay: number; dur: number }[]; labels: { delay: number; dur: number }; total: number }
 interface SceneData {
   id: string; loop: boolean; dim: 'flows' | 'all'; steps: Step[]; vis: Record<string, boolean[]>;
-  assemble: boolean; grid: boolean; assembly: Assembly;
+  assemble: boolean; grid: boolean; motion: MotionModel;
 }
 interface Data { scenes: SceneData[] }
 
 const NS = 'http://www.w3.org/2000/svg';
 const TRAVEL = 1150;
-const EASE_IN = 'cubic-bezier(.16,.84,.3,1)';
 
 function svgEl(tag: string, attrs: Record<string, string | number>, parent: Element): SVGElement {
   const e = document.createElementNS(NS, tag);
@@ -77,7 +75,7 @@ function init() {
     if (sd.dim === 'all') svg.classList.add('dim-all');
 
     let cur = 0, playing = false, userPaused = false, active = false, timer = 0, raf = 0, groups = 0, t0 = 0;
-    let assembling = false, assembled = false, animations: Animation[] = [];
+    let assembling = false, assembled = false, introTimer = 0, introDone: (() => void) | undefined;
     let tokens: { path: SVGPathElement; len: number; gi: number; stop: boolean; c: SVGElement }[] = [];
 
     // ---- grid ----
@@ -177,50 +175,35 @@ function init() {
     function stop() { playing = false; clearTimeout(timer); setBtn(); restartProg(); }
     function userPause() { userPaused = true; stop(); }
 
-    // ---- assemble: regions and nodes fly in from the nearest edge, routes draw in, labels fade in ----
-    const A = sd.assembly;
-    const layer = (name: string) => svg.querySelector(`.g-${name}`);
-    function finishAssemble() {
-      if (!assembling) return;
-      for (const a of animations) a.finish();
-    }
+    // ---- assemble: the motion core's plan (the same a video is made from), painted as time goes by ----
+    const plan = planOf(sd.motion, 'assemble');
+    function finishAssemble() { if (assembling) introDone?.(); }
     function assemble(freezeAt?: number) {
-      for (const a of animations) a.cancel();
-      animations = [];
+      clearTimeout(introTimer);
+      introDone = undefined;
       stop();
       if (N) show(cur);          // set what is visible at this step; focus comes back at the end
       clearAnim();
       svg.classList.remove('focus', 'pre-assemble', 'all');
       assembling = true;
-      const run = (el: Element, frames: Keyframe[], delay: number, dur: number, easing = EASE_IN) =>
-        animations.push(el.animate(frames, { delay, duration: dur, easing, fill: 'backwards' }));
-      const solid = ['base', 'blocks', 'air'].map(layer).filter(Boolean) as Element[];
-      for (const p of A.pieces) {
-        const from = `translate(${p.dx}px, ${p.dy}px)`;
-        for (const L of solid) L.querySelectorAll(`[data-id="${CSS.escape(p.id)}"]`).forEach(el =>
-          run(el, [{ transform: from }, { transform: 'translate(0px, 0px)' }], p.delay, p.dur));
-      }
-      for (const r of A.routes) {
-        const g = layer('flows')?.querySelector(`[data-hl="${CSS.escape(r.id)}"]`);
-        const path = g?.querySelector<SVGPathElement>('path.flow');
-        if (!g || !path) continue;
-        const len = path.getTotalLength();
-        run(g, [{ opacity: 0 }, { opacity: 1 }], r.delay, 80, 'linear');
-        run(path, [{ strokeDasharray: `${len} ${len}`, strokeDashoffset: len }, { strokeDasharray: `${len} ${len}`, strokeDashoffset: 0 }], r.delay, r.dur, 'ease-out');
-      }
-      for (const name of ['floor', 'labels', 'badges']) {
-        const L = layer(name);
-        if (L) run(L, [{ opacity: 0 }, { opacity: 1 }], A.labels.delay, A.labels.dur, 'ease-out');
-      }
-      if (freezeAt !== undefined) {
-        for (const a of animations) { a.pause(); a.currentTime = freezeAt; }
-        return;
-      }
-      Promise.all(animations.map(a => a.finished)).then(() => {
-        assembling = false; assembled = true; animations = [];
+      if (freezeAt !== undefined) { paint(svg, plan.at(freezeAt)); return; }
+      const start = performance.now();
+      introDone = () => {
+        clearTimeout(introTimer);
+        introDone = undefined;
+        paint(svg, {});
+        assembling = false; assembled = true;
         if (N) show(cur);
         if (active && !userPaused) play();
-      }, () => { /* replaced by a newer run */ });
+      };
+      // a timer, not a frame callback, so it also finishes where no frames are drawn
+      const step = () => {
+        const t = performance.now() - start;
+        if (t >= plan.duration) { introDone?.(); return; }
+        paint(svg, plan.at(t));
+        introTimer = window.setTimeout(step, 16);
+      };
+      step();
     }
     asmBtn?.addEventListener('click', () => { userPaused = false; assemble(); });
 

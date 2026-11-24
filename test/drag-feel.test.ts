@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { drivePage, bundlePage, type Driver } from './adapters/page-driver.ts';
 import { readBoxes } from './adapters/boxes.ts';
 import { C, S } from '../src/iso-core/kernel.ts';
-import { DWELL_HINT, DWELL_GIVE } from '../src/iso-editor/make-way.ts';
+import { DWELL_HINT, DWELL_GIVE, BACK_AFTER } from '../src/iso-editor/make-way.ts';
 // @ts-ignore plain JS helper
 import { chromePath } from '../scripts/chrome.mjs';
 
@@ -25,6 +25,8 @@ const pinsOf = (t: string) => Object.fromEntries(Object.entries((readBoxes(t).re
 
 async function page(run: (d: Driver & ReturnType<typeof tools>) => Promise<void>, opts: { attrs?: string; reduce?: boolean } = {}) {
   await drivePage(chrome!, await bundled(), '__boxes', async d => {
+    // DRAG_THROTTLE=6: a processor six times slower (a continuous-integration runner's, or a loaded machine)
+    if (process.env.DRAG_THROTTLE) await d.cdp('Emulation.setCPUThrottlingRate', { rate: Number(process.env.DRAG_THROTTLE) });
     if (opts.reduce) await d.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await d.until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
     const t = tools(d);
@@ -58,11 +60,21 @@ function tools({ ev, until, cdp }: Driver) {
   const text = () => ev<string>(`return E.getText();`);
   const at = () => ev<At>(`const L = I.canvas.doc.scene.layout, o = {}; for (const i of L.items) if (!i.region) o[i.id] = [i.box.x0, i.box.y0]; return o;`);
   /** a record of every frame: when, whether it may drop, what is outlined, how far each thing is shifted, where the drawing has it */
-  const record = () => ev(`window.__log = []; window.__rec = true; const go = () => { if (!window.__rec) return; const g = I.canvas.drag, o = {}; for (const i of I.canvas.doc.scene.layout.items) o[i.id] = i.box.x0 + ',' + i.box.y0;
+  const record = () => ev(`window.__log = []; window.__rec = true; window.__moves = []; window.__mv ??= [addEventListener('pointermove', e => window.__moves.push(e.timeStamp), true), addEventListener('pointerup', e => { window.__upAt = e.timeStamp; }, true)]; const go = () => { if (!window.__rec) return; const g = I.canvas.drag, o = {}; for (const i of I.canvas.doc.scene.layout.items) o[i.id] = i.box.x0 + ',' + i.box.y0;
     window.__log.push({ t: performance.now(), inv: !!g?.invalid, at: g?.move ? g.move.at.join() : '', way: [...document.querySelectorAll('.iso-canvas .overlay .way')].map(e => e.dataset.way).join(), box: o,
       tf: Object.fromEntries(Object.keys(o).map(id => [id, document.querySelector('.iso-canvas svg.scene [data-id="' + id + '"]')?.getAttribute('transform') ?? ''])) }); requestAnimationFrame(go); }; requestAnimationFrame(go);`);
   type Frame = { t: number; inv: boolean; at: string; way: string; box: Record<string, string>; tf: Record<string, string> };
   const log = () => ev<Frame[]>(`window.__rec = false; return window.__log;`);
+  /** the pointer's own times of its moves since record() began: a step of a test is one move, so the nth is the one that came to the nth cell. What
+   *  the canvas does is after it however late a frame shows it; a frame's time, taken as the start, is late on a slow machine */
+  const moves = () => ev<number[]>(`return window.__moves;`);
+  /** what is only so when it is quick (two of the pointer's own times within `limit` ms): tried again, from the start, when the machine wasn't */
+  const quickly = async (limit: number, again: () => Promise<void>, attempt: () => Promise<[number, number]>) => {
+    for (let n = 0; n < 6; n++) { const [a, b] = await attempt(); if (b - a < limit) return; await again(); }
+    assert.fail(`never within ${limit} ms: the machine is too slow to say`);
+  };
+  /** the pointer's own time of its last move, and of its release */
+  const times = () => ev<[number, number]>(`return [window.__moves.at(-1), window.__upAt];`);
   const wait = (ms: number) => ev(`await tick(${ms});`);
   const esc = async () => { for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await until(`!I.canvas.drag`, 'the drag is over'); };
   const undo = async (t: string, why: string) => { await ev(`I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`); await until(`E.getText() === ${JSON.stringify(t)}`, why); await wait(150); };
@@ -73,28 +85,29 @@ function tools({ ev, until, cdp }: Driver) {
     for (let i = 1; i <= 8; i++) { await mouse('mouseMoved', b.x + (to.x - b.x) * i / 8, b.y + (to.y - b.y) * i / 8); await wait(25); }
     await wait(60);
   };
-  return { mouse, load, cell, middle, grab, by, up, text, at, record, log, wait, esc, undo, take };
+  return { mouse, load, cell, middle, grab, by, up, text, at, record, moves, quickly, times, log, wait, esc, undo, take };
 }
 const ROW = doc({ a: [0, 0], b: [4, 0], far: [0, 9] });
 
 test('make way (0.14.0): a drop that waits, with a real mouse: 150 ms of nothing, a jiggle and outlines, at 700 ms it gives way; the drop is one undo step', { skip, timeout: 120000 }, async () => {
-  await page(async ({ load, grab, by, record, log, wait, at, up, text, undo, ev, mouse, esc }) => {
+  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, undo, ev, mouse, esc, until }) => {
     await load(ROW);
     const p = await grab('a');
     await record();
     await by(p, [3, 0]);
-    await wait(1300);
-    const L = await log();
-    const t0 = L.find(f => f.inv && f.at === '3,0')!.t, hint = L.find(f => f.way)!, gave = L.find(f => f.t > t0 && !f.inv)!;
+    await until(`I.canvas.drag.given?.size && !document.querySelector('.iso-canvas .overlay .way') && I.canvas.doc.scene.layout.byId.get('b').box.x0 === 5`, 'it gave way'); await wait(900);
+    const t0 = (await moves())[2], L = await log(), taken = L.findIndex(f => f.inv && f.at === '3,0');
+    assert.ok(taken >= 0, 'taken'); const hint = L.slice(taken).find(f => f.way)!, gave = L.slice(taken).find(f => !f.inv)!;
     assert.ok(hint && gave, `outlined ${hint?.t}, gave ${gave?.t}`);
-    // never early (a frame or two of slack: the record is a frame behind); late only as the machine is
-    assert.ok(hint.t - t0 >= DWELL_HINT - 40, `the hint at ${hint.t - t0}`); assert.ok(gave.t - t0 >= DWELL_GIVE - 40 && gave.t - t0 < DWELL_GIVE + 500, `gave way at ${gave.t - t0}`);
+    // in this order, and never early, from the move that came there (a timer may be a millisecond early); late only as the machine is
+    assert.ok(hint.t < gave.t); assert.ok(hint.t - t0 >= DWELL_HINT - 2, `the hint at ${hint.t - t0}`); assert.ok(gave.t - t0 >= DWELL_GIVE - 2, `gave way at ${gave.t - t0}`);
     assert.ok(L.filter(f => f.t < hint.t).every(f => !f.tf.b), 'still until the hint');
     const jig = L.filter(f => f.t > hint.t && f.t < gave.t).map(f => Number(/translate\(([-\d.]+) ([-\d.]+)\)/.exec(f.tf.b)?.[1] ?? 0)), k = await ev<number>(`return I.canvas.scale();`);
-    assert.ok(jig.some(v => v > 0) && jig.some(v => v < 0) && Math.max(...jig.map(Math.abs)) * k <= 1.55, `a jiggle of at most 1.5 px: ${Math.max(...jig.map(Math.abs)) * k}`);
+    assert.ok((jig.length < 8 || (jig.some(v => v > 0) && jig.some(v => v < 0))) && jig.some(v => v !== 0) && Math.max(...jig.map(Math.abs)) * k <= 1.55, `a jiggle of at most 1.5 px: ${Math.max(...jig.map(Math.abs)) * k}`);
     assert.ok(L.filter(f => f.way).every(f => f.way === 'b' && f.box.b === '4,0'), 'only what would move, where it was');
-    assert.ok(L.filter(f => f.t > gave.t + 400).every(f => !f.way && !f.tf.b && f.box.b === '5,0'), 'then it is there, still');
-    assert.ok(L.some(f => f.t >= gave.t && f.box.b === '5,0' && /translate\(-/.test(f.tf.b)), 'it glided there');
+    const end = L[L.length - 1]; assert.ok(!end.way && !end.tf.b && end.box.b === '5,0', 'then it is there, still');
+    // (a machine too slow for a frame in 180 ms shows no glide)
+    const gl = L.filter(f => f.box.b === '5,0' && f.tf.b); assert.ok(gl.every(f => /translate\(-/.test(f.tf.b)) && (gl.length || L.filter(f => f.t >= gave.t && f.t < gave.t + 180).length < 3), 'it glided there');
     assert.equal(await text(), ROW, 'nothing is written until the drop');
     await up();
     await ev(`await tick(300);`);
@@ -110,60 +123,69 @@ test('make way (0.14.0): a drop that waits, with a real mouse: 150 ms of nothing
 });
 
 test('make way: no wait, no push; another cell starts the clock again; drifting in the cell does not; Esc at any time is all back', { skip, timeout: 180000 }, async () => {
-  await page(async ({ load, grab, by, record, log, wait, at, up, text, esc, cell, mouse, ev }) => {
+  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, esc, cell, mouse, ev, until, quickly, times }) => {
     await load(ROW);
+    const reset = async () => { await load(ROW); };
     // dropped at once: refused
-    let p = await grab('a'); await by(p, [3, 0]); await up(); await wait(400);
+    let p = { x: 0, y: 0 };
+    await quickly(DWELL_GIVE - 50, reset, async () => { await record(); p = await grab('a'); await by(p, [3, 0]); await up(); return times(); }); await wait(400);
     assert.equal(await text(), ROW); assert.deepEqual(await at(), { a: [0, 0], b: [4, 0], far: [0, 9] });
     // dropped in the jiggle: refused
-    p = await grab('a'); await by(p, [3, 0]); await ev(`for (let i = 0; i < 60 && !document.querySelector('.iso-canvas .overlay .way'); i++) await tick(10);`); await up(); await wait(400);
+    await quickly(DWELL_GIVE - 50, reset, async () => { await record(); p = await grab('a'); await by(p, [3, 0]); await until(`document.querySelector('.iso-canvas .overlay .way') || I.canvas.drag?.given?.size`, 'the hint'); await up(); return times(); }); await wait(400);
     assert.equal(await text(), ROW); assert.equal(await ev(`return document.querySelectorAll('.iso-canvas .overlay .way, .iso-canvas svg.scene [transform^="translate"]').length;`), 0);
     // another taken cell before it gives way: the outlines go at once and the clock starts again
-    p = await grab('a'); await record(); await by(p, [3, 0]); await wait(420); await by(p, [4, 0], [3, 0]); await wait(1200);
-    let L = await log();
-    const t1 = L.find(f => f.at === '4,0')!.t, gave = L.find(f => f.t > t1 && !f.inv && f.at === '4,0')!;
-    assert.ok(L.some(f => f.at === '3,0' && f.way === 'b'), 'it had begun'); assert.ok(L.filter(f => f.t >= t1 && f.t < t1 + DWELL_HINT - 60).every(f => !f.way && !f.tf.b), 'stopped at once');
-    assert.ok(gave.t - t1 >= DWELL_GIVE - 40, `${gave.t - t1} from the new cell`);
+    p = await grab('a'); await record(); await by(p, [3, 0]); await until(`document.querySelector('.iso-canvas .overlay .way')`, 'begun'); await by(p, [4, 0], [3, 0]); await until(`I.canvas.drag.given?.size`, 'it gave way'); await wait(100);
+    let t1 = (await moves())[3], L = await log(), first = L.findIndex(f => f.at === '4,0');
+    const again = L.slice(first).find(f => f.way)!, gave = L.slice(first).find(f => !f.inv)!;
+    assert.ok(L.slice(0, first).some(f => f.at === '3,0' && f.way === 'b'), 'it had begun'); assert.ok(!L[first].way && !L[first].tf.b, 'stopped at once');
+    assert.ok(again && again.t - t1 >= DWELL_HINT - 2 && gave.t - t1 >= DWELL_GIVE - 2, `${again?.t - t1} and ${gave?.t - t1} from the new cell`);
     await esc(); await wait(400);
     assert.equal(await text(), ROW); assert.deepEqual(await at(), { a: [0, 0], b: [4, 0], far: [0, 9] }, 'Esc after it gave way: all back');
     await mouse('mouseReleased', p.x, p.y); await wait(200); assert.equal(await text(), ROW);
     // the pointer cancelled after it gave way: all back, nothing written (the release that follows does nothing)
-    p = await grab('a'); await by(p, [3, 0]); await wait(1100); assert.deepEqual((await at()).b, [5, 0]);
+    p = await grab('a'); await by(p, [3, 0]); await until(`I.canvas.doc.scene.layout.byId.get('b').box.x0 === 5`, 'it gave way'); assert.deepEqual((await at()).b, [5, 0]);
     await ev(`I.canvas.stage.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 }));`); await wait(400); assert.equal(await ev(`return !!I.canvas.drag;`), false); await mouse('mouseReleased', p.x, p.y); await wait(200);
     assert.equal(await text(), ROW); assert.deepEqual(await at(), { a: [0, 0], b: [4, 0], far: [0, 9] });
     // drifting inside the cell
     p = await grab('a'); await record(); await by(p, [3, 0]); for (let i = 0; i < 12; i++) { const [dx, dy] = await cell([3 + (i % 2 ? 0.2 : -0.2), 0]); await mouse('mouseMoved', p.x + dx, p.y + dy); await wait(60); } await wait(500);
-    L = await log(); { const t0 = L.find(f => f.inv && f.at === '3,0')!.t, g = L.find(f => f.t > t0 && !f.inv)!; assert.ok(g && g.t - t0 < DWELL_GIVE + 500, `not restarted: ${g?.t - t0}`); }
+    L = await log(); // not restarted: it gave way while it drifted or soon after, not 700 ms after the last drift
+    t1 = (await moves()).at(-1)!; { const i = L.findIndex(f => f.inv && f.at === '3,0'), g = L.slice(i).find(f => !f.inv)!; assert.ok(g && g.t - t1 < DWELL_GIVE, `not restarted: ${g?.t - t1} after the last drift`); }
     await esc(); await wait(300); await mouse('mouseReleased', p.x, p.y);
   });
 });
 
 test('make way: left again, it goes back (after 250 ms, no sooner), and a drop elsewhere leaves it unpinned; kept while the place is still needed', { skip, timeout: 180000 }, async () => {
-  await page(async ({ load, grab, by, record, log, wait, at, up, text, undo }) => {
+  await page(async ({ load, grab, by, record, moves, log, wait, at, up, text, undo, until, quickly, times }) => {
+    const gave = () => until(`I.canvas.doc.scene.layout.byId.get('b').box.x0 === 5`, 'it gave way');
     await load(ROW);
-    let p = await grab('a'); await by(p, [3, 0]); await wait(1100); assert.deepEqual((await at()).b, [5, 0]);
-    await record(); await by(p, [3, 5], [3, 0]); await wait(900);
-    const L = await log(), out = L.find(f => f.at === '3,2')!, back = L.find(f => f.t > out.t && f.box.b === '4,0')!;
-    assert.ok(back && back.t - out.t >= 250 - 40, `back ${back?.t - out.t} ms after`);
+    let p = await grab('a'); await by(p, [3, 0]); await gave(); assert.deepEqual((await at()).b, [5, 0]);
+    await record(); await by(p, [3, 5], [3, 0]); await until(`I.canvas.doc.scene.layout.byId.get('b').box.x0 === 4`, 'it went back'); await wait(100);
+    // from the move that left (its second: two cells down, clear of where b was)
+    const out = (await moves())[1], L = await log(), i = L.findIndex(f => f.at === '3,2'), back = L.slice(Math.max(0, i)).find(f => f.box.b === '4,0')!;
+    assert.ok(back && back.t - out >= BACK_AFTER - 2, `back ${back?.t - out} ms after`);
     await up(); await wait(300);
     assert.deepEqual(pinsOf(await text()), { a: [3, 5], b: [4, 0], far: [0, 9] }); await undo(ROW, 'one step');
     // one more cell the same way still needs the place of b: it stays out of it, with no new wait for what is clear
-    p = await grab('a'); await by(p, [3, 0]); await wait(1100); await by(p, [2, 0], [3, 0]); await by(p, [3, 0], [2, 0]); await wait(120); assert.deepEqual((await at()).b, [5, 0], 'out and in again within 250 ms: no flicker');
+    await quickly(BACK_AFTER - 40, async () => { await up(); await load(ROW); }, async () => {
+      p = await grab('a'); await by(p, [3, 0]); await gave(); await record(); await by(p, [2, 0], [3, 0]); await by(p, [3, 0], [2, 0]);
+      const m = await moves(); return [m[0], m[1]];
+    });
+    await wait(120); assert.deepEqual((await at()).b, [5, 0], 'out and in again within 250 ms: no flicker');
     await up(); await wait(300); assert.deepEqual(pinsOf(await text()), { a: [3, 0], b: [5, 0], far: [0, 9] }); await undo(ROW, 'one step');
     // dropped beyond it before it went back: it isn't pinned anywhere else
-    p = await grab('a'); await by(p, [3, 0]); await wait(1100); await by(p, [0, 3], [3, 0]); await up(); await wait(400);
-    assert.deepEqual(pinsOf(await text()), { a: [0, 3], b: [4, 0], far: [0, 9] });
+    await quickly(BACK_AFTER - 20, async () => { await load(ROW); }, async () => { await record(); p = await grab('a'); await by(p, [3, 0]); await gave(); const n = (await moves()).length; await by(p, [0, 3], [3, 0]); await up(); const m = await moves(); return [m[n], (await times())[1]]; });
+    await wait(400); assert.deepEqual(pinsOf(await text()), { a: [0, 3], b: [4, 0], far: [0, 9] });
   });
 });
 
 test('make way: a chain of three; four, or a margin with no place, stays red with no jiggle', { skip, timeout: 120000 }, async () => {
   // three deep above and below, so that sideways is a chain of four
   const walls = { n: [-6, 2, 40, 1], n2: [-6, 3, 40, 1], n3: [-6, 4, 40, 1], s: [-6, -1, 40, 1], s2: [-6, -2, 40, 1], s3: [-6, -3, 40, 1] } as Record<string, [number, number, number, number]>;
-  await page(async ({ load, grab, by, record, log, wait, up, text, esc, mouse }) => {
+  await page(async ({ load, grab, by, record, log, wait, up, text, esc, mouse, until }) => {
     for (const [n, gives] of [[3, true], [4, false]] as const) {
       const row = Object.fromEntries(Array.from({ length: n }, (_, i) => [`b${i}`, [4 + i * 2, 0]])) as Record<string, [number, number]>;
       const T = doc({ a: [0, 0], ...row, ...walls }); await load(T);
-      const p = await grab('a'); await record(); await by(p, [3, 0]); await wait(1200);
+      const p = await grab('a'); await record(); await by(p, [3, 0]); if (gives) await until(`I.canvas.drag.given?.size`, 'it gave way'); await wait(gives ? 100 : 1500);
       const L = await log(); assert.equal(L.some(f => f.way), gives, `${n} in a row`);
       if (gives) { await up(); await wait(300); const q = pinsOf(await text()); assert.deepEqual([q.a, q.b0, q.b1, q.b2, q.n, q.s], [[3, 0], [5, 0], [7, 0], [9, 0], [-6, 2], [-6, -1]]); }
       else { assert.ok(L.every(f => Object.entries(f.tf).every(([id, t]) => id === 'a' || !t)), 'nothing moves'); await esc(); await mouse('mouseReleased', p.x, p.y); await wait(300); assert.equal(await text(), T); }
@@ -172,9 +194,9 @@ test('make way: a chain of three; four, or a margin with no place, stays red wit
 });
 
 test('make way under Reduce Motion: it moves all the same (the default); with dragMotion: respect, the outlines and the wait only', { skip, timeout: 120000 }, async () => {
-  for (const [attrs, moves] of [['', true], ['data-drag-motion="respect"', false]] as const) await page(async ({ load, grab, by, record, log, wait, up, text }) => {
+  for (const [attrs, moves] of [['', true], ['data-drag-motion="respect"', false]] as const) await page(async ({ load, grab, by, record, log, wait, up, text, until }) => {
     await load(ROW);
-    const p = await grab('a'); await record(); await by(p, [3, 0]); await wait(1200);
+    const p = await grab('a'); await record(); await by(p, [3, 0]); await until(`I.canvas.doc.scene.layout.byId.get('b').box.x0 === 5`, 'it gave way'); await wait(300);
     const L = await log(); assert.ok(L.some(f => f.way === 'b'), 'outlined'); assert.equal(L.some(f => f.tf.b), moves, attrs); assert.equal(L[L.length - 1].box.b, '5,0');
     await up(); await wait(300); assert.deepEqual(pinsOf(await text()), { a: [3, 0], b: [5, 0], far: [0, 9] });
   }, { attrs, reduce: true });
@@ -295,4 +317,21 @@ test('the palette\'s look (0.14.0): the thing itself, small, in the theme; an en
     assert.equal(await text(), ROW);
   }, { attrs: 'data-looks' });
   await page(async ({ ev, wait }) => { await wait(300); const L = await ev<Look[]>(look); assert.deepEqual(L.map(x => [x.look, x.icon, x.solid]), [[null, true, 0], [null, true, 0], [null, true, 0]]); });
+});
+
+test('the palette: released as it crosses from a container onto the canvas: drawn where it was dropped from the first frame on (motion on and reduced)', { skip, timeout: 180000 }, async () => {
+  for (const reduce of [false, true]) await page(async ({ mouse, ev, until, wait }) => {
+    // the page's own file (two trays, a zone). The thing itself: its label may take another side once it is laid out where it was dropped
+    const T = await ev<string>(`return E.getText();`);
+    for (let n = 0; n < 3; n++) {
+      const [x0, y0, x1, y1] = await ev<number[]>(`const b = document.querySelector('.palette .pal-item[data-entry="0"]').getBoundingClientRect(), s = I.canvas.stage.getBoundingClientRect(); return [b.left + 8, b.top + 8, s.left + s.width * 0.7, s.top + s.height * 0.9];`);
+      await ev(`window.__w = []; window.__rec = false; addEventListener('pointerup', () => { window.__rec = true; const go = () => { if (!window.__rec) return; const rs = [...document.querySelectorAll('.iso-canvas svg.scene .g-blocks [data-id="box-1"]')].map(e => e.getBoundingClientRect()).filter(r => r.width); if (rs.length) window.__w.push([(Math.min(...rs.map(r => r.left)) + Math.max(...rs.map(r => r.right))) / 2, Math.min(...rs.map(r => r.top))].map(Math.round).join()); requestAnimationFrame(go); }; setTimeout(go, 0); }, { once: true });`);
+      // in six steps, over the zone, the last onto the canvas and released with it
+      await mouse('mouseMoved', x0, y0); await mouse('mousePressed', x0, y0); for (let i = 1; i <= 6; i++) await mouse('mouseMoved', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await mouse('mouseReleased', x1, y1);
+      await until(`document.querySelector('.rename-field input')`, 'asked'); await wait(600);
+      const w = await ev<string[]>(`window.__rec = false; return window.__w;`); assert.ok(w.length > 5);
+      const last = w[w.length - 1].split(',').map(Number); for (const q of w) { const [x, y] = q.split(',').map(Number); assert.ok(Math.abs(x - last[0]) < 2 && Math.abs(y - last[1]) < 2, `${reduce ? 'reduced' : 'motion'}: ${[...new Set(w)].join(' ; ')}`); }
+      await ev(`document.querySelector('.rename-field input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); I.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));`); await until(`E.getText() === ${JSON.stringify(T)}`, 'undone'); await wait(400);
+    }
+  }, { reduce });
 });

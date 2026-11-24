@@ -21,7 +21,7 @@ import { chromePath, headless } from '../scripts/chrome.mjs';
 
 let chrome: string | undefined;
 try { chrome = chromePath(); } catch { /* no Chrome: the browser part skips */ }
-const PAGES = ['index.html', 'docs/index.html', 'docs/format.html', 'docs/assets.html', 'docs/editor-guide.html', 'docs/flat-view.html', 'docs/layers.html', 'api.html', 'gallery.html', 'playground.html', 'changelog.html'];
+const PAGES = ['index.html', 'docs/index.html', 'docs/format.html', 'docs/assets.html', 'docs/editor-guide.html', 'docs/flat-view.html', 'docs/motion.html', 'docs/layers.html', 'api.html', 'gallery.html', 'playground.html', 'changelog.html'];
 const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 const dir = mkdtempSync(join(tmpdir(), 'site-'));
 const built = buildSite(dir);

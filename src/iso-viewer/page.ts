@@ -1,5 +1,6 @@
 // The HTML page around the scenes: header, one section per scene, theme toggle. One file, no network.
 
+import { motionModel } from '../iso-objects/motion.ts';
 import { esc } from '../iso-core/kernel.ts';
 import type { Compiled } from '../iso-objects/compile.ts';
 import { themeCss } from '../iso-core/theme.ts';
@@ -31,7 +32,7 @@ export function stepData(c: Compiled): string {
     scenes: c.scenes.map(s => ({
       id: s.id, loop: s.raw.loop ?? true, dim: s.raw.dim ?? 'flows', vis: s.steps.vis,
       steps: s.steps.steps.map(st => ({ ...st, caption: md(st.caption) })),
-      assemble: s.assemble, grid: !!s.grid.show, assembly: s.rendered.assembly,
+      assemble: s.assemble, grid: !!s.grid.show, motion: motionModel(s),
     })),
   });
 }

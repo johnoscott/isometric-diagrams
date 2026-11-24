@@ -5,7 +5,7 @@
 // The layer's public API. Importers name the module a name comes from (with code splitting, a barrel puts every file
 // it reaches into each bundle that imports it); the Node tests may import this index.
 
-export type { Side, StepRef, RawPlacement, RawDeco, RawNode, RawGate, RawRegion, RawNote, RawScene, GridDef, RawDiagram, RegionKindName, Placed, RawRole, RawKind, Theme } from './types.ts';
+export type { Side, StepRef, RawPlacement, RawDeco, RawNode, RawGate, RawRegion, RawNote, RawScene, GridDef, RawDiagram, RegionKindName, Placed, RawRole, RawKind, Theme, RawMotion, RawVariant } from './types.ts';
 export { regionKind, nodeKind, nodeKindOr, wallHeight, kindsCss } from './kinds.ts';
 export type { RegionShape, RegionKind, KindCatalog } from './kinds.ts';
 export { drawDecos, boxAsset, plate, cloudPath, drawCloud, defaultLabel, registerMarks, markCss, iconPainter, facePainter, placeholderIcon } from './assets.ts';
@@ -18,6 +18,19 @@ export { silhouette, polyBounds, polyRectArea, rectArea, lineRectArea, Obstacles
 export type { Rect, Poly, LabelText, PlacedLabel, CalloutSpot } from './labels.ts';
 export { offscreen, assembly } from './assemble.ts';
 export type { Edge, Piece, Assembly } from './assemble.ts';
+export { ASSEMBLE_STYLES, DISASSEMBLE_STYLES, MOTION_ORDERS, MOTION_EASINGS, motionModel, motionOrder, planOf, assemble, disassemble, alongPath, svgAt, paint, introSvg } from './motion.ts';
+export type { AssembleStyle, DisassembleStyle, MotionOrder, MotionEasing, Direction, PieceMotion, AssembleOptions, DisassembleOptions, PlanOptions, MotionPiece, MotionModel, MotionPlan, ScenePlan, SceneState, ItemState, LabelState, RouteState } from './motion.ts';
+export { drawLooks } from './looks.ts';
+export { withAnts, antsOf, antDash, ANTS_CSS, ANT_SPEED, ANT_DASH, ANT_STILL } from './ants.ts';
+export type { AntsOptions } from './ants.ts';
+export { motion, MotionBuilder, SeriesBuilder, NodesBuilder } from './motion-builder.ts';
+export type { SequenceOptions, Timing, CameraVerbs, Ids as MotionIds } from './motion-builder.ts';
+export { bindMotion, motionOfSteps } from './timeline.ts';
+export type { Timeline, BindOptions, BeatInfo, Cue } from './timeline.ts';
+export { MOTION_SCHEMA, EASING_NAMES, EXTRAPOLATE, checkMotion, msOf, readMs, easeOf, curveAt, springAt, bezier } from './motion-doc.ts';
+export type { MotionDoc, MotionNode, MotionTime, MotionEase, EasingName, Extrapolate, SpringConfig, Curve, Say as MotionSay, Focus, ReadTime, Sequence, SeriesItem, Transition, MotionDiag } from './motion-doc.ts';
+export { resolveSvg, FONT_STACKS } from './resolve.ts';
+export type { ResolveOptions, ThemeMode } from './resolve.ts';
 export { durationFor, resolveSteps, midpoint } from './steps.ts';
 export type { RawStep, Token, StepData, Say, Mark, Badge, Steps } from './steps.ts';
 export { focusView } from './focus.ts';

@@ -14,74 +14,117 @@
 </marker>
 </defs>
 <g class="g-base">
+<g data-item="api-area" data-part="block">
 <g class="blk k-slab" data-id="api-area" data-dim="1">
 <polygon points="-385.7,249.9 309.2,651.1 309.2,612 -385.7,210.8" class="lft"/>
 <polygon points="694.9,428.4 309.2,651.1 309.2,612 694.9,389.3" class="rgt"/>
 <polygon points="0,-11.9 694.9,389.3 309.2,612 -385.7,210.8" class="top"/>
 <path class="grid" d="M29.4,5L-356.3,227.7M58.9,22L-326.8,244.7M88.3,39L-297.4,261.7M117.8,56L-267.9,278.7M147.2,73L-238.5,295.7M176.7,90L-209.1,312.7M206.1,107L-179.6,329.7M235.6,124L-150.2,346.7M265,141L-120.7,363.7M294.4,158L-91.3,380.7M323.9,175L-61.8,397.7M353.3,192L-32.4,414.7M382.8,209L-2.9,431.7M412.2,226L26.5,448.7M441.7,243L55.9,465.7M471.1,260L85.4,482.7M500.6,277L114.8,499.7M530,294L144.3,516.7M559.5,311L173.7,533.7M588.9,328L203.2,550.7M618.3,345L232.6,567.7M647.8,362L262.1,584.7M677.2,379L291.5,601.7M-29.4,5L665.5,406.2M-58.9,22L636,423.2M-88.3,39L606.6,440.2M-117.8,56L577.1,457.2M-147.2,73L547.7,474.2M-176.7,90L518.2,491.2M-206.1,107L488.8,508.2M-235.6,124L459.3,525.2M-265,141L429.9,542.2M-294.4,158L400.5,559.2M-323.9,175L371,576.2M-353.3,192L341.6,593.2M-382.8,209L312.1,610.2"/>
 </g>
+</g>
+<g data-item="api-area" data-part="name">
 <g data-id="api-area" data-dim="1">
 <text transform="matrix(0.866 0.5 0 1 -368.0608 250.58)" class="slabname">Proxy · stream · inbox</text>
 </g>
+</g>
+<g data-item="web-area" data-part="block">
 <g class="blk k-pad" data-id="web-area" data-dim="1">
 <polygon points="-15.9,630 141.3,720.8 141.3,714 -15.9,623.2" class="lft"/>
 <polygon points="220.8,674.9 141.3,720.8 141.3,714 220.8,668.1" class="rgt"/>
 <polygon points="63.6,577.3 220.8,668.1 141.3,714 -15.9,623.2" class="top"/>
 <path class="grid" d="M85.4,589.8L5.9,635.7M114.8,606.8L35.3,652.7M144.3,623.8L64.8,669.7M173.7,640.8L94.2,686.7M203.2,657.8L123.7,703.7M37.1,592.6L194.3,683.3M7.7,609.6L164.9,700.3"/>
 </g>
+</g>
+<g data-item="cache-area" data-part="block">
 <g class="blk k-sandbox" data-id="cache-area" data-dim="1">
 <polygon points="214.9,496.4 326.8,561 326.8,545.7 214.9,481.1" class="lft"/>
 <polygon points="438.7,496.4 326.8,561 326.8,545.7 438.7,481.1" class="rgt"/>
 <polygon points="326.8,416.5 438.7,481.1 326.8,545.7 214.9,481.1" class="top"/>
 <path class="grid" d="M338.6,423.2L226.7,487.8M368.1,440.2L256.2,504.8M397.5,457.2L285.6,521.8M427,474.2L315.1,538.8M312.1,424.9L424,489.5M282.7,441.9L394.6,506.5M253.2,458.9L365.1,523.5M223.8,475.9L335.7,540.5"/>
 </g>
+</g>
+<g data-item="cache-area" data-part="name">
 <g data-id="cache-area" data-dim="1">
 <text transform="matrix(0.866 0.5 0 1 223.781 498.1)" class="slabname sm">SEARCH</text>
 </g>
 </g>
+</g>
 <g class="g-floor">
+<g data-route="r27" data-part="label">
 <text transform="matrix(0.866 0.5 -0.866 0.5 69.7843 95.03)" class="floor mono t-send" data-hl="r27">small parser</text>
+</g>
+<g data-route="profile" data-part="label">
 <text transform="matrix(0.866 0.5 -0.866 0.5 636.598 444.38)" class="floor mono t-user" data-hl="profile">Webhook profile</text>
+</g>
+<g data-route="r30" data-part="label">
 <text transform="matrix(0.866 0.5 -0.866 0.5 63.012 431.8)" class="floor mono t-blocked" data-hl="r30">config alerts</text>
+</g>
+<g data-route="r32" data-part="label">
 <text transform="matrix(0.866 -0.5 0.866 0.5 -54.019 182.8279)" class="floor mono t-blocked" data-hl="r32">search sync router</text>
+</g>
+<g data-route="r33" data-part="label">
 <text transform="matrix(0.866 0.5 -0.866 0.5 -136.3297 220.83)" class="floor mono t-control" data-hl="r33">payments</text>
 </g>
+</g>
 <g class="g-flows">
+<g data-route="r27" data-part="line">
 <g data-hl="r27" data-id="r27">
 <path d="M54.5,94 L189.9,172.2 L181.1,177.3 L189.9,182.4" class="flow f-send" marker-end="url(#ah-scene7-send)"/>
 </g>
+</g>
+<g data-route="r28" data-part="line">
 <g data-hl="r28" data-id="r28">
 <path d="M45.6,53.2 L51.5,49.8 L469.6,291.2 L463.8,294.6" class="flow f-send" marker-end="url(#ah-scene7-send)"/>
 </g>
+</g>
+<g data-route="profile" data-part="line">
 <g data-hl="profile" data-id="profile">
 <path d="M463.8,340.5 L621.3,431.5 L621.3,443.4 L792.1,542 L709.6,589.6" class="flow f-user" marker-end="url(#ah-scene7-user)"/>
 </g>
+</g>
+<g data-route="r29" data-part="line">
 <g data-hl="r29" data-id="r29">
 <path d="M269.4,228.3 L351.9,275.9 L275.3,320.1 L544.7,475.7 L544.7,487.6 L697.8,576 L692,579.4" class="flow f-user" marker-end="url(#ah-scene7-user)"/>
 </g>
+</g>
+<g data-route="r30" data-part="line">
 <g data-hl="r30" data-id="r30">
 <path d="M-17.1,386.6 L-23,390 L335.1,596.7 L335.1,608.6 L488.2,697 L618.3,621.9" class="flow f-blocked" marker-end="url(#ah-scene7-blocked)"/>
 </g>
+</g>
+<g data-route="r31" data-part="line">
 <g data-hl="r31" data-id="r31">
 <path d="M366.6,503.7 L382.8,513.1 L382.8,528.4 L418.1,548.8 L418.1,560.7 L525.6,622.7 L609.5,574.3 L618.3,579.4" class="flow f-blocked" marker-end="url(#ah-scene7-blocked)"/>
 </g>
+</g>
+<g data-route="r32" data-part="line">
 <g data-hl="r32" data-id="r32">
 <path d="M36.8,104.2 L66.3,121.2 L-69.2,199.4 L85.4,288.7 L78,292.9" class="flow f-blocked" marker-end="url(#ah-scene7-blocked)"/>
 </g>
+</g>
+<g data-route="r2" data-part="line">
 <g data-hl="r2" data-id="r2">
 <path d="M-33.9,99.1 L-163.4,173.9" class="flow f-control" marker-end="url(#ah-scene7-control)"/>
 </g>
+</g>
+<g data-route="r33" data-part="line">
 <g data-hl="r33" data-id="r33">
 <path d="M-151.6,219.8 L-22.1,294.6 L-10.3,287.8 L-1.5,292.9" class="flow f-control" marker-end="url(#ah-scene7-control)"/>
 </g>
+</g>
+<g data-route="r34" data-part="line">
 <g data-hl="r34" data-id="r34">
 <path d="M-231.1,213 L-242.9,219.8 L225.3,490.1 L225.3,474.8 L281.2,507.1 L287.1,503.7" class="flow f-control" marker-end="url(#ah-scene7-control)"/>
 </g>
+</g>
+<g data-route="r26" data-part="line">
 <g data-hl="r26" data-id="r26">
 <path d="M164.9,681.4 L181.1,690.7 L181.1,697.5 L351.9,796.1 L636,632.1" class="flow f-user" marker-end="url(#ah-scene7-user)"/>
 </g>
 </g>
+</g>
 <g class="g-blocks">
+<g data-item="api" data-part="block">
 <g class="blk k-lead" data-id="api" data-dim="1">
 <polygon points="-70.7,76.5 5.9,120.7 5.9,59.5 -70.7,15.3" class="lft"/>
 <polygon points="82.4,76.5 5.9,120.7 5.9,59.5 82.4,15.3" class="rgt"/>
@@ -91,6 +134,8 @@
 <line x1="-60.4" y1="62.9" x2="-28.2" y2="81.4" class="det"/>
 <line x1="-60.4" y1="75.1" x2="-33.6" y2="90.6" class="det"/>
 </g>
+</g>
+<g data-item="mirror" data-part="block">
 <g class="blk k-grey" data-id="mirror" data-dim="1">
 <polygon points="-273.8,187 -185.5,238 -185.5,207.4 -273.8,156.4" class="lft"/>
 <polygon points="-120.7,200.6 -185.5,238 -185.5,207.4 -120.7,170" class="rgt"/>
@@ -98,6 +143,8 @@
 <line x1="-263.5" y1="170.9" x2="-208.8" y2="202.5" class="det"/>
 <line x1="-263.5" y1="177" x2="-232.6" y2="194.9" class="det"/>
 </g>
+</g>
+<g data-item="payments" data-part="block">
 <g class="blk k-work" data-id="payments" data-dim="1">
 <polygon points="153.1,205.7 229.7,249.9 229.7,188.7 153.1,144.5" class="lft"/>
 <polygon points="306.2,205.7 229.7,249.9 229.7,188.7 306.2,144.5" class="rgt"/>
@@ -107,16 +154,22 @@
 <line x1="163.4" y1="192.1" x2="195.6" y2="210.6" class="det"/>
 <line x1="163.4" y1="204.3" x2="190.2" y2="219.8" class="det"/>
 </g>
+</g>
+<g data-item="queue-area" data-part="wall-1">
 <g class="blk k-fence wall" data-id="queue-area" data-dim="1">
 <polygon points="33.6,247.5 192.6,339.3 192.6,312.1 33.6,220.3" class="lft"/>
 <polygon points="197.3,336.6 192.6,339.3 192.6,312.1 197.3,309.4" class="rgt"/>
 <polygon points="38.3,217.6 197.3,309.4 192.6,312.1 33.6,220.3" class="top"/>
 </g>
+</g>
+<g data-item="queue-area" data-part="wall-2">
 <g class="blk k-fence wall" data-id="queue-area" data-dim="1">
 <polygon points="-104.2,327.1 -99.5,329.8 -99.5,302.6 -104.2,299.9" class="lft"/>
 <polygon points="38.3,250.2 -99.5,329.8 -99.5,302.6 38.3,223" class="rgt"/>
 <polygon points="33.6,220.3 38.3,223 -99.5,302.6 -104.2,299.9" class="top"/>
 </g>
+</g>
+<g data-item="shipping" data-part="block">
 <g class="blk k-work" data-id="shipping" data-dim="1">
 <polygon points="-38.3,316.2 38.3,360.4 38.3,299.2 -38.3,255" class="lft"/>
 <polygon points="114.8,316.2 38.3,360.4 38.3,299.2 114.8,255" class="rgt"/>
@@ -126,6 +179,8 @@
 <line x1="-28" y1="302.6" x2="4.2" y2="321.1" class="det"/>
 <line x1="-28" y1="314.8" x2="-1.2" y2="330.3" class="det"/>
 </g>
+</g>
+<g data-item="invoices" data-part="block">
 <g class="blk k-work" data-id="invoices" data-dim="1">
 <polygon points="347.4,317.9 424,362.1 424,300.9 347.4,256.7" class="lft"/>
 <polygon points="500.6,317.9 424,362.1 424,300.9 500.6,256.7" class="rgt"/>
@@ -135,26 +190,36 @@
 <line x1="357.8" y1="304.3" x2="389.9" y2="322.8" class="det"/>
 <line x1="357.8" y1="316.5" x2="384.5" y2="332" class="det"/>
 </g>
+</g>
+<g data-item="queue-area" data-part="wall-4">
 <g class="blk k-fence wall" data-id="queue-area" data-dim="1">
 <polygon points="-108.9,329.8 -48.9,364.5 -48.9,337.3 -108.9,302.6" class="lft"/>
 <polygon points="-44.2,361.8 -48.9,364.5 -48.9,337.3 -44.2,334.6" class="rgt"/>
 <polygon points="-104.2,299.9 -44.2,334.6 -48.9,337.3 -108.9,302.6" class="top"/>
 </g>
+</g>
+<g data-item="queue-area" data-part="wall-3">
 <g class="blk k-fence wall" data-id="queue-area" data-dim="1">
 <polygon points="50.1,416.2 54.8,418.9 54.8,391.7 50.1,389" class="lft"/>
 <polygon points="192.6,339.3 54.8,418.9 54.8,391.7 192.6,312.1" class="rgt"/>
 <polygon points="187.9,309.4 192.6,312.1 54.8,391.7 50.1,389" class="top"/>
 </g>
+</g>
+<g data-item="billing" data-part="block">
 <g class="blk k-gate" data-id="billing" data-dim="1">
 <polygon points="-50.9,365.7 19.7,406.5 19.7,369.1 -50.9,328.3" class="lft"/>
 <polygon points="28.6,401.4 19.7,406.5 19.7,369.1 28.6,364" class="rgt"/>
 <polygon points="-42.1,323.2 28.6,364 19.7,369.1 -50.9,328.3" class="top"/>
 </g>
+</g>
+<g data-item="queue-area" data-part="wall-5">
 <g class="blk k-fence wall" data-id="queue-area" data-dim="1">
 <polygon points="21.8,405.3 50.1,421.6 50.1,394.4 21.8,378.1" class="lft"/>
 <polygon points="54.8,418.9 50.1,421.6 50.1,394.4 54.8,391.7" class="rgt"/>
 <polygon points="26.5,375.4 54.8,391.7 50.1,394.4 21.8,378.1" class="top"/>
 </g>
+</g>
+<g data-item="notifier" data-part="block">
 <g class="blk k-work" data-id="notifier" data-dim="1">
 <polygon points="250.3,481.1 326.8,525.3 326.8,464.1 250.3,419.9" class="lft"/>
 <polygon points="403.4,481.1 326.8,525.3 326.8,464.1 403.4,419.9" class="rgt"/>
@@ -164,6 +229,8 @@
 <line x1="260.6" y1="467.5" x2="292.7" y2="486" class="det"/>
 <line x1="260.6" y1="479.7" x2="287.4" y2="495.2" class="det"/>
 </g>
+</g>
+<g data-item="router" data-part="block">
 <g class="blk k-cloud" data-id="router" data-dim="1">
 <g transform="matrix(0.866 0.5 -0.866 0.5 655.1482 560.15)">
 <path d="M8.1,8.1 A15.5,15.5 0 0 1 36.7,8.1 A15.5,15.5 0 0 1 65.3,8.1 A15.5,15.5 0 0 1 93.9,8.1 A11.8,11.8 0 0 1 93.9,29.9 A11.8,11.8 0 0 1 93.9,51.7 A11.8,11.8 0 0 1 93.9,73.5 A15.5,15.5 0 0 1 65.3,73.5 A15.5,15.5 0 0 1 36.7,73.5 A15.5,15.5 0 0 1 8.1,73.5 A11.8,11.8 0 0 1 8.1,51.7 A11.8,11.8 0 0 1 8.1,29.9 A11.8,11.8 0 0 1 8.1,8.1Z" class="lft cloud-side"/>
@@ -172,6 +239,8 @@
 <path d="M8.1,8.1 A15.5,15.5 0 0 1 36.7,8.1 A15.5,15.5 0 0 1 65.3,8.1 A15.5,15.5 0 0 1 93.9,8.1 A11.8,11.8 0 0 1 93.9,29.9 A11.8,11.8 0 0 1 93.9,51.7 A11.8,11.8 0 0 1 93.9,73.5 A15.5,15.5 0 0 1 65.3,73.5 A15.5,15.5 0 0 1 36.7,73.5 A15.5,15.5 0 0 1 8.1,73.5 A11.8,11.8 0 0 1 8.1,51.7 A11.8,11.8 0 0 1 8.1,29.9 A11.8,11.8 0 0 1 8.1,8.1Z" class="top cloud-top"/>
 </g>
 </g>
+</g>
+<g data-item="gateway" data-part="block">
 <g class="blk k-person person" data-id="gateway" data-dim="1">
 <polygon points="19.4,623.2 63.6,648.7 63.6,642.6 19.4,617.1" class="lft"/>
 <polygon points="107.8,623.2 63.6,648.7 63.6,642.6 107.8,617.1" class="rgt"/>
@@ -179,6 +248,8 @@
 <path class="body" d="M50.6,613.1 C50.6,583.1 76.6,583.1 76.6,613.1 Q63.6,621.1 50.6,613.1z"/>
 <circle class="head" cx="63.6" cy="577.1" r="10"/>
 </g>
+</g>
+<g data-item="builder" data-part="block">
 <g class="blk k-term" data-id="builder" data-dim="1">
 <polygon points="163.4,680.9 167.5,678.5 167.5,619 163.4,621.4" class="rgt"/>
 <polygon points="115.1,593.5 163.4,621.4 167.5,619 119.3,591.1" class="top"/>
@@ -192,43 +263,66 @@
 </g>
 </g>
 </g>
+</g>
 <g class="g-air">
 </g>
 <g class="g-labels">
+<g data-item="queue-area" data-part="name">
 <text transform="matrix(0.866 0.5 0 1 -100.1125 330.48)" class="slabname sm fz" data-id="queue-area">STANDBY</text>
+</g>
+<g data-item="router" data-part="label">
 <g data-id="router" data-dim="1">
 <text x="664" y="525.9" class="lbl" text-anchor="middle">service</text>
 <text x="664" y="539.9" class="sub mono" text-anchor="middle">Webhook profile</text>
 </g>
+</g>
+<g data-item="notifier" data-part="label">
 <g data-id="notifier" data-dim="1">
 <text x="326.8" y="365.7" class="lbl" text-anchor="middle">Public snapshot</text>
 </g>
+</g>
+<g data-item="shipping" data-part="label">
 <g data-id="shipping" data-dim="1">
 <text x="38.3" y="200.8" class="lbl" text-anchor="middle">Main registry</text>
 </g>
+</g>
+<g data-item="api" data-part="label">
 <g data-id="api" data-dim="1">
 <text x="5.9" y="-52.9" class="lbl" text-anchor="middle">primary</text>
 <text x="5.9" y="-38.9" class="sub mono" text-anchor="middle">Router · orders · store · queue · catalog</text>
 </g>
+</g>
+<g data-item="payments" data-part="label">
 <g data-id="payments" data-dim="1">
 <text x="229.7" y="76.3" class="lbl" text-anchor="middle">backup</text>
 <text x="229.7" y="90.3" class="sub mono" text-anchor="middle">listener</text>
 </g>
+</g>
+<g data-item="invoices" data-part="label">
 <g data-id="invoices" data-dim="1">
 <text x="424" y="202.5" class="lbl" text-anchor="middle">Payments console</text>
 </g>
+</g>
+<g data-item="mirror" data-part="label">
 <g data-id="mirror" data-dim="1">
 <text x="-197.3" y="109" class="lbl" text-anchor="middle">old index</text>
 </g>
+</g>
+<g data-item="gateway" data-part="label">
 <g data-id="gateway" data-dim="1">
 <text x="63.6" y="533.3" class="lbl" text-anchor="middle">Report</text>
 </g>
+</g>
+<g data-item="billing" data-part="label">
 <g data-id="billing" data-dim="1">
 <text x="-11.2" y="420.5" class="lbl" text-anchor="middle">volume</text>
 <text x="-11.2" y="434.5" class="sub mono" text-anchor="middle">feed service console</text>
 </g>
+</g>
+<g data-item="builder" data-part="label">
 <g data-id="builder" data-dim="1">
 <text x="139.3" y="580.9" class="lbl" text-anchor="middle">service</text>
+</g>
 </g>
 </g>
 <g class="g-marks">

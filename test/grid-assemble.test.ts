@@ -102,23 +102,28 @@ function probe(hash: string, js: string, flags: string[] = [], budget = 6000): s
 }
 const PIECES = `[...document.querySelectorAll('.g-base [data-id], .g-blocks [data-id], .g-air [data-id]')]`;
 
-test('in Chrome: at the start of the intro, every part is outside the canvas', { skip: chrome ? false : 'no Chrome' }, () => {
-  const out = probe('assemble&at=0', `const s=document.querySelector('svg').getBoundingClientRect();
-    const bad=${PIECES}.filter(e=>{const r=e.getBoundingClientRect(); if(!r.width&&!r.height) return false;
-      return r.right>s.left+1&&r.left<s.right-1&&r.bottom>s.top+1&&r.top<s.bottom-1;}).map(e=>e.dataset.id);
-    return JSON.stringify({n:${PIECES}.length,bad:[...new Set(bad)]});`);
-  const r = JSON.parse(out);
-  assert.ok(r.n > 5);
-  assert.deepEqual(r.bad, []);
+test('in Chrome: at the start of the intro nothing shows; just after, what shows is outside the canvas', { skip: chrome ? false : 'no Chrome' }, () => {
+  // (0.15.0) the intro is the motion core's plan: what hasn't started is hidden (its wrapper's opacity), and what has
+  // comes from outside the canvas
+  for (const at of [0, 1]) {
+    const out = probe(`assemble&at=${at}`, `const s=document.querySelector('svg').getBoundingClientRect();
+      const hidden=e=>getComputedStyle(e.closest('[data-item]')).opacity==='0';
+      const bad=${PIECES}.filter(e=>{const r=e.getBoundingClientRect(); if((!r.width&&!r.height)||hidden(e)) return false;
+        return r.right>s.left+1&&r.left<s.right-1&&r.bottom>s.top+1&&r.top<s.bottom-1;}).map(e=>e.dataset.id);
+      return JSON.stringify({n:${PIECES}.length,shown:${PIECES}.filter(e=>!hidden(e)).length,bad:[...new Set(bad)]});`);
+    const r = JSON.parse(out);
+    assert.ok(r.n > 5);
+    assert.deepEqual(r.bad, []);
+    if (at === 0) assert.equal(r.shown, 0); else assert.ok(r.shown > 0 && r.shown < r.n, `${r.shown} of ${r.n} have started`);
+  }
 });
 
 test('in Chrome: after the intro, every part is in place and the step player runs', { skip: chrome ? false : 'no Chrome' }, () => {
-  // the browser's animation clock and headless virtual time drift apart, so wait for the intro to start, then
-  // fast-forward it, rather than trusting a fixed delay
+  // wait for the intro to start, then to end (the steps' focus comes back), never a fixed delay
   const out = probe('assemble&motion', `const svg0=document.querySelector('svg'); const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     for(let i=0;i<50&&svg0.classList.contains('pre-assemble');i++) await sleep(50);
-    document.getAnimations().forEach(a=>{ if(a.constructor===Animation) a.finish(); }); await sleep(100);
-    const moved=${PIECES}.filter(e=>{const t=getComputedStyle(e).transform;return t!=='none'&&t!=='matrix(1, 0, 0, 1, 0, 0)'}).map(e=>e.dataset.id);
+    for(let i=0;i<100&&!svg0.classList.contains('focus');i++) await sleep(50);
+    const moved=[...document.querySelectorAll('[data-part]')].filter(e=>{const c=getComputedStyle(e),t=c.transform;return c.opacity!=='1'||(t!=='none'&&t!=='matrix(1, 0, 0, 1, 0, 0)')}).map(e=>e.dataset.item??e.dataset.route);
     const svg=document.querySelector('svg');
     const playing=document.querySelector('[data-a=play]').textContent.includes('Pause');
     return JSON.stringify({anims:document.getAnimations().filter(a=>a.constructor===Animation&&a.playState==='running').length,moved,pre:svg.classList.contains('pre-assemble'),focus:svg.classList.contains('focus'),playing});`, [], 12000);

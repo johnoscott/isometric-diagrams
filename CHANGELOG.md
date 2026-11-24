@@ -2,9 +2,23 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.15.0 — motion
+
+- **Motion documents**: beats with commentary, show and hide, focus, highlight, levels, looks, tokens, ants, lift, camera, in a scene's
+  `motion:` or in code (`motion()`); `bindMotion(scene, doc)` is a Timeline: `at(ms)` in any order, `cues(ms)`, two clocks. `variants` on
+  nodes and regions; `ants` on a scene. `systems.renderSvg(yaml, { theme, t })`: one frame, or a still, as one SVG.
+- **Motion as a function of time** (`@johnoscott/isometric-engine/motion`): `assemble` and `disassemble` plans you can seek,
+  `at(ms)` as plain JSON, `svgAt` and `frame(ms)` as SVG text, `paint` on a live drawing. No clock, no DOM: for video
+  renderers, and the page's own intro. `motion:` in the file.
+- A wrapper per part of a thing in the SVG (`data-item` or `data-route`, with `data-part`), for a host that animates it.
+- `compile(…, { mode, resolveVars, strict, stepMs })`: self-contained drawings, dark or light; strict reading.
+- **Known**: `paint` on a self-contained drawing (`resolveVars`) draws the rings and tokens a state adds in the page's colours; `svgAt`
+  and `renderSvg` draw them right. Fixed in 0.16.0.
+
 ## 0.14.1 — a double click to rename
 
 - With `doubleClick: 'rename'`, a double click on a connection does nothing, and beside one on a group's floor it renames the group.
+
 
 ## 0.14.0 — the editor's feel
 

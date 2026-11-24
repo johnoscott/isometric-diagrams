@@ -83,6 +83,8 @@ paragraphs.
 | `dim` | | What a step dims: `flows` (default: routes, their labels and marks) or `all` (nodes, regions and badges too). |
 | `badges` | | `true` puts a numbered badge for each step on the diagram. |
 | `grid`, `assemble` | | As at the top of the file, for this scene only. |
+| `motion` | | The scene's motion document: a timeline of beats. See [MOTION.md](MOTION.md#a-motion-document). |
+| `ants` | | Its connectors march, showing which way they flow: `true`, a list of route ids, or `{ ids, speed, dash }`. In `renderSvg`'s stills and in a timeline's frames. |
 | `after` | | Markdown under the scene's figure. |
 
 Ids are one namespace per scene: a region, node and route may not share an id.
@@ -132,6 +134,8 @@ regions:
 | `z` | | Lift above the floor it stands on (tunnels float at 0.2). |
 | `flow` | | `row` or `column` for its contents. |
 | `gate` | fence only | `side` (required: n, e, s, w), `at` (0–1 along the wall, default 0.5), `width` (default 2), `height`, `node` (a node id: the fence puts that node in the gap). |
+| `motion` | | How it, and what it holds, arrives and leaves. See [MOTION.md](MOTION.md). |
+| `variants` | | Other looks of it, by name, for a motion to switch to: `{ asleep: { role, ghost, label, sub } }`. See [MOTION.md](MOTION.md#looks). |
 | `around` | tunnel only | Route ids: the tunnel lights with those routes. |
 | `nodes`, `regions` | | Contents. Their `at` is relative to this region's corner. |
 | placement keys | | As for nodes, [below](#placement). |
@@ -167,6 +171,8 @@ nodes:
 | `ghost` | | Dashed outline only. |
 | `face`, `facing` | screen, monitor | What the screen shows (`terminal`, `chat`, `desktop`, `tiles`, or a face the host registers: one nothing registered draws a placeholder, with a warning); turn in degrees. |
 | `nodes` | | Nodes standing on top of this one (files on a folder). |
+| `motion` | | How it arrives and leaves: `{ style, out, easing, from, delay, duration }`. See [MOTION.md](MOTION.md). |
+| `variants` | | Other looks of it, by name, for a motion to switch to: `{ asleep: { role, ghost, label, sub, face, deco } }`. See [MOTION.md](MOTION.md#looks). |
 | placement keys | | [Below](#placement). |
 | `appears`, `disappears` | | A step id or number: hidden before / from that step. Routes to a hidden node hide with it. |
 

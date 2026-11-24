@@ -103,7 +103,9 @@ function typesIso(out: string) {
     '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--strict', '--allowImportingTsExtensions', '--verbatimModuleSyntax',
     '--erasableSyntaxOnly', '--resolveJsonModule', '--lib', 'ES2022,DOM', '--types', 'node', '--skipLibCheck', ...Object.values(DIRS).map(d => `${d}/index.ts`),
     // 0.12.2: every public module's declarations (its subpath's types), not only what an index reaches
-    ...SOURCE_LAYERS.flatMap(l => [...publicOf(l)].filter(m => m.endsWith('.ts') && m !== 'index.ts').sort().map(m => `${l.dir}/${m}`))],
+    ...SOURCE_LAYERS.flatMap(l => [...publicOf(l)].filter(m => m.endsWith('.ts') && m !== 'index.ts').sort().map(m => `${l.dir}/${m}`)),
+    // (0.15.0) /motion's
+    'src/iso-objects/motion-entry.ts'],
   { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? files(join(d, e.name)) : [join(d, e.name)]));
   const DROP = NODE_ONLY.map(r => new RegExp(r.source.replace('\\.ts', '\\.(ts|js)')));
@@ -184,7 +186,9 @@ function packageIso(out: string, registry: Registry) {
     bugs: { url: 'https://github.com/johnoscott/isometric-diagrams/issues' },
     publishConfig: PUBLISH[registry],
     files: PACKAGE_FILES,
-    exports: { './render': exp('iso-render.js'), './editor': exp('iso-editor.js'), './systems': exp('iso-systems.js'), ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },
+    exports: { './render': exp('iso-render.js'), './editor': exp('iso-editor.js'), './systems': exp('iso-systems.js'),
+      // 0.15.0: motion (plans, documents, the Timeline, svgAt, paint): the modules and what they need, not a bundle of their own
+      './motion': { types: './types/iso-objects/motion-entry.d.ts', source: './src/iso-objects/motion-entry.ts', default: './js/iso-objects/motion-entry.js' }, ...moduleExports(), './assets/*': './assets/*', './package.json': './package.json' },
     // no dependencies of any kind: the code bundles what it runs (yaml). Only /editor's declarations name other packages'
     // types (yaml's, and Monaco's for the optional text pane); a host type-checking against /editor installs them itself.
     // (0.7.1: as optional peers they were installed anyway from the registry, which drops peerDependenciesMeta, and

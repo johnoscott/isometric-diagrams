@@ -29,6 +29,29 @@
     "scenes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/scene" } }
   },
   "$defs": {
+    "motion": {
+      "type": "object", "additionalProperties": false, "minProperties": 1,
+      "description": "how this piece (a region: its contents too) moves when the drawing assembles or disassembles",
+      "properties": {
+        "style": { "enum": ["edge", "drop", "rise", "fly", "pop", "scatter", "build", "fade"], "description": "how it arrives" },
+        "out": { "enum": ["explode", "lift-off", "sink", "scatter", "fly-out", "collapse", "fade", "reverse"], "description": "how it leaves" },
+        "easing": { "enum": ["linear", "ease", "ease-in", "ease-out", "settle", "spring", "bounce"] },
+        "from": { "enum": ["left", "right", "top", "bottom"], "description": "fly: the side it comes from" },
+        "delay": { "type": "number", "minimum": 0, "description": "ms after its turn" },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "ms its own move takes" }
+      }
+    },
+    "variants": {
+      "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/id" },
+      "description": "other looks of it, by name, for a motion to switch to (its box stays as it is)",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false, "minProperties": 1,
+        "properties": {
+          "role": { "type": "string" }, "ghost": { "type": "boolean" }, "label": { "type": "string" }, "sub": { "type": "string" },
+          "face": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "deco": { "type": "array", "items": { "$ref": "#/$defs/deco" } }
+        }
+      }
+    },
     "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
     "grid": {
       "type": "object",
@@ -88,6 +111,18 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "title": { "type": "string" },
+        "ants": {
+          "description": "its connectors march, showing which way they flow: all that may, these, or with a speed (units a second) and a dash",
+          "anyOf": [
+            { "type": "boolean" },
+            { "type": "array", "items": { "type": "string" } },
+            { "type": "object", "additionalProperties": false, "properties": {
+              "ids": { "type": "array", "items": { "type": "string" } },
+              "speed": { "type": "number" },
+              "dash": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2 } } }
+          ]
+        },
+        "motion": { "type": "object", "description": "the scene's motion document (isomotion/1; its `isomotion: 1` may be left out)" },
         "caption": { "type": "string" },
         "aria": { "type": "string" },
         "gap": { "type": "number", "exclusiveMinimum": 0 },
@@ -143,6 +178,8 @@
         },
         "around": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "tunnel: routes it wraps" },
         "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
+        "motion": { "$ref": "#/$defs/motion" },
+        "variants": { "$ref": "#/$defs/variants" },
         "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } }
       }
     },
@@ -188,6 +225,8 @@
             "dy": { "type": "number" }
           }
         },
+        "motion": { "$ref": "#/$defs/motion" },
+        "variants": { "$ref": "#/$defs/variants" },
         "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" }, "description": "nodes standing on top of this one" }
       }
     },

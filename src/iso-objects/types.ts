@@ -8,6 +8,15 @@ export type { RawRole, RawKind, Theme };
 export type Side = 'n' | 'e' | 's' | 'w';
 export type StepRef = string | number;
 
+/** how one piece (and, a region's, its contents) moves when a drawing assembles or disassembles (motion.ts) */
+export interface RawMotion {
+  style?: 'edge' | 'drop' | 'rise' | 'fly' | 'pop' | 'scatter' | 'build' | 'fade';
+  out?: 'explode' | 'lift-off' | 'sink' | 'scatter' | 'fly-out' | 'collapse' | 'fade' | 'reverse';
+  easing?: 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'settle' | 'spring' | 'bounce';
+  from?: 'left' | 'right' | 'top' | 'bottom';
+  /** ms after its turn, and ms its own move takes */
+  delay?: number; duration?: number;
+}
 export interface RawPlacement {
   in?: string; at?: [number, number];
   'right-of'?: string; 'left-of'?: string; below?: string; behind?: string;
@@ -19,13 +28,18 @@ export interface RawNode extends RawPlacement {
   id: string; asset?: string; role?: string; label?: string; sub?: string;
   size?: number[]; z?: number; deco?: RawDeco[]; ghost?: boolean; face?: string; facing?: number;
   'label-at'?: { side?: 'above' | 'right' | 'left' | 'below'; dx?: number; dy?: number };
-  nodes?: RawNode[];
+  nodes?: RawNode[]; motion?: RawMotion;
+  /** other looks of it, by name, for a motion to switch to: its own keys, over what it is */
+  variants?: Record<string, RawVariant>;
 }
+/** what a look may change: never the thing's box, so nothing else moves */
+export interface RawVariant { role?: string; ghost?: boolean; label?: string; sub?: string; face?: string; deco?: RawDeco[] }
 export interface RawGate { side: Side; at?: number; width?: number; height?: number; node?: string }
 export interface RawRegion extends RawPlacement {
   id: string; kind: RegionKindName; label?: string; 'label-style'?: 'face' | 'face-right' | 'floor' | 'none'; ghost?: boolean;
   role?: string; size?: number[]; padding?: number; height?: number; z?: number; flow?: 'row' | 'column';
-  gate?: RawGate; around?: string[]; regions?: RawRegion[]; nodes?: RawNode[];
+  gate?: RawGate; around?: string[]; regions?: RawRegion[]; nodes?: RawNode[]; motion?: RawMotion;
+  variants?: Record<string, RawVariant>;
 }
 export interface RawNote {
   floor?: string; face?: string; label?: string; sub?: string; at?: number[]; on?: string; kind?: string;
@@ -36,6 +50,10 @@ export interface RawScene {
   regions?: RawRegion[]; nodes?: RawNode[]; routes?: unknown[]; notes?: RawNote[]; steps?: unknown[];
   legend?: 'auto' | false | string[]; badges?: boolean; loop?: boolean; after?: string;
   grid?: GridDef; assemble?: boolean; dim?: 'flows' | 'all';
+  /** the scene's motion document (its `isomotion: 1` may be left out) */
+  motion?: Record<string, unknown>;
+  /** its connectors march: all that may, these, or these with a speed and a dash (ants.ts) */
+  ants?: boolean | string[] | { ids?: string[]; speed?: number; dash?: [number, number] };
 }
 export interface GridDef { snap?: number; show?: boolean; step?: number }
 export interface RawDiagram {
