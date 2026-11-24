@@ -168,7 +168,7 @@ a drawing with neither is drawn.
 
 | Attribute | |
 |---|---|
-| `controls` | Play, Back, Next, Reset, the ambient switch, a scrubber, the beats as dots by chapter, the commentary and a text list of the beats. Without it, the drawing alone. |
+| `controls` | Play, Back, Next, Reset, the ambient switch, **Motion off** for a reader who asked for less motion, a scrubber, the beats as dots by chapter, the commentary and a text list of the beats. Without it, the drawing alone. |
 | `autoplay` | Plays at once. `autoplay="visible"`: when most of it is in view; one on a page plays at a time, and a reader's pause is kept. |
 | `loop`, `rate` | Begins again at its end; how fast. |
 | `ambient` | `on` or `off`: the ants, and the tokens and pulses that loop (default: the document's). |
@@ -176,14 +176,14 @@ a drawing with neither is drawn.
 | `scene` | Which scene, by its id (default: the first). |
 | `treatment` | `mono`: black and white, in either mode; `none`: in colour, whatever the drawing says. |
 | `label` | What a screen reader calls it. |
-| `reduced-motion` | `ignore` (the default: motion plays) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
+| `reduced-motion` | `ignore` (the default: motion plays, and a reader who asked for less has a **Motion off** button, with or without `controls`: everything is in place and lit, nothing moves, and the steps are open as text; pressed again, from the first step) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
 | `links` | It follows the page's `#step=3`, `#t=0.5` (how far into the step) and `#still` (one picture, no controls). |
 
 Its properties are `source`, `theme`, `motion` (a document as data) and `transport`. Its events are `beat` (`detail.beat`, `detail.how`),
 `play`, `pause`, `end`, `loop`, `isometric-ready` and `isometric-error` (a fault is also said in its place, in words). Arrow keys step; on
 the player itself, Space plays and pauses.
 
-A reader without the script sees what is in the element besides the text. `isodiag build PAGE.html -o OUT.html` writes a still there, for
+A reader without the script sees what is in the element besides the text. `isodiag build` writes a still there: **it is a command of the repository (`bin/isodiag.mjs`), not in the npm package**. `isodiag build PAGE.html -o OUT.html` writes one for
 each element whose text is in a `<script type="text/yaml">`, in its mode and treatment; run again, it replaces the stills it wrote.
 
 ## Black and white
@@ -234,14 +234,14 @@ const Story = (p: DrawingProps) => <IsometricScene {...p} />;
 ```
 
 - `<IsometricScene>` takes the drawing's text (`src`), a theme's text, and what it may have: `motion` (default: the scene's own, else its steps), `scene`, `mode`,
-  `treatment: 'mono'`, `font`, `ambient: 'off'`; and `width`, `height`, `style`, `className`, `prefix` (its ids' beginning). A fault in the drawing or its motion is thrown, with every one said.
+  `treatment: 'mono'`, `font`, `ambient: 'off'`; and `width`, `height` (both `100%` of what it is in, where the drawing keeps its proportions), `style`, `className`, `prefix` (its ids' beginning). A fault in the drawing or its motion is thrown, with every one said.
 - `isometricMetadata` makes the video as long as the motion. `useIsometricCues(props)` is the commentary now, for a caption of yours. `<IsometricSequences>` is a Remotion
-  `Sequence` for each beat, by its name, with what you put beside it.
+  `Sequence` for each beat, by its name, with what you put beside it: its children are a function of the beat (`beat => <h1>{beat.say?.title}</h1>`).
 - In a `TransitionSeries`: `isometricTiming({ spring: { damping: 200 } })` (or `{ linear: 400 }`, `'1.2s'`, `'12f'`) is a document's transition as a timing, and
   `isometricPresentation()` its fade. Both scenes fade, as a drawing has no ground of its own; `{ exiting: 'stay' }` keeps the one going out.
 - With no React: `drawingOf(props)`, `frameSvg(drawing, frame, fps)`, `cueAt`, `framesOf`, `timeOf`, the same numbers (the module itself imports both).
 
-`samples/remotion` in the repository is a small project of its own.
+`samples/remotion` is a small project of its own. **It is in the repository (github.com/johnoscott/isometric-diagrams), as this page is; neither is in the npm package.**
 
 **Remotion isn't open source, and using it needs Remotion's own licence** (`remotion.dev/license`). Rendering is your own setup, with Remotion's renderer:
 

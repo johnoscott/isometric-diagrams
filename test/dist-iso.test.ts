@@ -353,6 +353,11 @@ export const Story = (q: DrawingProps) => <><IsometricScene {...q} width={800} /
 export const Root = () => <Composition id="Story" component={Story} defaultProps={p} calculateMetadata={isometricMetadata({ fps: 30, width: 1920, height: 1080 })} />;
 export const n: number = isometricTiming({ spring: { damping: 200 } }).getDurationInFrames({ fps: 30 });
 export const c = isometricPresentation({ exiting: 'stay' }).component, f: string = isometricFonts({ url: 'a.ttf' }).family;
+// what Remotion's Composition asks of its props once its command line is installed (zod comes with it, and its types with that)
+export const rec: Record<string, unknown> = p;
+export const loose: (q: Record<string, unknown> & DrawingProps) => unknown = Story;
+type Meta<T extends Record<string, unknown>> = (o: { props: T }) => unknown;
+export const meta: Meta<DrawingProps> = isometricMetadata({ fps: 30, width: 1920, height: 1080 });
 // @ts-expect-error no such font
 export const bad: DrawingProps = { src: '', theme: '', font: 'helvetica' };
 `);

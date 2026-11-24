@@ -7,6 +7,7 @@ A small project of its own: `Story` is a drawing with its motion and a caption, 
 **Remotion isn't open source, and using it needs Remotion's own licence** (remotion.dev/license). The engine is MIT; Remotion, and what you render with, are yours to install
 and to have a licence for. This project has nothing to render with: add Remotion's command line (`@remotion/cli`, at the same version, 4.0.546), then
 
+    npm run check            # its types, with the command line's beside them
     npx remotion studio ./src/index.ts
     npx remotion render ./src/index.ts Story
 

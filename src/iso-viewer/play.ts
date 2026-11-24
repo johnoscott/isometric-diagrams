@@ -24,7 +24,7 @@ export interface PlayerOptions {
   loop?: boolean;
   rate?: number;
   ambient?: 'on' | 'off';
-  /** a reader who asked for less motion (default 'ignore': motion plays). 'respect': the last state, everything lit, the ambient off, until they press Play */
+  /** a reader who asked for less motion (default 'ignore': motion plays, and they get a Motion off button). 'respect': the last state, everything lit, the ambient off, until they press Play */
   reducedMotion?: 'ignore' | 'respect';
   mode?: 'light' | 'dark';
   /** the timeline is the drawing's own steps (motionOfSteps): its callouts and marks show at their step, and the other steps' numbers dim */
@@ -74,8 +74,9 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   let scene = o.scene, svg = svgOf(scene.rendered.svg), frozen: number | undefined, stepTo: number | undefined, userPaused = false, gone = false;
   const tr = transport(o.timeline ?? NOTHING, { loop: o.loop, rate: o.rate, ambient: o.ambient, clock: o.clock });
   const controls = o.controls ?? true;
-  const calm = o.reducedMotion === 'respect' && typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let resting = calm;
+  const asked = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, calm = asked && o.reducedMotion === 'respect';
+  /** off: the reader pressed Motion off, and nothing moves, whoever asks it to */
+  let resting = calm, off = false, inView = true;
 
   // ---- the parts ----
   const btn = (cls: string, label: string, text: string, f: () => void) => h('button', { type: 'button', class: `iso-play-btn ${cls}`, 'aria-label': label, title: label, on: { click: f as EventListener } }, text);
@@ -83,8 +84,11 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   const back = btn('back', 'Back', '‹', () => byHand(() => step(Math.max(0, at() - 1))));
   const play = btn('play', 'Play', '▶', () => toggle());
   const next = btn('next', 'Next', '›', () => byHand(() => step(Math.min(tr.timeline.beats.length - 1, at() + 1))));
-  const again = btn('again', 'Reset', '↺', () => byHand(() => { stop(); tr.restart(); }));
+  const again = btn('again', 'Reset', '↺', () => byHand(() => { stop(); if (off) tr.seek(0); else tr.restart(); }));
   const amb = btn('ambient', 'Ambient motion', '∿', () => { wake(); tr.ambient = !tr.ambient; show(); });
+  // a reader who asked their machine for less motion: it plays, as for anybody, and they get this (docs/design/MOTION.md, 6.2)
+  const still = btn('still', 'Motion off', 'Motion off', () => setOff(!off));
+  still.title = 'Draw everything in place, with nothing moving';
   const bar = h('input', { type: 'range', class: 'iso-play-bar', min: 0, step: 1, 'aria-label': 'Time', on: { input: (() => byHand(() => { stop(); tr.seek(Number(bar.value)); })) as EventListener } });
   const time = h('span', { class: 'iso-play-time' });
   const dots = h('div', { class: 'iso-play-dots' });
@@ -92,9 +96,9 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   const text = h('div', { class: 'iso-play-text' }), code = h('pre', { class: 'iso-play-code' }), facts = h('dl', { class: 'iso-play-facts' });
   const say = h('div', { class: 'iso-play-say', 'aria-live': 'polite' }, h('div', { class: 'iso-play-head' }, num, title, chapter, count), text, code, facts);
   const list = h('details', { class: 'iso-play-list' });
-  const row = h('div', { class: 'iso-play-row' }, back, play, next, again, amb, bar, time);
+  const row = h('div', { class: 'iso-play-row' }, back, play, next, again, amb, still, bar, time), alone = h('div', { class: 'iso-play-row' });
   const root = h('div', { class: 'iso-play', role: 'group', 'aria-roledescription': 'animated diagram', 'aria-label': o.label ?? 'Diagram', tabindex: controls ? 0 : undefined, 'data-mode': o.mode ?? 'light' },
-    stage, controls && row, controls && dots, controls && say, controls && list);
+    stage, controls ? row : alone, controls && dots, controls && say, controls && list);
   host.append(root);
 
   // ---- what there is to show: the beats ----
@@ -113,6 +117,9 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
     for (const el of [back, next, dots]) el.hidden = !some;
     say.hidden = !said; list.hidden = !said;
     amb.hidden = !tr.timeline.loops;
+    still.hidden = !asked || calm || (tr.duration <= 0 && !tr.timeline.loops) || (!controls && !o.autoplay && !tr.timeline.loops);
+    alone.hidden = still.hidden;
+    if (!controls && !still.hidden) alone.append(still);
     bar.max = String(Math.round(tr.duration));
     for (const el of [play, again, bar, time]) el.hidden = tr.duration <= 0;
     told = undefined;
@@ -153,7 +160,7 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
     dotOf.forEach((d, i) => { d.classList.toggle('on', i === b?.index); d.classList.toggle('done', b !== undefined && i < b.index); if (i === b?.index) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current'); });
   }
   function show() {
-    const S = frozen !== undefined ? tr.timeline.at(frozen, { ambient: frozen }) : resting ? lit(tr.timeline.at(tr.duration, { ambient: 'off' })) : tr.state();
+    const S = frozen !== undefined ? tr.timeline.at(frozen, { ambient: frozen }) : resting ? lit(tr.timeline.at(tr.duration, { ambient: 'off' })) : off ? tr.timeline.at(tr.time, { ambient: 'off' }) : tr.state();
     paint(svg, S, scene.rendered, { styles: 'cssom' });
     root.dataset.time = String(Math.round(frozen ?? tr.time));
     if (frozen !== undefined) marks(tr.timeline.beatAt(frozen)); else caption();
@@ -169,6 +176,8 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
     amb.setAttribute('aria-pressed', String(tr.ambient));
     say.setAttribute('aria-live', on ? 'off' : 'polite');
     root.dataset.playing = String(on);
+    still.setAttribute('aria-pressed', String(off));
+    play.disabled = off; amb.disabled = off;
   }
 
   // ---- playing ----
@@ -180,6 +189,19 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   /** the reader did it: an autoplay doesn't start again by itself */
   function byHand(f: () => void) { wake(); userPaused = true; f(); buttons(); show(); }
   function stop() { stepTo = undefined; tr.pause(); }
+  /** off: everything in place and lit, nothing moving, the steps open as text; on again: from the first step, playing if it began by itself */
+  function setOff(v: boolean) {
+    if (gone || v === off) return;
+    off = v; resting = v; told = undefined;
+    stop();
+    tr.active = inView && !off;
+    tr.seek(off ? tr.duration : 0);
+    if (off) list.open = true;
+    marks(tr.beat);
+    buttons(); show();
+    if (!off && o.autoplay === true && !userPaused) tr.play();
+    pick();
+  }
   function step(i: number) {
     const b = tr.timeline.beats[i];
     if (!b || gone) return;
@@ -188,9 +210,12 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
     const nextStart = tr.timeline.beats[i + 1]?.start ?? Infinity;
     // through the beat, and to a stop within it (its end is the next one's start)
     stepTo = Math.max(b.start, Math.min(b.end, nextStart, tr.duration) - 1);
+    // off: the step as it is when it is over, and no way there
+    if (off) { const to = stepTo; stepTo = undefined; tr.seek(to); return; }
     tr.play({ until: stepTo });
   }
   function toggle() {
+    if (off) return;
     wake();
     if (going()) { userPaused = true; stop(); } else { userPaused = false; stepTo = undefined; tr.pause(); tr.play(); }
     buttons(); show();
@@ -216,10 +241,10 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   // ---- in view: neither clock moves for a player nobody can see; one that autoplays in view is one at a time ----
   const me = {
     seen: 0, wants: o.autoplay === 'visible' && !calm,
-    auto(on: boolean) { if (on) { if (!userPaused && !going()) { stepTo = undefined; tr.play(); } } else if (going()) { stepTo = undefined; tr.pause(); } },
+    auto(on: boolean) { if (on) { if (!off && !userPaused && !going()) { stepTo = undefined; tr.play(); } } else if (going()) { stepTo = undefined; tr.pause(); } },
   };
   mounted.set(root, me);
-  const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => { for (const e of es) { me.seen = e.isIntersecting ? e.intersectionRatio : 0; if (frozen === undefined) tr.active = e.isIntersecting; } pick(); }, { threshold: [0, 0.2, 0.35, 0.5, 0.7, 0.9, 1] }) : undefined;
+  const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => { for (const e of es) { me.seen = e.isIntersecting ? e.intersectionRatio : 0; inView = e.isIntersecting; if (frozen === undefined) tr.active = inView && !off; } pick(); }, { threshold: [0, 0.2, 0.35, 0.5, 0.7, 0.9, 1] }) : undefined;
   io?.observe(root);
 
   beats(); buttons(); show();
@@ -254,6 +279,9 @@ export const PLAY_CSS = `
 .iso-play-btn:hover{border-color:var(--ip-muted)}
 .iso-play-btn.play{background:var(--ip-ink);color:var(--ip-bg);border-color:var(--ip-ink);min-width:44px}
 .iso-play-btn.ambient[aria-pressed="false"]{color:var(--ip-muted);text-decoration:line-through}
+.iso-play-btn.still{font-size:12px;white-space:nowrap}
+.iso-play-btn.still[aria-pressed="true"]{background:var(--ip-ink);color:var(--ip-bg)}
+.iso-play-btn:disabled{opacity:.4;cursor:default}
 .iso-play-bar{flex:1 1 60px;min-width:0;accent-color:var(--ip-ink)}
 .iso-play-time{color:var(--ip-muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .iso-play-dots{display:flex;flex-wrap:wrap;gap:4px 12px;padding:2px 12px}

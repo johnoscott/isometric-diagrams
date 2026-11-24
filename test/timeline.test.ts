@@ -170,6 +170,25 @@ test('what children do: assemble and leave, draw, type, lift and back, camera, f
   assert.equal(opacity(f, 'a', 1500 + 125), 0.56); assert.equal(opacity(f, 'a', 2000), 0.12); assert.equal(opacity(f, 'a', 2500 - 125), 0.56);
 });
 
+test('assemble and disassemble wherever a beat may have them: its children, its layers, a sequence or a series in it, a loop; with a length of its own or not', () => {
+  const places: [string, (n: object) => object][] = [
+    ['children', n => ({ children: [n] })], ['layers', n => ({ layers: [n] })], ['a sequence in it', n => ({ children: [{ sequence: { duration: 3000, children: [n] } }] })],
+    ['a series in it', n => ({ series: [{ sequence: { duration: 3000, children: [n] } }] })], ['layers in layers', n => ({ children: [{ layers: [n] }] })], ['a loop', n => ({ children: [{ sequence: { duration: 1500, loop: 2, children: [n] } }] })],
+  ];
+  for (const n of [{ assemble: {} }, { assemble: { style: 'drop' } }, { disassemble: { style: 'fade' } }]) for (const [where, put] of places) for (const own of [{ duration: 3000 }, {}]) {
+    const say = `${JSON.stringify(n)} in ${where}, ${JSON.stringify(own)}`;
+    const t = bind({ series: [{ sequence: { name: 'a', ...own, ...put(n) } }] });
+    assert.ok(t.ok, say);
+    // the same as the plan of the same options, where it stands
+    const plan = bind({ layers: [n] });
+    for (const ms of [0, 120, 400, 900]) assert.deepEqual(t.at(ms).items, plan.at(ms).items, `${say} at ${ms}`);
+    // given in time, its own length
+    assert.ok(bind({ series: [{ sequence: { name: 'a', ...own, ...put({ ...n, from: 200, duration: 900 }) } }] }).at(1000), say);
+  }
+  // a fault in one is said when it is bound, not when it is drawn
+  assert.throws(() => bind({ series: [{ sequence: { name: 'a', duration: 3000, children: [{ assemble: { style: 'dropp' } }] } }] }));
+});
+
 test('an explosion whole, and phases: the slabs appear as they rise, the rest fades to .1 in .45 s and comes back; levels as a phase has them', () => {
   // the page: the layers' opacity is 0 until each rises (.25 s, 50 ms apart); everything else goes to .1 over .45 s (CSS ease), but one to .6
   const up = { times: [0, 250], values: [0, 1], extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }, away = { times: [380, 560], values: [1, 0], extrapolateLeft: 'clamp', extrapolateRight: 'clamp' };

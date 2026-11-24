@@ -45,8 +45,26 @@ test('a drawing with motion: drawn from a script of YAML or from the element\'s 
   assert.ok((await d.ev<string[]>('return B.events;')).includes('isometric-ready'));
 }));
 
+test('a reader who asked for less motion: the element plays, and has a Motion off button; with respect, none', opts, page(`<isometric-diagram controls autoplay><script type="text/yaml">\n${MOVING}</script></isometric-diagram>`, async d => {
+  const has = `${E0} const b = r.querySelector('.still'); return !!b && b.getClientRects().length > 0;`;
+  for (const [v, want] of [['no-preference', false], ['reduce', true]] as const) {
+    await d.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: v }] });
+    // drawn anew, as a page opened by that reader is
+    await d.ev(`const el = document.querySelector("isometric-diagram"), p = el.parentNode, n = el.nextSibling; el.remove(); const c = el.cloneNode(true); p.insertBefore(c, n);`);
+    await d.until('document.querySelector("isometric-diagram")?.shadowRoot?.childElementCount', 'drawn again');
+    assert.equal(await d.ev(has), want, v);
+    await d.until('(t => t.playing && t.time > 0)(document.querySelector("isometric-diagram").transport)', 'it plays');
+  }
+  await d.ev(`${E0} r.querySelector('.still').click();`);
+  const t = await d.ev<number>(`${E0} return tr.time;`); await d.ev('await tick(300);');
+  assert.deepEqual(await d.ev(`${E0} return [tr.time, tr.playing, r.querySelector('.still').getAttribute('aria-pressed')];`), [t, false, 'true']);
+  await d.ev(`document.querySelector("isometric-diagram").setAttribute('reduced-motion', 'respect'); await tick(200);`);
+  assert.equal(await d.ev(has), false);
+}));
+
 test('attributes: none, the drawing alone; loop, rate and ambient as it plays; mode draws again and keeps the place; scene', opts, page(`<isometric-diagram rate="2"><script type="text/yaml">\n${MOVING}</script></isometric-diagram>`, async d => {
-  assert.equal(await d.ev(`${E0} return r.querySelectorAll('button').length;`), 0);
+  // (a reader who asked for less motion has one button here, its own test's)
+  assert.equal(await d.ev(`${E0} return [...r.querySelectorAll('button')].filter(b => !b.classList.contains('still')).length;`), 0);
   assert.deepEqual(await d.ev(`${E0} el.setAttribute('loop', ''); el.setAttribute('rate', '3'); el.setAttribute('ambient', 'off'); return [tr.rate, tr.loop, tr.ambient];`), [3, true, false]);
   assert.deepEqual(await d.ev(`${E0} el.removeAttribute('loop'); el.setAttribute('rate', 'no'); el.removeAttribute('ambient'); return [tr.rate, tr.loop, tr.ambient];`), [1, false, true]);
   await d.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });

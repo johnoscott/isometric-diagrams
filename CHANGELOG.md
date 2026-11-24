@@ -2,6 +2,14 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.17.1 — fixes from the first video
+
+- `assemble` and `disassemble` in a beat that says its own length threw; they play, wherever a beat may have them.
+- **Motion off** on `<isometric-diagram>` (and `mountPlayer`): motion plays for a reader who asked their machine for less, as before, and they now have a button that stops
+  everything and lights the whole drawing; with or without `controls`.
+- `DrawingProps` is a type that Remotion's `<Composition>` takes, with its command line installed too.
+- The package's README says what is in the repository alone, and where: the docs, the sample, the `isodiag` command.
+
 ## 0.17.0 — drawings in Remotion videos
 
 - **`@johnoscott/isometric-engine/remotion`**: `<IsometricScene>`, `useIsometricCues`, `<IsometricSequences>`, `isometricMetadata`, and `isometricTiming` and `isometricPresentation` for a

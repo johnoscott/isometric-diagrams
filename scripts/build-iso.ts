@@ -279,6 +279,10 @@ Use:
   only), or uses \`skipLibCheck\`. \`/render\` and \`/systems\` need nothing else installed.
 - \`/remotion\` is for Remotion videos, and needs \`react\` and \`remotion\`, which you install (optional peers: installing the engine installs neither).
   Remotion isn't open source: using it needs Remotion's own licence.
+- Not in this package, and in the repository: the docs (motion, the player and Remotion videos:
+  https://github.com/johnoscott/isometric-diagrams/blob/main/docs/MOTION.md), a sample Remotion project
+  (https://github.com/johnoscott/isometric-diagrams/tree/main/samples/remotion), and the \`isodiag\` command, whose
+  \`isodiag build PAGE.html\` writes a still into each \`<isometric-diagram>\` for readers without its script.
 - Inline-safe: no bundle holds \`<!--\`, \`<script\` or \`</script\`, so a page may inline one (or its own bundle of them)
   in \`<script type="module">…</script>\`, as a page opened from disk does.
 - Schemas: \`core\` compiles JSON Schemas with ajv at run time, which needs a CSP that allows it (or precompile them).

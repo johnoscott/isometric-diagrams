@@ -217,6 +217,8 @@ export function bindMotion(drawing: CompiledScene | MotionSource, doc: MotionDoc
     if ('sequence' in n) { seq(n.sequence, `${path}/sequence`, at(ms(n.sequence.from, 0)), false); return; }
     if ('series' in n) { for (const p of layoutSeries(n.series, `${path}/series`).list) seq(p.s, p.path, at(p.start), false); return; }
     if ('layers' in n) { n.layers.forEach((x, i) => visit(x, `${path}/layers/${i}`, abs)); return; }
+    // its plan, whether or not its length was asked for (a beat that says its own length doesn't ask)
+    if ('assemble' in n || 'disassemble' in n) { nodeEnd(n, path); return; }
     if ('travel' in n) n.travel.forEach((x, i) => (Array.isArray(x) ? x : [x]).forEach((id, j) => need(id.split(':')[0], `${path}/travel/${i}${Array.isArray(x) ? `/${j}` : ''}`, 'route')));
     else if ('pulse' in n) needAll(n.pulse, `${path}/pulse`, 'thing');
     else if ('ants' in n) { if (n.ants !== true) needAll(n.ants, `${path}/ants`, 'route'); }

@@ -7,7 +7,8 @@ import { ARIMO } from '../iso-core/arimo.ts';
 import { msOf, type MotionDoc, type Transition } from '../iso-objects/motion-doc.ts';
 import { svgAt } from '../iso-objects/motion.ts';
 
-export interface DrawingProps {
+/** (a type, not an interface: Remotion's Composition takes props that are a record of unknowns, and an interface isn't one) */
+export type DrawingProps = {
   /** the drawing's text */
   src: string;
   /** the theme's text */
@@ -22,7 +23,7 @@ export interface DrawingProps {
   font?: 'arimo';
   /** the ambient clock: with the video (default), or 'off' */
   ambient?: 'off';
-}
+};
 export interface Drawing { compiled: Compiled; scene: CompiledScene; timeline: Timeline }
 
 /** Throws, with every fault, when the drawing or its motion has one: a video of half a drawing is worse than none. */
