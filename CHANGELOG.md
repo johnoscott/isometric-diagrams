@@ -2,6 +2,10 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.18.2 — a switch of view fits
+
+- In the editor, after a zoom or a pan, switching between 3D and 2D left the new view unfitted, with the old view's zoom on the readout, and the next edit made it jump. It is fitted now.
+
 ## 0.18.1 — tests
 
 - Two tests of the enlarged view failed where a page's scrollbar takes room. They are run with both kinds. The package is 0.18.0's but for its version.

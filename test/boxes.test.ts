@@ -363,6 +363,31 @@ test('boxes/1 in Chrome (0.10.1): a palette drop onto a container nests the new 
   });
 });
 
+// 0.18.2: a switch of view fits the drawing in the new one, also after the person has zoomed or panned in the old one (it was left as it was
+// built, at the top, with the old zoom's readout, until something else drew it again and it jumped: the drop above, on GitHub's runner)
+test('boxes/1 in Chrome (0.18.2): a switch of view fits, whatever was done in the other; and nothing jumps after', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  const SEE = `const svg = document.querySelector('.iso-canvas svg.scene'), q = id => { const b = svg.querySelector('[data-id="' + id + '"]').getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom].map(Math.round); }; return { mode: I.canvas.mode, zoom: Math.round(I.canvas.zoom * 1000) / 1000, said: document.querySelector('.iso-canvas .zoom, .zoom-label, [class*=zoom] output')?.textContent ?? '', view: svg.getAttribute('viewBox'), shelf: q('shelf'), c: q('c') };`;
+  const moves: [string, string][] = [['nothing', ''],
+    ['a zoom', `const r = I.canvas.stage.getBoundingClientRect(); I.canvas.stage.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120, metaKey: true, clientX: r.left + 300, clientY: r.top + 300 })); await tick(150);`],
+    ['a pan', `const r = I.canvas.stage.getBoundingClientRect(); I.canvas.stage.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaX: 90, deltaY: 0, shiftKey: true, clientX: r.left + 300, clientY: r.top + 300 })); await tick(150);`]];
+  const fitted: Record<string, unknown> = {};
+  for (const [what, move] of moves) await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    const before = await ev<{ view: string }>(SEE);
+    for (const v of ['2d', '3d', '2d']) {
+      await ev(move); if (what !== 'nothing') assert.notDeepEqual((await ev<{ view: string }>(SEE)).view, v === '2d' ? before.view : (fitted['2d'] as { view: string }).view, `${what} moved it`);
+      await ev(`document.querySelector('.view-seg [data-v="${v}"]').click();`);
+      await until(`I.canvas.mode === '${v}' && document.querySelectorAll('.iso-canvas svg.scene').length === 1 && !document.querySelector('.dual-morph') && document.querySelector('.iso-canvas svg.scene [data-id="shelf"]') && document.querySelector('.iso-canvas svg.scene').style.visibility === ''`, `${what}: the ${v} view`);
+      const now = await ev<object>(SEE); fitted[v] ??= now;
+      assert.deepEqual(now, fitted[v], `${what}, then ${v}: as with nothing moved`);
+    }
+    // a change to the words of one thing: the rest stays where it is
+    const shelf = (await ev<{ shelf: number[] }>(SEE)).shelf;
+    await ev(`E.setText(${JSON.stringify(TEXT.replace('label: C', 'label: Cc'))}); await tick(700);`);
+    assert.deepEqual((await ev<{ shelf: number[] }>(SEE)).shelf, shelf, `${what}: nothing jumps`);
+  });
+});
+
 // 0.10.1, from the cloud editor's palette turn: a long palette scrolls (its items keep their height), and a palette add
 // as the page's first action leaves the focus on the canvas once the name field is dismissed, so a real ⌘Z (on the
 // focused element) undoes it.

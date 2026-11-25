@@ -145,8 +145,8 @@ export function viewport(host: HTMLElement, o: ViewportOpts) {
   resizes.observe(host);
 
   return {
-    /** the view (the drawing's units): set by a pan or a reveal, then applyView() */
-    get view() { return view; }, set view(v: View | undefined) { view = v; },
+    /** the view (the drawing's units): set by a pan or a reveal, then applyView(). None: it starts again, and there is nothing the person has moved */
+    get view() { return view; }, set view(v: View | undefined) { view = v; if (!v) moved = false; },
     /** the scene's whole frame */
     get full() { return full; }, set full(v: View | undefined) { full = v; },
     /** the person has moved the view since the last fit */
