@@ -21,8 +21,9 @@ const BUILD = read('test/fixtures/motion/stepped-build.yaml'), DEMO = read('exam
 const MOVING = `${BUILD}    motion:\n${read('test/fixtures/motion/stepped-build.motion.yaml').split('\n').map(l => (l ? '      ' + l : l)).join('\n')}`;
 const bundle = async () => (await bundlePage(fileURLToPath(new URL('../src/player/isometric-diagram.ts', import.meta.url)), ['../src/iso-systems/schema.json']));
 /** a page of it: its errors gathered before anything else runs */
-const page = (body: string, run: (d: Driver) => Promise<void>, o: { errors?: RegExp } = {}) => async () => {
-  const pre = `window.__t = { errors: [] }; addEventListener('error', e => __t.errors.push(e.message)); addEventListener('unhandledrejection', e => __t.errors.push(String(e.reason))); addEventListener('securitypolicyviolation', e => __t.errors.push('CSP ' + e.violatedDirective + ' ' + e.blockedURI)); __t.events = []; for (const k of ['beat', 'play', 'pause', 'end', 'loop', 'isometric-ready', 'isometric-error']) addEventListener(k, e => __t.events.push(k + (k === 'beat' ? ':' + e.detail.beat.name : '')), true);\n`;
+const page = (body: string, run: (d: Driver) => Promise<void>, o: { errors?: RegExp; bars?: boolean } = {}) => async () => {
+  // (bars: scrollbars that take room, as on GitHub's Macs, on Windows, and where a mouse is plugged in: here they lie over the page)
+  const pre = `${o.bars || process.env.BARS ? "{ const s = new CSSStyleSheet(); s.replaceSync('html::-webkit-scrollbar{width:15px}'); document.adoptedStyleSheets = [s]; } " : ''}window.__t = { errors: [] }; addEventListener('error', e => __t.errors.push(e.message)); addEventListener('unhandledrejection', e => __t.errors.push(String(e.reason))); addEventListener('securitypolicyviolation', e => __t.errors.push('CSP ' + e.violatedDirective + ' ' + e.blockedURI)); __t.events = []; for (const k of ['beat', 'play', 'pause', 'end', 'loop', 'isometric-ready', 'isometric-error']) addEventListener(k, e => __t.events.push(k + (k === 'beat' ? ':' + e.detail.beat.name : '')), true);\n`;
   const js = Buffer.concat([Buffer.from(pre), (await bundle()).outputFiles[0].contents]);
   await drivePage(chrome!, js, '__t', async d => {
     await d.until('document.querySelector("isometric-diagram")?.shadowRoot?.childElementCount', 'drawn');
@@ -185,13 +186,15 @@ test('registerMarks while it plays: its place is kept, and it plays on', opts, p
   assert.deepEqual(await d.ev(`${E0} return [tr === window.__tr, tr.playing, tr.time > 9000 && tr.time < 14000];`), [true, true, true]);
 }));
 
-const FULL = `const el = document.querySelector('isometric-diagram'), r = el.shadowRoot, full = () => r.querySelector('dialog'), btn = r.querySelector('.iso-enlarge'), tr = el.transport;`;
+// the window, less a scrollbar that takes room: what a dialog may cover
+const FULL = `const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight; const el = document.querySelector('isometric-diagram'), r = el.shadowRoot, full = () => r.querySelector('dialog'), btn = r.querySelector('.iso-enlarge'), tr = el.transport;`;
 const key = (d: Driver, k: string, code: number, shift = false) => (async () => { for (const type of ['rawKeyDown', 'keyUp']) await d.cdp('Input.dispatchKeyEvent', { type, key: k, code: k, windowsVirtualKeyCode: code, modifiers: shift ? 8 : 0 }); })();
 const click = async (d: Driver, what: string) => { const p = await d.ev<{ x: number; y: number }>(`${FULL} const b = ${what}.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 };`); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await d.cdp('Input.dispatchMouseEvent', { type, ...p, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 }); };
 const TALL = `<p>before</p><isometric-diagram controls label="Built"><script type="text/yaml">\n${MOVING}</script></isometric-diagram><div id="gap"></div><p>after</p>`;
 const LISTEN = `window.__ev = []; for (const k of ['expand', 'collapse', 'play', 'pause']) document.querySelector('isometric-diagram').addEventListener(k, () => __ev.push(k));`;
 
-test('enlarged: the same player, its time and playing kept, in a dialog nearly the window; Esc, the ✕ and collapse() put it back, and the focus', opts, page(TALL, async d => {
+for (const bars of [false, true]) test(`enlarged: the same player, its time and playing kept, in a dialog nearly the window; Esc, the ✕ and collapse() put it back, and the focus${bars ? ' (scrollbars that take room)' : ''}`, opts, page(TALL, async d => {
+  if (bars) assert.equal(await d.ev('document.body.style.minHeight = "3000px"; return innerWidth - document.documentElement.clientWidth;'), 15, 'a scrollbar');
   await d.ev(`${LISTEN} document.querySelector('#gap').style.height = '2000px'; scrollTo(0, 30); await tick(60);`);
   const place = () => d.ev<number[]>(`${FULL} const b = el.getBoundingClientRect(); return [scrollY, Math.round(b.top), Math.round(b.height), document.documentElement.scrollHeight];`);
   const before = await place();
@@ -201,7 +204,7 @@ test('enlarged: the same player, its time and playing kept, in a dialog nearly t
   for (const [how, shut] of [['Esc', () => key(d, 'Escape', 27)], ['the ✕', () => click(d, 'full().querySelector(".iso-full-close")')], ['collapse()', () => d.ev(`${FULL} el.collapse();`)]] as const) {
     await click(d, 'btn');
     await d.until(`document.querySelector('isometric-diagram').expanded`, `${how}: enlarged`);
-    const on = await d.ev<Record<string, unknown>>(`${FULL} await tick(200); const b = full().querySelector('.iso-play').getBoundingClientRect(), s = full().querySelector('svg').getBoundingClientRect(); return { same: tr === __tr && full().querySelector('.iso-play') === __root, playing: tr.playing, modal: full().matches(':modal'), wide: b.width >= innerWidth - 40 && b.height >= innerHeight - 100, inside: s.right <= innerWidth && s.bottom <= innerHeight && s.width > 200 && s.height > 200, focus: full().contains(r.activeElement), name: full().getAttribute('aria-label') };`);
+    const on = await d.ev<Record<string, unknown>>(`${FULL} await tick(200); const b = full().querySelector('.iso-play').getBoundingClientRect(), s = full().querySelector('svg').getBoundingClientRect(); return { same: tr === __tr && full().querySelector('.iso-play') === __root, playing: tr.playing, modal: full().matches(':modal'), wide: b.width >= W - 40 && b.height >= H - 100, inside: s.right <= W && s.bottom <= H && s.width > 200 && s.height > 200, focus: full().contains(r.activeElement), name: full().getAttribute('aria-label') };`);
     assert.deepEqual(on, { same: true, playing: true, modal: true, wide: true, inside: true, focus: true, name: 'Built' }, how);
     assert.deepEqual((await place()).slice(1), before.slice(1), `${how}: the page behind is as it was`);
     await shut();
@@ -213,7 +216,7 @@ test('enlarged: the same player, its time and playing kept, in a dialog nearly t
   // opened by the page, with the focus on one of the player's own buttons: it goes in with the player, and back to that button
   assert.deepEqual(await d.ev(`${FULL} const n = __ev.length, next = r.querySelector('.next'); next.focus(); el.expand(); await tick(80); const inside = full().contains(r.activeElement); el.collapse(); await tick(80); __ev.length = n; return [inside, r.activeElement === next];`), [true, true]);
   assert.deepEqual(await d.ev('return __ev;'), ['play', 'expand', 'collapse', 'expand', 'collapse', 'expand', 'collapse'], 'told once each, and nothing paused');
-}));
+}, { bars }));
 
 test('enlarged: Tab stays in it, the arrows and Space work, and Motion off keeps', opts, page(TALL, async d => {
   await d.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
@@ -263,14 +266,15 @@ test('enlarged among several that play in view: it plays, and what is behind it 
   await d.ev(`document.querySelector('#p2').collapse();`); await playing(true, false, 'the first again');
 }));
 
-test('enlarged on a phone, light and dark: nothing cut off, the ✕ clear of it', opts, page(TALL, async d => {
+for (const bars of [false, true]) test(`enlarged on a phone, light and dark: nothing cut off, the ✕ clear of it${bars ? ' (scrollbars that take room)' : ''}`, opts, page(TALL, async d => {
+  if (bars) assert.equal(await d.ev('document.body.style.minHeight = "3000px"; return innerWidth - document.documentElement.clientWidth;'), 15, 'a scrollbar');
   for (const [w, h2] of [[380, 760], [760, 380], [1400, 900]] as const) for (const mode of ['light', 'dark']) {
     await d.cdp('Emulation.setDeviceMetricsOverride', { width: w, height: h2, deviceScaleFactor: 1, mobile: false });
     const bad = await d.ev<string[]>(`${FULL} el.setAttribute('mode', '${mode}'); await tick(150); tr.seek(40000); el.expand(); await tick(200); const out = [], p = full().querySelector('.iso-play').getBoundingClientRect(), x = full().querySelector('.iso-full-close').getBoundingClientRect();
-      if (p.left < 0 || p.right > innerWidth + 1 || p.bottom > innerHeight + 1) out.push('outside ' + JSON.stringify(p)); if (x.bottom > p.top) out.push('the ✕ over it'); if (x.width !== 44 || Math.round(innerWidth - x.right) !== 16 || Math.round(x.top) !== 16) out.push('the ✕ is ' + JSON.stringify(x));
+      if (p.left < 0 || p.right > W + 1 || p.bottom > H + 1) out.push('outside ' + JSON.stringify(p)); if (x.bottom > p.top) out.push('the ✕ over it'); if (x.width !== 44 || Math.round(W - x.right) !== 16 || Math.round(x.top) !== 16) out.push('the ✕ is ' + JSON.stringify(x));
       const s = full().querySelector('svg').getBoundingClientRect(); if (s.width < 120 || s.height < 100) out.push('the drawing is ' + s.width + ' × ' + s.height); if (full().querySelector('.iso-play').scrollWidth > full().querySelector('.iso-play').clientWidth + 1) out.push('scrolls sideways'); return out;`);
     assert.deepEqual(bad, [], `${w} ${mode}`);
-    if (process.env.PLAYER_SHOTS) (await import('node:fs')).writeFileSync(`${process.env.PLAYER_SHOTS}/full-${mode}-${w}.png`, Buffer.from((await d.cdp('Page.captureScreenshot', { format: 'png' })).data!, 'base64'));
+    if (process.env.PLAYER_SHOTS) (await import('node:fs')).writeFileSync(`${process.env.PLAYER_SHOTS}/full-${mode}-${w}${bars ? '-bars' : ''}.png`, Buffer.from((await d.cdp('Page.captureScreenshot', { format: 'png' })).data!, 'base64'));
     await d.ev(`${FULL} el.collapse(); await tick(60);`);
   }
-}));
+}, { bars }));

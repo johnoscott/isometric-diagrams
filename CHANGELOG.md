@@ -2,6 +2,10 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.18.1 — tests
+
+- Two tests of the enlarged view failed where a page's scrollbar takes room. They are run with both kinds. The package is 0.18.0's but for its version.
+
 ## 0.18.0 — your marks in the element, and the enlarged view
 
 - **Every `<isometric-diagram>` now has an Enlarge button** in its corner, shown when it is pointed at or reached by keyboard (always on a touch screen). It opens the same drawing, playing on,
