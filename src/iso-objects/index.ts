@@ -26,6 +26,7 @@ export type { AntsOptions } from './ants.ts';
 export { motion, MotionBuilder, SeriesBuilder, NodesBuilder } from './motion-builder.ts';
 export type { SequenceOptions, Timing, CameraVerbs, Ids as MotionIds } from './motion-builder.ts';
 export { bindMotion, motionOfSteps, motionSource } from './timeline.ts';
+export { bindAnts } from './bind-ants.ts';
 export type { Timeline, BindOptions, BeatInfo, Cue, MotionSource } from './timeline.ts';
 export { MOTION_SCHEMA } from './motion-schema.ts';
 export { EASING_NAMES, EXTRAPOLATE, checkMotion, msOf, readMs, easeOf, curveAt, springAt, bezier } from './motion-doc.ts';

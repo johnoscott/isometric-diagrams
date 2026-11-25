@@ -11,6 +11,7 @@
 // it is the same player, so nothing about it changes but its size.
 
 import { compile, type Compiled, type CompiledScene } from '../iso-systems/compile.ts';
+import { bindAnts } from '../iso-objects/bind-ants.ts';
 import { bindMotion, motionOfSteps, type BeatInfo, type Timeline } from '../iso-objects/timeline.ts';
 import type { MotionDoc } from '../iso-objects/motion-doc.ts';
 import { registerMarks as register } from '../iso-objects/assets.ts';
@@ -27,6 +28,7 @@ const HOST_CSS = ':host{display:block}:host([hidden]){display:none}.iso-play-pro
   + '.iso-full{position:fixed;inset:0;box-sizing:border-box;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;padding:72px 16px 16px;background:rgba(12,12,14,.95);overflow:hidden;overscroll-behavior:contain}'
   + '.iso-full[open]{display:flex}.iso-full::backdrop{background:none}'
   + '.iso-full-close{position:absolute;top:16px;right:16px;width:44px;height:44px;padding:0;border:1px solid #000;border-radius:50%;background:#fff;color:#000;font:20px/1 system-ui,sans-serif;cursor:pointer}'
+  + ':host([expand="off"]) .iso-zoom,.iso-full .iso-zoom{right:10px}'
   + '.iso-full>.iso-play{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto}.iso-full>.iso-play>*{flex:none}'
   + '.iso-full>.iso-play>.iso-play-stage{flex:1 1 0;min-height:45%;position:relative}.iso-full>.iso-play>.iso-play-stage svg{position:absolute;inset:0;width:100%;height:100%}';
 let sheet: CSSStyleSheet | undefined;
@@ -35,7 +37,7 @@ let sheet: CSSStyleSheet | undefined;
 const Base = (typeof HTMLElement === 'function' ? HTMLElement : class {}) as typeof HTMLElement;
 
 export class IsometricDiagram extends Base {
-  static readonly observedAttributes = ['ambient', 'autoplay', 'controls', 'expand', 'label', 'loop', 'mode', 'rate', 'reduced-motion', 'scene', 'treatment'];
+  static readonly observedAttributes = ['ambient', 'autoplay', 'controls', 'expand', 'label', 'loop', 'mode', 'rate', 'reduced-motion', 'scene', 'treatment', 'zoom'];
   #source: string | undefined;
   #theme: string | undefined;
   #motion: MotionDoc | undefined;
@@ -124,7 +126,7 @@ export class IsometricDiagram extends Base {
     this.#name = this.getAttribute('label') ?? drawn.s.raw.title ?? drawn.c.doc?.title ?? 'Diagram';
     this.#player = mountPlayer(this.#full?.open ? this.#full : this.#frame!, {
       scene: drawn.s, timeline: drawn.tl, mode, steps: drawn.steps, label: this.#name,
-      controls: this.hasAttribute('controls'), loop: this.hasAttribute('loop'), rate: rateOf(this.getAttribute('rate')),
+      zoom: this.getAttribute('zoom') !== 'off', controls: this.hasAttribute('controls'), loop: this.hasAttribute('loop'), rate: rateOf(this.getAttribute('rate')),
       autoplay: link ? false : at === 'visible' ? 'visible' : at !== null,
       ...(this.getAttribute('ambient') === null ? {} : { ambient: this.getAttribute('ambient') === 'off' ? 'off' as const : 'on' as const }),
       reducedMotion: this.getAttribute('reduced-motion') === 'respect' ? 'respect' : 'ignore',
@@ -220,7 +222,8 @@ function read(source: string, theme: string, mode: 'light' | 'dark', scene: stri
   const s = scene === null ? c.scenes[0] : c.scenes.find(x => x.id === scene);
   if (!s) throw new Error(scene === null ? 'no scene in it' : `no scene "${scene}" (there ${c.scenes.length === 1 ? 'is' : 'are'} ${c.scenes.map(x => x.id).join(', ')})`);
   const doc = motion ?? s.motion ?? (s.steps.steps.length ? motionOfSteps(s) : undefined);
-  const tl = doc && bindMotion(s, doc, { kinds: c.theme!.kinds });
+  // (with nothing to play, the file's own ants march all the same)
+  const tl = doc ? bindMotion(s, doc, { kinds: c.theme!.kinds }) : bindAnts(s, { kinds: c.theme!.kinds });
   if (tl && !tl.ok) throw new Error(tl.diags.map(d => `${d.path}: ${d.message}${d.hint ? ` (${d.hint})` : ''}`).join('\n'));
   return { c, s, tl, steps: !motion && !s.motion };
 }

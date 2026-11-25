@@ -12,6 +12,8 @@ export { S, C, iso, n1, pt, esc, tag, FONTS, textWidth, withFont, apply, matStr,
 export type { P2, P3, Box, Attrs, FontKey, Font, Mat, Face, TextRect } from './kernel.ts';
 export { termLines, envelope, bubble, fileLines, keyGlyph, socketGlyph, screenFaces, screenGlass, placeholderFace } from './glyphs.ts';
 export type { FacePainter } from './glyphs.ts';
+export { turned, isoAt, planeAt, quarterOf, turnBox, viewOf, cameraOf, fitCamera, fromStage, toStage, zoomAt, turnAt, panBy, shortTurn, mixCamera } from './camera.ts';
+export type { Camera, Stage, ViewBox } from './camera.ts';
 export { depthSort } from './depth.ts';
 export type { Drawable } from './depth.ts';
 export { loadTheme, extendTheme, colorRef, themeCss, themeParts } from './theme.ts';

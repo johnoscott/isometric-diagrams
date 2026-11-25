@@ -2,6 +2,16 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.19.0 — zoom and pan, and a file's own ants
+
+- **Every `<isometric-diagram>` can now be zoomed and moved by its reader**, up to 8 times: ⌘ or Ctrl with the wheel (the wheel alone still scrolls your page), a pinch, a drag once it is closer,
+  a double click to fit, `+` `−` `0` and Shift with the arrows, and three buttons. Enlarged, the wheel alone zooms. **`zoom="off"` leaves it out.** A host of `mountPlayer` asks for it: `zoom: true`.
+- A drawing's player takes the keyboard's focus without `controls` too, now that it has keys; not with `zoom="off"`.
+- **A drawing with no motion marches its file's own `ants:`**, where it stood still; `ambient="off"` stops it.
+- Fixed: `autoplay="visible"` without `loop`, once it had ended, began again at any scroll. It plays once.
+- `iso-core` has a camera as a value: fit, zoom about a point, pan, turn.
+- Tried in Chrome on a desktop, and with emulated touch. A real phone, Safari and Firefox are untried.
+
 ## 0.18.2 — a switch of view fits
 
 - In the editor, after a zoom or a pan, switching between 3D and 2D left the new view unfitted, with the old view's zoom on the readout, and the next edit made it jump. It is fitted now.

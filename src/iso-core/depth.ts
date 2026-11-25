@@ -2,12 +2,14 @@
 // A box is drawn before another when it is separated from it on the far side of some axis and their
 // pictures overlap; everything else keeps the references' rule, the sum x0 + y0, then z0.
 
-import { type Box, iso } from './kernel.ts';
+import { isoAt, quarterOf, turnBox } from './camera.ts';
+import { type Box, iso, type P2 } from './kernel.ts';
 
 export interface Drawable { box: Box; key?: number }
 
-function screenRect(b: Box): [number, number, number, number] {
-  const pts = [iso(b.x0, b.y0, b.z1), iso(b.x1, b.y0, b.z0), iso(b.x0, b.y1, b.z0), iso(b.x1, b.y1, b.z0), iso(b.x1, b.y1, b.z1), iso(b.x0, b.y0, b.z0)];
+function screenRect(b: Box, rest = 0): [number, number, number, number] {
+  const at = (x: number, y: number, z: number): P2 => (rest ? isoAt(rest, x, y, z) : iso(x, y, z));
+  const pts = [at(b.x0, b.y0, b.z1), at(b.x1, b.y0, b.z0), at(b.x0, b.y1, b.z0), at(b.x1, b.y1, b.z0), at(b.x1, b.y1, b.z1), at(b.x0, b.y0, b.z0), ...(rest ? [at(b.x1, b.y0, b.z1), at(b.x0, b.y1, b.z1), at(b.x1, b.y1, b.z0)] : [])];
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
 }
@@ -24,9 +26,17 @@ function behind(a: Box, b: Box): number {
   return 0;
 }
 
-export function depthSort<T extends Drawable>(list: T[]): T[] {
+/** the order to draw them in, the furthest first; at a camera's turn, too (camera.ts), where it is the order of the turn's nearest quarter */
+export function depthSort<T extends Drawable>(list: T[], turn = 0): T[] {
+  if (turn) {
+    const q = quarterOf(turn), rest = turn - Math.round(turn);
+    return sorted(list.map(d => ({ d, box: turnBox(d.box, q) })), rest).map(x => x.d);
+  }
+  return sorted(list, 0);
+}
+function sorted<T extends Drawable>(list: T[], rest: number): T[] {
   const n = list.length;
-  const rects = list.map(d => screenRect(d.box));
+  const rects = list.map(d => screenRect(d.box, rest));
   const prio = (d: T) => d.box.x0 + d.box.y0 + d.box.z0 * 0.01;
   const after: number[][] = list.map(() => []);
   const indeg = new Array(n).fill(0);

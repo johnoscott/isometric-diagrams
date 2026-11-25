@@ -139,7 +139,7 @@ const doc = objects.motion()
 ## On a page: `<isometric-diagram>`
 
 One script, with the compiler, the theme and the player in it. It fetches and stores nothing, evaluates nothing and adds no style
-element, so it runs under `script-src 'self'` alone (120 KB gzipped).
+element, so it runs under `script-src 'self'` alone (123 KB gzipped).
 
 ```html
 <script type="module" src="isometric-diagram.js"></script>
@@ -164,12 +164,12 @@ element, so it runs under `script-src 'self'` alone (120 KB gzipped).
 
 It is in the package as `isometric-diagram.js`, and `import '@johnoscott/isometric-engine/player'` defines it. Write the text in a
 `<script type="text/yaml">`, or straight in the element with `&` and `<` escaped. It plays the scene's `motion`, or else its `steps`;
-a drawing with neither is drawn.
+a drawing with neither is drawn, and its file's own `ants:` march (0.19.0; before that only a motion's did).
 
 | Attribute | |
 |---|---|
 | `controls` | Play, Back, Next, Reset, the ambient switch, **Motion off** for a reader who asked for less motion, a scrubber, the beats as dots by chapter, the commentary and a text list of the beats. Without it, the drawing alone. |
-| `autoplay` | Plays at once. `autoplay="visible"`: when most of it is in view; one on a page plays at a time, and a reader's pause is kept. |
+| `autoplay` | Plays at once. `autoplay="visible"`: when most of it is in view; one on a page plays at a time, a reader's pause is kept, and at its end it stays (0.19.0: before that a scroll began it again; plain `autoplay` never did). |
 | `loop`, `rate` | Begins again at its end; how fast. |
 | `ambient` | `on` or `off`: the ants, and the tokens and pulses that loop (default: the document's). |
 | `mode` | `light` or `dark` (default: the reader's). |
@@ -178,11 +178,12 @@ a drawing with neither is drawn.
 | `label` | What a screen reader calls it. |
 | `reduced-motion` | `ignore` (the default: motion plays, and a reader who asked for less has a **Motion off** button, with or without `controls`: everything is in place and lit, nothing moves, and the steps are open as text; and the page's own `transport.play()` does nothing; pressed again, it plays from the first step, unless the reader had paused it) or `respect`: a reader who asked for less motion sees the last state, everything lit, until they press Play. |
 | `expand` | `off`: no **Enlarge** button (0.18.0; by default there is one, in the corner, shown when the drawing is pointed at or by keyboard, always on a touch screen). It opens the same player, as it is, in a dialog nearly the size of the window; Esc or ✕ closes it and the focus goes back. Not on a `#still`. |
+| `zoom` | `off`: no zoom and pan (0.19.0; by default a reader has both, 1 to 8 times). On the page the wheel scrolls the page, as anywhere, and says once how to zoom; with ⌘ or Ctrl, or a trackpad's pinch, it zooms about the pointer, and two fingers zoom and move it on a touch screen (one scrolls the page). Enlarged, the wheel alone zooms and one finger moves it. Closer, a drag moves it, never off its edge, and a double click fits it. Keys on the drawing: `+`, `−`, `0`, and Shift with the arrows (the arrows alone step; with no steps, they move it too). Buttons: **Zoom out**, **Zoom in** and **Fit**, shown when the drawing is pointed at or by keyboard (on a touch screen Fit, once it is closer; all three enlarged). It is on top of the document's own camera, kept when it is enlarged and when the same drawing is drawn again, and never stored. Not on a `#still`. Not part of the drawing: nothing exported has it. |
 | `links` | It follows the page's `#step=3`, `#t=0.5` (how far into the step) and `#still` (one picture, no controls). |
 
 Its properties are `source`, `theme`, `motion` (a document as data), `transport` and `expanded`; its methods, `expand()` (whether it is, after) and `collapse()`. Its events are `expand`, `collapse`, `beat` (`detail.beat`, `detail.how`),
 `play`, `pause`, `end`, `loop`, `isometric-ready` and `isometric-error` (a fault is also said in its place, in words). Arrow keys step; on
-the player itself, Space plays and pauses.
+the player itself, Space plays and pauses. With `mountPlayer`, zoom is yours to ask for: `zoom: true`.
 
 A reader without the script sees what is in the element besides the text. `isodiag build` writes a still there: **it is a command of the repository (`bin/isodiag.mjs`), not in the npm package**. `isodiag build PAGE.html -o OUT.html` writes one for
 each element whose text is in a `<script type="text/yaml">`, in its mode and treatment; run again, it replaces the stills it wrote.

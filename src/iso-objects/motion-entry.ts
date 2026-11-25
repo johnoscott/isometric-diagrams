@@ -2,6 +2,7 @@
 
 export * from './motion.ts';
 export { bindMotion, motionOfSteps, motionSource } from './timeline.ts';
+export { bindAnts } from './bind-ants.ts';
 export type { Timeline, BindOptions, BeatInfo, Cue, MotionSource } from './timeline.ts';
 export { motion, MotionBuilder, SeriesBuilder, NodesBuilder } from './motion-builder.ts';
 export type { SequenceOptions, Timing, CameraVerbs, Ids as MotionIds } from './motion-builder.ts';
