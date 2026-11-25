@@ -215,6 +215,32 @@ self-contained drawing in black and white, light or dark: the same shapes, ids a
 `mono: { roles: { server: { step: 2, pattern: 'dots' } }, kinds: { send: { dash: [8, 3], width: 3 } } }` is a host's own table, over ours.
 The page `isodiag build FILE.yaml` writes is in colour.
 
+## What changed between two drawings
+
+`diffScenes(a, b)` says it as plain data, by ids; `drawDiff(a, b)` draws it: the second drawing, with what changed since the first marked in it. Both are self-contained
+drawings (`resolveVars`) in one mode and treatment; it throws, and says so, for others.
+
+```js
+const a = systems.compile(before, theme, { mode: 'dark', resolveVars: true, strict: 'throw' }).scenes[0];
+const b = systems.compile(after, theme, { mode: 'dark', resolveVars: true, strict: 'throw' }).scenes[0];
+const d = objects.drawDiff(a, b, { as: { oldid: 'newid' } });
+d.rendered.svg;                       // the picture
+d.legend;                             // [{ kind, words, color, dash?, opacity? }]: a row for each kind there is, for you to draw
+objects.svgAt(d, { items: { 'was:db': { opacity: 0.5 } } });
+```
+
+| | A thing | A connector |
+|---|---|---|
+| added | a solid outline | a solid band either side of its line |
+| changed | a dashed outline | a dashed band: its ends, label, kind or arrowhead |
+| moved | a dotted outline, and a fainter one where it was (moved and changed: dashed, with the fainter one) | re-routed: a dotted band, and a fainter dotted line where it went |
+| removed | a ghost, unless `ghosts: false` | a ghost |
+
+A region is marked for what its file says of it, or for a move whole; not when it only grew with what it holds. One pushed along by a neighbour counts as moved. A note is added (outlined) or removed (a ghost, with no outline). In black and white the four
+are told apart by their dashes. In a legend of yours, draw each swatch in its `color` and `dash` at full strength: `opacity` is how faint the thing itself is in the drawing (a ghost's .4),
+and a swatch that faint can't be made out. Marks and ghosts are things to a state: `mark:ID`, `from:ID`, `was:ID`, and a connector's `band:ID` and `path:ID`. The ids in its defs are its own,
+so a page may hold the two drawings and several diffs of them (`id`: a name of yours for them).
+
 ## A clock of your own: the transport
 
 A Timeline has no clock. `transport` is one: headless, for an app, an editor's preview or a player of your own.

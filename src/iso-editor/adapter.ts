@@ -19,6 +19,8 @@ export interface ObjectKindInfo {
   group: string;
   /** what a new one starts as */
   template(): unknown;
+  /** whether the outline offers the section where the file has none (default: yes) */
+  when?(data: Record<string, unknown>): boolean;
 }
 
 /** a place in a file whose value names another thing */

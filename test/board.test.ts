@@ -5,10 +5,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { compileRaw } from '../src/iso-objects/compile.ts';
 import { boardOf, boardDiagram, boardCatalog } from '../src/iso-objects/board.ts';
-import { layoutFlat, metricsMeasure, type Board } from '../src/iso-objects/flat.ts';
+import { boardErrors, layoutFlat, metricsMeasure, type Board } from '../src/iso-objects/flat.ts';
 import { flatSvg, flatCss } from '../src/iso-viewer/flat-view.ts';
 import { compile } from '../src/iso-systems/compile.ts';
 import { MODEL, checkLayout } from './fixtures/flat/check.ts';
@@ -114,4 +115,48 @@ test('an empty board, and one with no panels or links, still lay out', () => {
   const L = layoutFlat(one, metricsMeasure);
   assert.deepEqual(L.cards[0].rect, { l: 0, t: 0, r: 178, b: 58 });
   assert.match(flatSvg(L, { id: 'x' }), /data-id="a"/);
+});
+
+// Two cards in one cell: the later one gets a column of its own. After one such move, the cards not reached yet were taken for settled, so a
+// second pair stayed together and the layout refused the drawing: it had no 2D view.
+const PAIRS: [string, string, [string, string][]][] = [
+  ['corpus/messaging.yaml', 'scene1', [['cache', 'index']]], ['corpus/relay-hub.yaml', 'scene1', [['client', 'router'], ['index', 'mirror']]],
+  ['examples/scenarios/a-services-and-workers.yaml', 'scene7', [['payments', 'billing']]], ['examples/scenarios/g-coordinating-workers.yaml', 'scene5', [['metrics', 'profile']]],
+];
+/** two regions of it lie corner to corner, neither above nor beside the other: both begin at the first cell, and their panels meet. Another fault, still there */
+const CORNERS: Record<string, string[]> = { 'corpus/relay-hub.yaml': ['panels "cache-area" and "worker-area" overlap without one holding the other'] };
+const sceneIn = (f: string, id: string) => { const c = compile(readFileSync(new URL('../' + f, import.meta.url), 'utf8'), THEME); return c.scenes.find(s => s.id === id)!; };
+const hereOf = (f: string) => existsSync(new URL('../' + f, import.meta.url));
+
+test('two cards in one cell, more than once in a drawing: each gets a cell of its own', () => {
+  // pairs that meet at a corner, so that neither parts the other, rows apart; each order reaches some card after another pair was parted
+  const at = (pairs: number) => Object.fromEntries(Array.from({ length: pairs }, (_, i) => [[`a${i}`, [0, i * 12]], [`b${i}`, [2, i * 12 + 2]]]).flat()) as Record<string, [number, number]>;
+  const draw = (ids: string[], xy: Record<string, [number, number]>) => compile(`isodiag: 1\ntitle: t\nscenes:\n  - id: s\n    title: t\n    nodes:\n${ids.map(i => `      - { id: ${i}, asset: block, label: ${i}, at: [${xy[i]}], size: [2, 2, 1] }\n`).join('')}`, THEME).scenes[0];
+  for (const pairs of [1, 2, 3, 5]) {
+    const xy = at(pairs), ids = Object.keys(xy);
+    for (const order of [ids, [...ids].reverse(), [...ids].sort(), [...ids].sort().reverse()]) {
+      const b = boardOf(draw(order, xy)), cells = b.cards.map(c => String(c.cell));
+      assert.equal(new Set(cells).size, cells.length, `${order}: ${cells}`); assert.deepEqual(boardErrors(b), [], String(order)); assert.ok(layoutFlat(b, metricsMeasure).cards.length);
+      const cell = (i: string) => b.cards.find(c => c.id === i)!.cell;
+      for (let i = 0; i < pairs; i++) assert.equal(cell(`a${i}`)[1], cell(`b${i}`)[1], `${order}: in a row still`);
+    }
+  }
+  for (const [f, id, pairs] of PAIRS.filter(x => hereOf(x[0]))) {
+    const b = boardOf(sceneIn(f, id)), cell = (i: string) => b.cards.find(c => c.id === i)!.cell, cells = b.cards.map(c => String(c.cell));
+    assert.equal(new Set(cells).size, cells.length, `${f}: ${cells}`); assert.deepEqual(boardErrors(b), CORNERS[f] ?? [], f);
+    if (!CORNERS[f]) assert.ok(layoutFlat(b, metricsMeasure).cards.length, f);
+    for (const [p, q] of pairs) { assert.equal(cell(p)[1], cell(q)[1], `${f}: in a row still`); assert.notEqual(cell(p)[0], cell(q)[0], `${f}: ${p}, ${q}`); }
+  }
+});
+
+test('every drawing that had a 2D view has the same one, to the byte', () => {
+  const { views } = JSON.parse(readFileSync(new URL('./fixtures/flat/views.json', import.meta.url), 'utf8')) as { views: Record<string, string> };
+  let n = 0;
+  for (const [k, want] of Object.entries(views)) {
+    const [f, id] = k.split(' ');
+    if (!hereOf(f)) continue;
+    n++;
+    assert.equal(createHash('sha256').update(flatSvg(layoutFlat(boardOf(sceneIn(f, id)), metricsMeasure), { id: 'v', title: id })).digest('hex'), want, k);
+  }
+  assert.ok(n > 2, String(n));
 });

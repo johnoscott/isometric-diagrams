@@ -367,7 +367,7 @@ function routeLabel(k: Kernel, r: Routed, obs: Obstacles, vis: Attrs, layout: La
 
 const shrink = (r: Rect, d: number): Rect => ({ x: r.x + d, y: r.y + d, w: Math.max(0, r.w - 2 * d), h: Math.max(0, r.h - 2 * d) });
 
-function drawNote(k: Kernel, note: RawNote, layout: Layout, routes: Routed[], id: string): string {
+export function drawNote(k: Kernel, note: RawNote, layout: Layout, routes: Routed[], id: string): string {
   const route = note.on ? routes.find(r => r.id === note.on) : undefined;
   const on = note.on && !route ? layout.byId.get(note.on) : undefined;
   const at = note.at;

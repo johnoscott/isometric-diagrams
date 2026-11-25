@@ -13,7 +13,7 @@ import { playerScript } from '../src/iso-viewer/bundle.ts';
 import { offscreen } from '../src/iso-objects/assemble.ts';
 import { rectArea } from '../src/iso-objects/labels.ts';
 // @ts-ignore plain JS helper
-import { chromePath, headless } from '../scripts/chrome.mjs';
+import { chromePath, headless, printed } from '../scripts/chrome.mjs';
 
 const THEME = readFileSync(new URL('../themes/default.yaml', import.meta.url), 'utf8');
 const scene = (head: string, body: string) => `isodiag: 1\n${head}scenes:\n  - id: s\n    title: T\n${body}`;
@@ -96,8 +96,11 @@ function probe(hash: string, js: string, flags: string[] = [], budget = 6000): s
   const page = renderPage(compile(DEMO, THEME), { runtime: playerScript() }).replace('</body>',
     `<script>addEventListener('load',()=>setTimeout(async()=>{const p=document.createElement('pre');p.id='probe';p.textContent=await (async()=>{${js}})();document.body.appendChild(p)},${Math.min(1200, budget - 1500)}))</script></body>`);
   writeFileSync(html, page);
-  const dom = execFileSync(chrome!, [...headless(), '--window-size=1240,1300', `--virtual-time-budget=${budget}`, ...flags, '--dump-dom', `file://${html}#${hash}`],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  let dom: string;
+  try {
+    dom = execFileSync(chrome!, [...headless(), '--window-size=1240,1300', `--virtual-time-budget=${budget}`, ...flags, '--dump-dom', `file://${html}#${hash}`],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch (e) { dom = printed(e); }
   return (/<pre id="probe">([^<]*)<\/pre>/.exec(dom)?.[1] ?? 'no probe').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 }
 const PIECES = `[...document.querySelectorAll('.g-base [data-id], .g-blocks [data-id], .g-air [data-id]')]`;

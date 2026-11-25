@@ -70,3 +70,9 @@ test('what is committed is what was checked, by content: an edit meanwhile, a fi
   assert.equal(y.status, 1); assert.match(y.stderr, /staged.*b\.txt/); assert.ok(!y.log.includes('second'));
   assert.equal(s.run().status, 0, 'the index is the tree\'s now'); assert.equal(s.git('show', 'HEAD:b.txt'), 'one\n');
 });
+
+test('a red run\'s whole output is kept, and said where', () => {
+  const r = make('printf "quiet one\\nerror TS1: no\\nthe reason why\\n"; exit 1').run();
+  assert.equal(r.status, 1); assert.match(r.stderr, /RED: types\. Not committed\./); assert.doesNotMatch(r.stderr, /the reason why/, 'a few lines here');
+  const kept = /^all of it: (.+)$/m.exec(r.stderr)?.[1]; assert.ok(kept, r.stderr); assert.equal(readFileSync(kept, 'utf8'), 'quiet one\nerror TS1: no\nthe reason why\n');
+});

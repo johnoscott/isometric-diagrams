@@ -30,3 +30,11 @@ test('fitted: both inside, the most zoom, the least move; and what it was where 
   }
   assert.ok(same > 300 && pushed > 1500 && mixed > 100, `${same} the same, ${pushed} changed, ${mixed} bound by one on one side and the other on the other`);
 });
+
+test('fitted: a host\'s own limits, and the usual ones without', () => {
+  const s = { w: 1000, h: 800 }, huge = { x: 0, y: 0, w: 150000, h: 1000 }, tiny = { x: 0, y: 0, w: 2, h: 2 };
+  assert.equal(fitted(s, huge).k, MIN_ZOOM); assert.equal(fitted(s, tiny).k, MAX_ZOOM);
+  assert.ok(Math.abs(fitted(s, huge, undefined, { min: 0.005 }).k - 952 / 150000) < 1e-12, 'as far out as it takes');
+  assert.equal(fitted(s, { ...huge, w: 1e7 }, undefined, { min: 0.005 }).k, 0.005); assert.equal(fitted(s, tiny, undefined, { max: 2 }).k, 2);
+  assert.equal(fitted(s, huge, undefined, { min: undefined, max: undefined }).k, MIN_ZOOM);
+});

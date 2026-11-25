@@ -42,6 +42,12 @@ export interface CanvasDrawing {
   pathOf: Map<string, string>;
   /** object name → the id of the element a pin moves */
   pinId: Map<string, string>;
+  /** the same for parts with no object of their own: their pins' names */
+  partId?: Map<string, string>;
+  /** what is dragged with no object of its own: by the id under the pointer, its pin's name (in partId) and what it is called */
+  parts?: Map<string, { pin: string; label: string }>;
+  /** what can't be dragged by itself, by the id under the pointer, and why */
+  fixed?: Map<string, string>;
   /** pins that couldn't apply, with why */
   pinNotes: string[];
   diags: string[];
@@ -92,6 +98,8 @@ export interface CanvasUi {
   text: {
     stage: string; dragGroup: string; dragSelectTip: string; unreadable: string; palette: string;
     /** the end of a pin drag's hint */
+    /** said while something that can't be moved is dragged */
+    cantMove: string;
     pinHint: string; renameWhy: string; duplicateWhy: string;
   };
 }
@@ -424,6 +432,15 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     return undefined;
   };
 
+  /** the innermost drawn thing under the pointer that is the file's, a part or fixed */
+  const idAtEvent = (target: EventTarget | null): string | undefined => {
+    let e = (target as Element | null)?.closest?.('[data-id]') as Element | null;
+    while (e && cd) { const id = e.getAttribute('data-id'); if (id && (cd.parts?.has(id) || cd.fixed?.has(id) || cd.pathOf.has(id))) return id; e = e.parentElement?.closest('[data-id]') ?? null; }
+    return undefined;
+  };
+  /** the part it is, if it is one */
+  const partAtEvent = (target: EventTarget | null) => { const id = idAtEvent(target); return id === undefined ? undefined : cd?.parts?.get(id); };
+
   // (0.12.4) connections: the routes that are entries of the file's own (src/iso-editor/connections.ts)
   const isRouteId = (id: string) => !!cd && Object.hasOwn(cd.scene.rendered.paths, id);
   const connections = () => (cd ? connectionsOf(cd.pathOf, isRouteId, K.objectOf) : new Map<string, string>());
@@ -593,7 +610,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     /** (0.14.0) a new thing, from the palette (origCd: the drawing without it): the drawing with it, and what it is made as */
     fresh?: { base: D; name: string; path: Path; plan: FreshPlan; text: string };
     /** siblings that flow after the dragged item, pinned where they stand so the drag doesn't push them */
-    keep?: [string, [number, number]][]; sel0?: Path[]; add?: boolean; touch?: boolean; name?: string; id?: string; box?: { x: number; y: number; w: number; h: number }; moved?: boolean; ptr?: string; narrow?: string } | undefined;
+    keep?: [string, [number, number]][]; sel0?: Path[]; add?: boolean; touch?: boolean; name?: string; label?: string; why?: string; id?: string; box?: { x: number; y: number; w: number; h: number }; moved?: boolean; ptr?: string; narrow?: string } | undefined;
   let spaceKeyDown = false;
   const ifEvents = () => {
     stage.addEventListener('pointerdown', down);
@@ -648,18 +665,22 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (!sel.includes(ptr)) doc.select([p], 'canvas');
     // a plain click on one of several selected things selects just it, once the button comes up without a drag
     const narrow = sel.includes(ptr) && sel.length > 1 ? ptr : undefined;
-    drag = { kind: 'click', x0: x, y0: y, ptr: narrow };
+    const at = ptr === pathAtEvent(e.target) ? idAtEvent(e.target) : undefined;
+    drag = { kind: 'click', x0: x, y0: y, ptr: narrow, why: at === undefined ? undefined : cd?.fixed?.get(at) };
+    if (drag.why && mode === '3d') return;
     // a press on a resource that can be pinned: a drag pins it
     const r = resourceOf(ptr);
-    const name = r && r.path === ptr ? r.name : undefined;
-    const id = name && mode === '3d' ? cd?.pinId.get(name) : undefined;
+    // (0.20.0) a part with no object of its own: its pin has a name too
+    const part = mode === '3d' && ptr === pathAtEvent(e.target) ? partAtEvent(e.target) : undefined;
+    const name = part?.pin ?? (r && r.path === ptr ? r.name : undefined);
+    const id = name && mode === '3d' && cd ? pinIds(cd).get(name) : undefined;
     if (id && cd) {
       const item = cd.scene.layout.byId.get(id);
       const start = localAt(cd.scene, id);
       if (item && start) {
         const b = item.box, par = item.parent;
         drag = {
-          kind: 'pin', x0: x, y0: y, name, id, ptr, narrow, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], beside: besideOf(cd, id),
+          kind: 'pin', x0: x, y0: y, name, label: part?.label, id, ptr, narrow, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], beside: besideOf(cd, id),
           parent: par ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: par.box, label: par.region?.label ?? par.id } : undefined,
           origCd: cd,
         };
@@ -684,6 +705,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (drag.kind === 'click' && mode === '2d' && !drag.moved && Math.hypot(x - drag.x0, y - drag.y0) > 4) {
       drag.moved = true;
       opts.onHint?.('Moving is in 3D: switch to 3D to drag it where it goes');
+      return;
+    }
+    // (0.20.0) what can't be moved says so, for as long as it is dragged
+    if (drag.kind === 'click' && mode === '3d' && !drag.moved && Math.hypot(x - drag.x0, y - drag.y0) > 4) {
+      drag.moved = true;
+      svg?.classList.add('cant-move');
+      opts.onHint?.(drag.why ?? T.cantMove);
       return;
     }
     if (drag.kind === 'pan') {
@@ -743,9 +771,11 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   }
   let pinFrame = false, lastPin: { x: number; y: number; alt: boolean } | undefined, relayout = 0;
   const pinDrag = () => (drag?.kind === 'pin' && drag.moved ? drag : undefined);
+  /** every pin's name, and the id of the element it moves */
+  const pinIds = (d: D): Map<string, string> => (d.partId?.size ? new Map([...d.pinId, ...d.partId]) : d.pinId);
   /** what stands beside a drawn thing, in its container (or on the canvas), and whether each can be pinned elsewhere */
   function besideOf(d: D, id: string, inside = d.scene.layout.byId.get(id)?.parent): Beside[] {
-    const pinned = new Set(d.pinId.values());
+    const pinned = new Set(pinIds(d).values());
     return (inside ? inside.children : d.scene.layout.items.filter(i => !i.parent)).filter(i => i.id !== id)
       .map(i => ({ id: i.id, x0: i.box.x0, y0: i.box.y0, x1: i.box.x1, y1: i.box.y1, movable: pinned.has(i.id) && !!localAt(d.scene, i.id) }));
   }
@@ -783,7 +813,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   function sayDrag(g: NonNullable<typeof drag>) {
     const within = g.parent ? `${g.fresh ? 'in' : 'within'} ${g.parent.label}` : 'on the canvas';
     const n = g.given?.size ?? 0;
-    opts.onHint?.(`${g.fresh ? 'Adding' : 'Moving'} ${g.name} ${within} · ${g.step === 1 ? 'whole cells (⌥: half cells)' : 'half cells'} · ${g.invalid ? (g.way ? 'hold still: it makes way' : g.fresh ? 'taken: the layout places it' : 'overlaps: it won\'t drop here') : n ? `${n} made way · Esc cancels` : 'Esc cancels'}${T.pinHint}`);
+    opts.onHint?.(`${g.fresh ? 'Adding' : 'Moving'} ${g.label ?? g.name} ${within} · ${g.step === 1 ? 'whole cells (⌥: half cells)' : 'half cells'} · ${g.invalid ? (g.way ? 'hold still: it makes way' : g.fresh ? 'taken: the layout places it' : 'overlaps: it won\'t drop here') : n ? `${n} made way · Esc cancels` : 'Esc cancels'}${T.pinHint}`);
   }
   function relayoutSoon(g: NonNullable<typeof drag>, glide = false) {
     if (!g.fresh && !lastS3) return;
@@ -908,7 +938,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
    * with it; any that did, and can be pinned, are kept where they stood, and the drop pins them too.
    */
   function trialLayout(g: NonNullable<typeof drag>, at = g.move!.at): { next: D; keep: [string, [number, number]][] } {
-    const orig = g.origCd!, nameOf = new Map([...orig.pinId].map(([n, id]) => [id, n]));
+    const orig = g.origCd!, nameOf = new Map([...pinIds(orig)].map(([n, id]) => [id, n]));
     // what gave way, where it gave way to (a pin each)
     const gave: [string, [number, number]][] = [];
     for (const [id, [dx, dy]] of g.given ?? []) { const was = localAt(orig.scene, id)!; gave.push([nameOf.get(id)!, [was[0] + dx, was[1] + dy]]); }
@@ -1041,14 +1071,14 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const moved = m && (m.at[0] !== g.start![0] || m.at[1] !== g.start![1]);
     if (commit && m && moved && !g.invalid) {
       // the item, and the neighbours the move would have pushed, kept where they stand: one command, one undo step
-      const label = `Pin ${describe(fromPointer(g.ptr!))} at [${m.at.join(', ')}]`;
+      const label = `Pin ${g.label ?? describe(fromPointer(g.ptr!))} at [${m.at.join(', ')}]`;
       let keep = g.keep ?? [];
       if (stale || !g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1]) try { keep = trialLayout(g).keep; } catch { /* drop it as it is */ }
       run(doc, keep.length ? pinsCmd([[g.name!, m.at], ...keep], `${label}${wayWords(g, keep)}`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: m.at }, label)), 'canvas', opts.note);
       pendingAfterDrag = false;                            // the drop's own reading draws what came meanwhile too
       return;
     }
-    if (commit && g.invalid) opts.note(`${g.name} can't go there: it would overlap`, 'warn');
+    if (commit && g.invalid) opts.note(`${g.label ?? g.name} can't go there: it would overlap`, 'warn');
     unshift(g);
     await draw(g.origCd!);
     redrawPending();
@@ -1058,8 +1088,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   function redrawPending() { if (pendingAfterDrag) { pendingAfterDrag = false; lastKey = ''; setTimeout(() => { if (lastS3 && !pinDrag()) void render(lastS3, lastData); }, 0); } }
   /** what a drop's command says of the things it pins beside the dragged one */
   function wayWords(g: NonNullable<typeof drag>, keep: [string, [number, number]][]): string {
-    const nameOf = new Map([...g.origCd!.pinId].map(([n, id]) => [id, n])), gave = new Set([...g.given?.keys() ?? []].map(id => nameOf.get(id)));
-    const a = keep.filter(([n]) => gave.has(n)).map(([n]) => n), b = keep.filter(([n]) => !gave.has(n)).map(([n]) => n);
+    const nameOf = new Map([...pinIds(g.origCd!)].map(([n, id]) => [id, n])), gave = new Set([...g.given?.keys() ?? []].map(id => nameOf.get(id)));
+    const says = (n: string) => [...g.origCd!.parts?.values() ?? []].find(p => p.pin === n)?.label ?? n;
+    const a = keep.filter(([n]) => gave.has(n)).map(([n]) => says(n)), b = keep.filter(([n]) => !gave.has(n)).map(([n]) => says(n));
     const words = [...(a.length ? [`${a.join(', ')} made way`] : []), ...(b.length ? [`${b.join(', ')} kept in place`] : [])].join('; ');
     return words && ` (${words})`;
   }
@@ -1176,6 +1207,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const d0 = drag;
     drag = undefined;
     svg?.classList.remove('panning');
+    if (svg?.classList.contains('cant-move')) { svg.classList.remove('cant-move'); paintNav(); }
     if (!d0) return;
     const { x, y } = pageXY(e);
     if ((d0.kind === 'marquee' && !d0.moved && !d0.add) || (d0.kind === 'pan' && d0.emptyClick)) doc.select([], 'canvas');
@@ -1228,9 +1260,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (layer?.context?.(e, { x, y })) return;
     const ptr = pathAt(e.target, x, y);
     if (ptr !== undefined && !doc.selection.some(p => toPointer(p) === ptr)) doc.select([fromPointer(ptr)], 'canvas');
-    openMenu(menuItems(ptr), { x, y }, 'Canvas');
+    openMenu(menuItems(ptr, ptr === pathAtEvent(e.target) ? partAtEvent(e.target) : undefined), { x, y }, 'Canvas');
   }
-  function menuItems(ptr: string | undefined): MenuItem[] {
+  function menuItems(ptr: string | undefined, part?: { pin: string; label: string }): MenuItem[] {
     const sel = doc.selection;
     const items: MenuItem[] = [];
     const ro = !doc.doc.ok;
@@ -1249,9 +1281,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       if (items.length) items.push({ sep: true });
       items.push({ label: 'Rename…', icon: 'pencil', keys: 'F2', disabled: ro || !isRes, why: T.renameWhy, onSelect: () => rename(one) });
       items.push({ label: 'Duplicate', icon: 'copy', keys: '⌘D', disabled: ro || !isRes, why: T.duplicateWhy, onSelect: () => duplicate(doc, one, 'canvas', opts.note) });
-      const name = isRes ? resourceOf(toPointer(one))!.name : '';
+      const name = part?.pin ?? (isRes ? resourceOf(toPointer(one))!.name : '');
       const pinned = !!K.pins.of(doc.goodDoc.data)?.[name];
-      if (pinned) items.push({ label: 'Unpin', icon: 'rotate-ccw', desc: 'Let the layout place it again', onSelect: () => run(doc, withPinsMoved({ ...deleteCmd([PINS_KEY, 'layout', name]), label: `Unpin ${describe(one)}` }), 'canvas', opts.note) });
+      if (pinned) items.push({ label: 'Unpin', icon: 'rotate-ccw', desc: 'Let the layout place it again', onSelect: () => run(doc, withPinsMoved({ ...deleteCmd([PINS_KEY, 'layout', name]), label: `Unpin ${part?.label ?? describe(one)}` }), 'canvas', opts.note) });
       items.push({ sep: true });
       items.push({ label: 'Show in text', icon: 'code-xml', onSelect: () => opts.showInText(one) });
       items.push({ label: 'Show in tree', icon: 'list-tree', onSelect: () => opts.showInTree(one) });

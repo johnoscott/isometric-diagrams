@@ -13,7 +13,7 @@ import { compile } from '../src/iso-systems/compile.ts';
 import { renderPage } from '../src/iso-viewer/page.ts';
 import { playerScript } from '../src/iso-viewer/bundle.ts';
 // @ts-ignore plain JS helpers
-import { chromePath, headless } from '../scripts/chrome.mjs';
+import { chromePath, headless, printed, wholePng } from '../scripts/chrome.mjs';
 // @ts-ignore plain JS helpers
 import { shot } from '../scripts/shot.mjs';
 
@@ -42,10 +42,16 @@ function diffShare(a: string, b: string): number {
       for(let k=0;k<p.length;k+=4){if(Math.abs(p[k]-q[k])>${TOL}||Math.abs(p[k+1]-q[k+1])>${TOL}||Math.abs(p[k+2]-q[k+2])>${TOL})n++;}
       document.getElementById('out').textContent=String(n/(p.length/4));
     });</script>`);
-  const dom = execFileSync(chrome!, [...headless(), '--virtual-time-budget=5000', '--dump-dom', 'file://' + page], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 });
-  const v = /<pre id="out">([^<]*)<\/pre>/.exec(dom)?.[1];
-  if (v === 'size') return 1;
-  return Number(v);
+  // (a busy machine's Chrome may print the page before its pictures are there: that is no answer, and it is asked again, three times at most)
+  for (let n = 1; n <= 3; n++) {
+    let dom: string;
+    try { dom = execFileSync(chrome!, [...headless(), '--virtual-time-budget=5000', '--dump-dom', 'file://' + page], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }); } catch (e) { dom = printed(e); }
+    const v = /<pre id="out">([^<]*)<\/pre>/.exec(dom)?.[1];
+    if (v === 'size') return 1;
+    if (v && Number.isFinite(Number(v))) return Number(v);
+    console.error(`# the comparison gave no answer (${n} of 3): ${v ?? 'nothing'}`);
+  }
+  throw new Error('the comparison gave no answer, three times');
 }
 
 for (const c of CASES) for (const theme of ['light', 'dark']) {
@@ -63,3 +69,15 @@ for (const c of CASES) for (const theme of ['light', 'dark']) {
     assert.ok(share <= MAX_SHARE, `${(share * 100).toFixed(2)}% of pixels differ from test/snapshots/png/${name} (new picture: ${now})`);
   });
 }
+
+test('a Chrome that fails its own shutdown: what it wrote is judged, whole or not; one that was stopped or wrote less is a fault', () => {
+  const PNG = readFileSync(join(SNAP, 'relay-hub-step4-light.png')), was = process.env.CHROME;
+  const fake = (name: string, body: string) => { const f = join(tmp, name); writeFileSync(f, `#!/bin/sh\nfor a in "$@"; do case "$a" in --screenshot=*) out="\${a#--screenshot=}";; esac; done\n${body}\n`, { mode: 0o755 }); return f; };
+  const whole = join(tmp, 'whole.png'), cut = join(tmp, 'cut.png'), out = join(tmp, 'out.png');
+  writeFileSync(whole, PNG); writeFileSync(cut, PNG.subarray(0, PNG.length - 20)); assert.ok(wholePng(whole)); assert.ok(!wholePng(cut)); assert.ok(!wholePng(join(tmp, 'none.png')));
+  const shoots = (body: string) => { process.env.CHROME = fake('chrome', body); try { shot(whole, out); return true; } catch { return false; } finally { if (was === undefined) delete process.env.CHROME; else process.env.CHROME = was; } };
+  assert.ok(shoots(`cp "${whole}" "$out"`)); assert.ok(shoots(`cp "${whole}" "$out"; exit 2`), 'whole, then exit 2');
+  assert.ok(!shoots(`cp "${cut}" "$out"; exit 2`), 'cut short'); assert.ok(!shoots('exit 2'), 'nothing, and not the picture before'); assert.ok(!shoots(`cp "${whole}" "$out"; kill -9 $$`), 'stopped');
+  const says = (body: string) => { try { return execFileSync(fake('dump', body), [], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { try { return printed(e); } catch { return undefined; } } };
+  assert.equal(says(`echo '<html>1</html>'; exit 2`), '<html>1</html>\n'); assert.equal(says(`echo '<html>1'; exit 2`), undefined); assert.equal(says('exit 2'), undefined); assert.equal(says(`echo '<html>1</html>'; kill -9 $$`), undefined);
+});

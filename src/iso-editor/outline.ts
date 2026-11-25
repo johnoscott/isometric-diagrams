@@ -81,6 +81,7 @@ export function outline(d: EditorDoc, a: OutlineAdapter, role: FileRole = 'main'
       if (path.length === 1) used.add(path[0]); else nested.add(path[0]);
       let mapNode: YNode | null | undefined = top?.value as YNode | null | undefined;
       if (path.length > 1) mapNode = isMap(mapNode) ? ((mapNode.items as Pair[]).find(p => keyOf(p) === path[1])?.value as YNode | undefined) : undefined;
+      if (!isMap(mapNode) && g.when && !g.when(data)) { if (path.length === 1 && !top) used.delete(path[0]); continue; }
       const group: OutlineNode = { id: toPointer(path), path, kind: 'group', label: g.group, section: g.kind, shape: isMap(mapNode) ? 'map' : 'missing', children: [] };
       if (isMap(mapNode)) {
         for (const p of mapNode.items as Pair[]) {

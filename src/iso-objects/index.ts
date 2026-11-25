@@ -28,6 +28,10 @@ export type { SequenceOptions, Timing, CameraVerbs, Ids as MotionIds } from './m
 export { bindMotion, motionOfSteps, motionSource } from './timeline.ts';
 export { bindAnts } from './bind-ants.ts';
 export type { Timeline, BindOptions, BeatInfo, Cue, MotionSource } from './timeline.ts';
+export { diffScenes } from './diff.ts';
+export type { DiffOptions, ThingField, RouteField, ThingChange, RouteChange, SceneDiff } from './diff.ts';
+export { drawDiff } from './diff-look.ts';
+export type { DiffKind, DiffLookOptions, DiffLegend, DiffDrawing } from './diff-look.ts';
 export { MOTION_SCHEMA } from './motion-schema.ts';
 export { EASING_NAMES, EXTRAPOLATE, checkMotion, msOf, readMs, easeOf, curveAt, springAt, bezier } from './motion-doc.ts';
 export type { MotionDoc, MotionNode, MotionTime, MotionEase, EasingName, Extrapolate, SpringConfig, Curve, Say as MotionSay, Focus, ReadTime, Sequence, SeriesItem, Transition, MotionDiag } from './motion-doc.ts';

@@ -14,7 +14,7 @@
 .iso-canvas svg.scene.mode-select { cursor: crosshair; }
 .iso-canvas svg.scene.pan-key, .iso-canvas svg.scene.pan-key [data-id] { cursor: grab; }
 .iso-canvas svg.scene.panning, .iso-canvas svg.scene.panning [data-id] { cursor: grabbing; }
-.iso-canvas svg.scene.drag-bad, .iso-canvas svg.scene.drag-bad * { cursor: not-allowed !important; }
+.iso-canvas svg.scene.drag-bad, .iso-canvas svg.scene.drag-bad *, .iso-canvas svg.scene.cant-move, .iso-canvas svg.scene.cant-move * { cursor: not-allowed !important; }
 .iso-canvas svg.scene.dragging, .iso-canvas svg.scene.dragging * { cursor: grabbing; }
 .iso-canvas .overlay, .iso-canvas .overlay * { pointer-events: none; }
 .iso-canvas .overlay .ring { fill: var(--iso-sel-fill); stroke: var(--iso-sel); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }

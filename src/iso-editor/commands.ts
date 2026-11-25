@@ -80,7 +80,7 @@ export function commandsFor(a: CommandsAdapter) {
 
   /** The references to an object, from the adapter's one table. */
   function referencesTo(text: string, kind: string, name: string): Ref[] {
-    return a.refs(dataOf(text)).filter(r => (r.slot.key ? r.value === name : r.name === name) && r.slot.targets.includes(kind));
+    return a.refs(dataOf(text)).filter(r => (r.slot.key && !r.slot.name ? r.value === name : r.name === name) && r.slot.targets.includes(kind));
   }
 
   function deleteCmd(path: Path, opts: { withRefs?: boolean } = {}): Command {

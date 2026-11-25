@@ -58,17 +58,23 @@ export function boardOf(scene: CompiledScene, visible: (id: string) => boolean =
   for (const p of cardsP) if (!p.parent) for (const q of cardsP) if (q.parent && q.box.x0 <= p.box.x0 + tolX) colOf.set(p.id, Math.max(colOf.get(p.id)!, colOf.get(q.id)!));
   const cell = new Map<string, [number, number]>();
   for (const p of cardsP) cell.set(p.id, [colOf.get(p.id)!, rowOf.get(p.id)!]);
-  // two in one cell: the later one gets a new column just right of it (everything right of it moves along)
-  const taken = new Map<string, string>();
-  for (const p of cardsP) {
-    const c = cell.get(p.id)!;
-    const was = taken.get(String(c));
-    if (was !== undefined && was !== p.id) {
-      for (const [, k] of cell) if (k[0] > c[0] && k !== c) k[0]++;
-      c[0]++;
-      taken.clear();
-      for (const q of cardsP) taken.set(String(cell.get(q.id)), q.id);
-    } else taken.set(String(c), p.id);
+  // two in one cell: one of them gets a new column just right of it (everything right of it moves along). The later one, as a rule; after a
+  // move each card's cell is looked up anew, also those not reached yet, so it may be the earlier one, and a pass may leave a pair together:
+  // again, until a pass moves none (each move parts a pair and makes none, as the new column is empty)
+  for (let moved = true; moved;) {
+    moved = false;
+    const taken = new Map<string, string>();
+    for (const p of cardsP) {
+      const c = cell.get(p.id)!;
+      const was = taken.get(String(c));
+      if (was !== undefined && was !== p.id) {
+        for (const [, k] of cell) if (k[0] > c[0] && k !== c) k[0]++;
+        c[0]++;
+        moved = true;
+        taken.clear();
+        for (const q of cardsP) taken.set(String(cell.get(q.id)), q.id);
+      } else taken.set(String(c), p.id);
+    }
   }
   const cards: BoardCard[] = cardsP.map(p => {
     if (p.region) { const r = p.region; return { id: p.id, label: r.label ?? p.id, sub: undefined, role: r.role ?? regionKind(cat, r.kind)?.role ?? 'grey', ghost: r.ghost || undefined, cell: cell.get(p.id)! }; }

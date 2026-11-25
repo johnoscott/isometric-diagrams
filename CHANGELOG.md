@@ -2,6 +2,15 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.20.0 — what changed between two drawings, and a legend's word
+
+- **`drawDiff`:** the second of two drawings with what changed since the first marked in it: added with a solid outline, changed dashed, moved dotted from a fainter outline, removed as a ghost;
+  connectors in the same language. Light, dark and black and white. `diffScenes` gives the changes as data. The legend is data, for you to draw.
+- **The legend of the `vm` region kind says "Sandbox"** (it was "Sandbox VM"), in every drawing with a legend. The kind's name in a file is still `vm`.
+- **The 2D view** of a drawing where two pairs of cards fell in one cell: it had none, and has one now. Every 2D view there was is unchanged.
+- `viewport()` takes `minZoom` and `maxZoom`.
+- In the space editor: what has no name of its own can be moved, what can't says why, exports (`exportSvg`, `exportPng`, `exportDrawing`), and a draft of space/3.2's execution realms.
+
 ## 0.19.0 — zoom and pan, and a file's own ants
 
 - **Every `<isometric-diagram>` can now be zoomed and moved by its reader**, up to 8 times: ⌘ or Ctrl with the wheel (the wheel alone still scrolls your page), a pinch, a drag once it is closer,

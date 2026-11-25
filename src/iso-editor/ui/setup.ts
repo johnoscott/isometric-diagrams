@@ -125,7 +125,7 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
     text: {
       stage: 'The file, drawn: arrow keys and Tab move through what is drawn; + and − zoom, 0 fits', dragGroup: 'A drag on nothing',
       dragSelectTip: 'Drag draws a selection; hold the space key to pan', unreadable: 'The canvas draws a file that reads cleanly; fix the problems listed to see it.',
-      palette: 'Add to the file: click, or drag onto the canvas', pinHint: '', renameWhy: 'Only objects are renamed here', duplicateWhy: 'Only objects are duplicated',
+      palette: 'Add to the file: click, or drag onto the canvas', cantMove: "This can't be moved: the layout places it", pinHint: '', renameWhy: 'Only objects are renamed here', duplicateWhy: 'Only objects are duplicated',
     },
   };
   const canvas: CanvasKit<R, D> = {

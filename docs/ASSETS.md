@@ -55,7 +55,7 @@ Use with `kind:` on a region. A region without `size` grows to fit what is in it
 |---|---|---|---|---|
 | `slab` | ![slab](img/assets/region-slab.png) | thick base, top at 0.35 | On its front face | A machine: "app host". Padding 1.2. |
 | `pad` | ![pad](img/assets/region-pad.png) | 0.2 | On the floor | A small plate for someone's things: a person and their screens. |
-| `vm` | ![vm](img/assets/region-vm.png) | 0.45, tinted | On its front face | A sandbox or VM: a raised plate; its contents stand on it. |
+| `vm` | ![vm](img/assets/region-vm.png) | 0.45, tinted | On its front face | A sandbox: a raised plate; its contents stand on it. |
 | `platform` | ![platform](img/assets/region-platform.png) | 0.7, tinted | On its right face | A server holding parts: rooms, a directory. Routes climb onto it. |
 | `fence` | ![fence](img/assets/region-fence.png) | walls 0.8 | On its front wall | A cage: translucent walls, back walls behind its contents and front walls over them. `gate: { side, at, width, height, node }` opens one wall and puts a node in it. |
 | `cloud` | ![cloud](img/assets/region-cloud.png) | 0.2 | On the floor | An area of the internet or a hosted service. |

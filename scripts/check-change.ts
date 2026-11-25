@@ -16,7 +16,7 @@ import { chromePath } from './chrome.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 /** run for every change, where they are here (this script's own among them: it never passes a change while that is red) */
-export const ALWAYS = ['check-change', 'layers-neutral', 'layers', 'public-scan', 'docs', 'baseline'];
+export const ALWAYS = ['check-change', 'layers-neutral', 'layers', 'public-scan', 'docs', 'baseline', 'transport'];
 /** what a changed path asks for: tests that drive Chrome, or build the package ('*': every test that drives Chrome). Paths from the root. */
 export const TOUCHES: [RegExp, string[]][] = [
   [/^src\/iso-editor\//, ['*']],
@@ -73,12 +73,18 @@ function main(argv: string[]): number {
   const changed = changedSince(opt('--since') ?? 'HEAD'), was = contents(changed), head = git('rev-parse', 'HEAD'), tests = here(testsFor(changed));
   if (argv.includes('--list')) { console.log(`${changed.length} changed\n${tests.join('\n')}`); return 0; }
   if (message && !changed.length) { console.error('check-change: nothing to commit'); return 2; }
-  const red = (what: string, out = '') => { console.error(`${out.split('\n').filter(l => /^not ok|^# (pass|fail)|error TS|NOT|found/.test(l)).slice(0, 12).join('\n')}\nRED: ${what}${message ? '. Not committed.' : ''}`); return 1; };
+  // a red's whole output is kept, and said where: its few lines here don't say why
+  const red = (what: string, out = '') => {
+    const kept = out ? join(mkdtempSync(join(tmpdir(), 'check-red-')), 'output.txt') : undefined;
+    if (kept) writeFileSync(kept, out);
+    console.error(`${out.split('\n').filter(l => /^not ok|^# (pass|fail)|error TS|NOT|found/.test(l)).slice(0, 12).join('\n')}\nRED: ${what}${message ? '. Not committed.' : ''}${kept ? `\nall of it: ${kept}` : ''}`);
+    return 1;
+  };
   const node = (args: string[], env = {}) => spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', ...args], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28, env: { ...process.env, ...env } });
   const tsc = spawnSync(join(ROOT, 'node_modules/.bin/tsc'), ['--noEmit'], { cwd: ROOT, encoding: 'utf8' });
   if (tsc.status !== 0) return red('types', tsc.stdout);
   const base = node(['--test', ...here(ALWAYS)]);
-  if (base.status !== 0) return red('layers, words, docs or recorded outputs', base.stdout);
+  if (base.status !== 0) return red('layers, words, docs or recorded outputs', `${base.stdout}\n${base.stderr}`);
   if (existsSync(join(ROOT, 'scripts/public-export.ts'))) {
     const dir = mkdtempSync(join(tmpdir(), 'check-export-'));
     const r = node(['scripts/public-export.ts', join(dir, 'out')]);
@@ -92,7 +98,7 @@ function main(argv: string[]): number {
     try {
       for (const [how, env] of [['with motion', {}], ['with Reduce Motion', { CHROME: calm }]] as const) {
         const r = node(['--test', '--test-concurrency=1', ...tests], env);
-        if (r.status !== 0) return red(`${how}: ${tests.join(' ')}`, r.stdout);
+        if (r.status !== 0) return red(`${how}: ${tests.join(' ')}`, `${r.stdout}\n${r.stderr}`);
         console.log(`${how}: ${/^# pass \d+/m.exec(r.stdout)?.[0].slice(2)}`);
       }
     } finally { rmSync(dir, { recursive: true, force: true }); }

@@ -17,7 +17,7 @@ export const REGION_KINDS: Record<string, RegionKind> = {
   },
   vm: {
     shape: 'block', pad: 0.6, z: [0, 0.45], floor: true, role: 'sandbox', labelStyle: 'face',
-    legend: { label: 'Sandbox VM', swatch: 'border-color:hsl(170 35% 40%);background:hsl(170 40% 50% / .2)', box: true, auto: true },
+    legend: { label: 'Sandbox', swatch: 'border-color:hsl(170 35% 40%);background:hsl(170 40% 50% / .2)', box: true, auto: true },
   },
   platform: { shape: 'block', pad: 0.6, z: [0, 0.7], floor: true, role: 'server', labelStyle: 'face-right' },
   cloud: { shape: 'cloud', pad: 0.8, z: [0, 0.2], floor: true, role: 'cloud', labelStyle: 'floor' },
