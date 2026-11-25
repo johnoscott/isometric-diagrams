@@ -31,6 +31,8 @@ export type { Timeline, BindOptions, BeatInfo, Cue, MotionSource } from './timel
 export { diffScenes } from './diff.ts';
 export type { DiffOptions, ThingField, RouteField, ThingChange, RouteChange, SceneDiff } from './diff.ts';
 export { drawDiff } from './diff-look.ts';
+export { compareScenes } from './diff-compare.ts';
+export type { ChangeSaid, CompareOptions, CompareState, Comparison } from './diff-compare.ts';
 export type { DiffKind, DiffLookOptions, DiffLegend, DiffDrawing } from './diff-look.ts';
 export { MOTION_SCHEMA } from './motion-schema.ts';
 export { EASING_NAMES, EXTRAPOLATE, checkMotion, msOf, readMs, easeOf, curveAt, springAt, bezier } from './motion-doc.ts';

@@ -20,7 +20,7 @@ import { setLayer } from './layer.ts';
 import type { Path } from '../path.ts';
 import { fromPointer, toPointer } from '../path.ts';
 import { h } from './icons.ts';
-import { EditorModel } from '../model.ts';
+import { EditorModel, type HistoryEntry, type StepMeta } from '../model.ts';
 import type { Problem } from '../validate.ts';
 import type { MountKit } from './mount-kit.ts';
 import type { PartCtx, EditorPart } from './part.ts';
@@ -184,8 +184,12 @@ export interface EditorState<R = unknown, X = unknown> {
   checks: number;
 }
 export interface Editor {
-  /** `fit` (0.12.5): it is another document, so its drawing is fitted once drawn (default: the view stays where it is) */
-  getText(): string; setText(text: string, o?: { fit?: boolean }): void; setReadOnly(ro: boolean): void; setTheme(t: Theme): void;
+  getText(): string;
+  /** another file, with a history of its own. `fit` (0.12.5): its drawing is fitted once drawn (default: the view stays where it is) */
+  setText(text: string, o?: { fit?: boolean }): true;
+  /** one whole text for the open file's, as one step (the step, always truthy; or false where it is the same). The host's own act: read-only doesn't stop it */
+  setText(text: string, o: { fit?: boolean; undoable: true; label?: string; meta?: StepMeta }): HistoryEntry | false;
+  setReadOnly(ro: boolean): void; setTheme(t: Theme): void;
   addFeatures(names: readonly string[]): Promise<void>; fit(): void; dispose(): void;
 }
 
@@ -234,10 +238,11 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
 
   // ---------- the one model: the text, its Document, the selection and the undo stack ----------
   const doc = new EditorModel();
-  // read-only: nothing changes the text (Monaco is read-only too); a view that tries says so
+  // read-only: nothing changes the text (Monaco is read-only too); a view that tries says so. The host's own setText is let through, once
+  let hostActs = false;
   for (const m of ['apply', 'undo', 'redo'] as const) {
     const f = (doc[m] as (...a: unknown[]) => boolean).bind(doc);
-    (doc as unknown as Record<string, unknown>)[m] = (...a: unknown[]) => { if (state.readOnly) { note('This file is read-only here', 'warn'); return false; } return f(...a); };
+    (doc as unknown as Record<string, unknown>)[m] = (...a: unknown[]) => { const host = hostActs; hostActs = false; if (state.readOnly && !host) { note('This file is read-only here', 'warn'); return false; } return f(...a); };
   }
 
   // ---------- the text: Monaco, bound to the one model ----------
@@ -652,7 +657,11 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
   return {
     internal,
     getText: () => doc.text,
-    setText(text: string, o: { fit?: boolean } = {}) { hideBanner(); if (o.fit && !disposed) canvas.fitNext?.(); doc.load(text); doc.markClean(); paintTitle(); paintHistory(); },
+    setText(text: string, o: { fit?: boolean; undoable?: boolean; label?: string; meta?: StepMeta } = {}): never {
+      // undoable: one step over the file that is open (it isn't saved by it); otherwise another file, with a history of its own
+      if (o.undoable) { if (disposed || text === doc.text) return false as never; if (o.fit) canvas.fitNext?.(); hostActs = true; return doc.replace(text, { label: o.label, meta: o.meta }) as never; }
+      hideBanner(); if (o.fit && !disposed) canvas.fitNext?.(); doc.load(text); doc.markClean(); paintTitle(); paintHistory(); return true as never;
+    },
     setReadOnly,
     setTheme,
     addFeatures,

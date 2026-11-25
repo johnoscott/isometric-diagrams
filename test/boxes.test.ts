@@ -874,6 +874,27 @@ test('boxes/1 in Chrome (0.12.5): setText with fit', { skip: chrome ? false : 'n
   });
 });
 
+// 0.21.0: setText undoable: one step over the open file, which is then unsaved; undone to the byte; read-only doesn't stop the host; the
+// same text is nothing. Plain setText starts anew, as before.
+test('boxes/1 in Chrome (0.21.0): setText undoable', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    const NEW = 'format: boxes/1\ntitle: New\nboxes:\n  fresh: {}\n', was = await ev<string>(`return E.getText();`), st = (o: string) => ev<unknown>(`const r = E.setText(${JSON.stringify(NEW)}, ${o}); return { r, text: E.getText() === ${JSON.stringify(NEW)}, undo: I.doc.undoEntries.map(e => [e.label, e.origin, e.meta]), dirty: I.doc.dirty, id: I.doc.undoEntries.at(-1)?.id };`);
+    const got = await st(`{ undoable: true, label: 'New', meta: { by: 'host' }, fit: true }`) as { r: { id: number; label: string }; text: boolean; undo: unknown[]; dirty: boolean; id: number };
+    assert.deepEqual([got.text, got.undo, got.dirty, got.r.label, got.r.id], [true, [['New', 'api', { by: 'host' }]], true, 'New', got.id]);
+    await until(`document.querySelector('.iso-canvas svg.scene [data-id="fresh"]') && !document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'the new one drawn');
+    assert.equal(await ev(`return I.canvas.moved;`), false);
+    assert.equal((await st(`{ undoable: true }`) as { r: unknown }).r, false, 'the same text is nothing');
+    await ev(`I.doc.undo();`); assert.equal(await ev(`return E.getText();`), was); await until(`document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'undone and drawn'); assert.equal(await ev(`return I.doc.dirty;`), false);
+    await ev(`E.setReadOnly(true);`); assert.equal((await st(`{ undoable: true }`) as { text: boolean }).text, true, 'the host\'s own act');
+    // that once, and only that: what a view does is still refused, also from a listener of that very step
+    assert.deepEqual(await ev(`const t = E.getText(), tries = () => I.doc.apply({ label: 'x', build: () => ({ steps: [[{ start: 0, end: 0, text: '# x\\n' }]] }) }, 'tree'); const a = [tries(), I.doc.undo(), E.getText() === t]; let heard; const off = I.doc.on(() => { heard ??= tries(); }); E.setText('format: boxes/1\\nboxes:\\n  y: {}\\n', { undoable: true }); off?.(); return [...a, heard, E.getText() === 'format: boxes/1\\nboxes:\\n  y: {}\\n'];`), [false, false, true, false, true], 'and nothing else');
+    await ev(`E.setReadOnly(false);`);
+    const plain = await ev(`const r = E.setText(${JSON.stringify('format: boxes/1\nboxes:\n  z: {}\n')}); return [r, I.doc.undoEntries.length, I.doc.dirty];`); assert.deepEqual(plain, [true, 0, false]);
+    assert.deepEqual(await ev(`return { violations: B.violations, errors: B.errors };`), { violations: [], errors: [] });
+  });
+});
+
 // 0.12.6: what Fit fits has the connectors in it: one that goes round a thing, past everything drawn, is inside the stage, in 3D and 2D.
 test('boxes/1 in Chrome (0.12.6): Fit counts the connectors', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
   await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {

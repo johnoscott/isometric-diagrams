@@ -2,6 +2,24 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.21.0 — two drawings compared
+
+Changes you'll notice:
+
+- **The script `isometric-diagram.js` is larger:** 477,755 bytes, 132,761 gzipped (0.20.0: 452,487 and 123,267), also for a page that compares nothing. It is still one script that fetches nothing.
+- **In the editors, an edit that leaves the text as it was is no undo step.**
+- **In the editors, the first entry of an empty `{}` or `[]` is written as a block**, unless it is short enough for a line.
+
+New:
+
+- **`<isometric-diagram compare>`:** put two drawings in it, before and after. It has Before | After, a slider between, what each mark means and what changed as text; what moved glides.
+  `compareScenes` gives the frames as SVG, `mountCompare` is it in a page of your own, and `isodiag build` writes its still. Halfway, a region that changes size shows both its edges.
+  Tried in Chrome only: Safari and Firefox are untried.
+- **For a host of an editor's model:** `undoEntries` and `redoEntries` (ids, labels, your own `meta`), changes that say their step, `replace` and `setText(text, { undoable: true })` as one
+  undoable step, and `readPins`.
+- Fixed: the space editor's types had `setText(text)` alone; `{ fit: true }`, there since 0.12.5, and the new options can be typed now. An object of your own that stands in for a `SpaceEditor`
+  gives `true` from `setText`, to type-check.
+
 ## 0.20.0 — what changed between two drawings, and a legend's word
 
 - **`drawDiff`:** the second of two drawings with what changed since the first marked in it: added with a solid outline, changed dashed, moved dotted from a fainter outline, removed as a ghost;

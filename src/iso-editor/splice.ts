@@ -230,6 +230,16 @@ export function setValue(text: string, path: Path, value: unknown): Splice {
   return { steps: [[{ start: colon + 1, end: stop, text: t }]] };
 }
 
+/** an empty { } or [ ] that is a value on its key's own line, as a block with its first entry (its comment stays on that line); undefined elsewhere */
+function opened(text: string, f: ReturnType<typeof find>, coll: YNode, shut: string, value: unknown): Splice | undefined {
+  if (!f.pair || inFlow(f.chain.slice(0, -1))) return undefined;
+  const open = coll.range![0], close = text.lastIndexOf(shut, coll.range![1]), k = (f.pair.key as YNode).range!, nl = text.indexOf('\n', close), eol = nl < 0 ? text.length : nl;
+  const between = text.slice(k[1], open);
+  if (!/^[ \t]*:[ \t]*$/.test(between) || !/^[ \t]*(#.*)?$/.test(text.slice(close + 1, eol).replace(/\r$/, ''))) return undefined;
+  const colon = k[1] + between.indexOf(':') + 1, body = blockValue(value, colOf(text, k[0]));
+  if (!body.startsWith('\n')) return undefined;          // small enough for one line, as it would be written anew
+  return { steps: [eol === close + 1 ? [{ start: colon, end: eol, text: body }] : [{ start: colon, end: close + 1, text: '' }, { start: eol, end: eol, text: body }]] };
+}
 /** Add `key: value` to the map at a path (creating the map, and its parents, when missing). order: the format's
  *  top-level key order, for where a new top-level key goes (the adapter's topOrder). */
 export function insertKey(text: string, mapPath: Path, key: string, value: unknown, opts: { after?: string; before?: string; order?: readonly string[] } = {}): Splice {
@@ -264,6 +274,7 @@ export function insertKey(text: string, mapPath: Path, key: string, value: unkno
     const now = (c.doc.getIn(mapPath, true) as { toJSON(): Record<string, unknown> }).toJSON();
     return { steps: [[{ start: map.range[0], end: map.range[1], text: flowText({ ...now, [key]: value }) }]] };
   }
+  if (flow && !items.length) { const b = opened(text, f, map, '}', { [key]: value }); if (b) return b; }
   if (flow) {
     const t = `${keyText(key)}: ${flowText(value)}`;
     if (!items.length) { const r = map.range!; return { steps: [[{ start: r[0], end: text.lastIndexOf('}', r[1]) + 1, text: `{ ${t} }` }]] }; }
@@ -352,6 +363,7 @@ export function insertItem(text: string, listPath: Path, value: unknown, index?:
   if (!isSeq(list)) throw new SpliceError(`${listPath.join('.')} is not a list`);
   const items = list.items as YNode[];
   const at = index === undefined ? items.length : Math.max(0, Math.min(index, items.length));
+  if ((list as { flow?: boolean }).flow && !items.length) { const b = opened(text, f, list, ']', [value]); if (b) return b; }
   if ((list as { flow?: boolean }).flow || inFlow(f.chain.slice(0, -1))) {
     const t = flowText(value);
     if (!items.length) { const r = list.range!; const close = text.lastIndexOf(']', r[1]); return { steps: [[{ start: r[0], end: close + 1, text: `[${t}]` }]] }; }

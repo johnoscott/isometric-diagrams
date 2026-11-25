@@ -241,6 +241,34 @@ are told apart by their dashes. In a legend of yours, draw each swatch in its `c
 and a swatch that faint can't be made out. Marks and ghosts are things to a state: `mark:ID`, `from:ID`, `was:ID`, and a connector's `band:ID` and `path:ID`. The ids in its defs are its own,
 so a page may hold the two drawings and several diffs of them (`id`: a name of yours for them).
 
+### Compared: Before and After
+
+`<isometric-diagram compare>` holds two texts, before then after, and shows the second with what changed marked in it, with a **Before | After** pair, a slider between them, what each mark
+means and **What changed** as text (with `controls`; the drawing alone without).
+
+```html
+<isometric-diagram compare controls>
+  <script type="text/yaml"> isodiag: 1 … as it was </script>
+  <script type="text/yaml"> isodiag: 1 … as it is </script>
+</isometric-diagram>
+```
+
+It opens on After. Before or After plays the way there, 900 ms (Space or `k` on the player turns it over); the slider goes straight to any place; `autoplay` goes from Before to After, once.
+What is in both and moved glides. Connectors that aren't the same go in the first fifth and come in the last, as marks and ghosts do; the rest is a crossfade, exact on any ground where the
+browser can add two pictures (`mix-blend-mode: plus-lighter`), and plain where it can't: there the ground shows through halfway. **Tried in Chrome only: Safari and Firefox are untried.**
+Neither drawing's own motion, steps or ants play; `loop` and `ambient` do nothing. A reader who asked for less motion has Motion off, and then there is no way between, only the ends and the
+slider's places. A fault says which of the two it is in. `isodiag build PAGE.html` writes its still, After as it rests.
+
+Its properties: `source` (the second text), `sourceBefore` (the first), `as` (ids renamed: `{ old: 'new' }`; one that can't be is said as a fault) and `ghosts` (`false`: what was removed is
+not drawn). With your own page, `mountCompare(host, { comparison })` and `COMPARE_CSS` beside `PLAY_CSS`; the frames, with no page, are `compareScenes(a, b)`:
+
+```js
+const c = objects.compareScenes(a, b, { as: { old: 'new' } });   // two scenes, self-contained, painted alike
+c.at(0.4);       // { before, after, fade }: each drawing's SceneState, and how much of the second there is
+c.svgAt(0.4);    // the frame as one SVG; between the ends, on the drawing's own paper
+c.changes;       // [{ kind, what, name, was? }], in words; c.legend, as drawDiff's
+```
+
 ## A clock of your own: the transport
 
 A Timeline has no clock. `transport` is one: headless, for an app, an editor's preview or a player of your own.

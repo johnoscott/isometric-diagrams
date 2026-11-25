@@ -12,8 +12,11 @@ import { md } from './page.ts';
 import { FITTED, MAX_TIMES, readerOn, readerPan, readerView, readerZoom, type Reader } from './zoom.ts';
 import { transport, type Transport, type TransportClock } from './transport.ts';
 
+/** what is played: a drawing, painted as the timeline says; or one that paints itself, at each time asked (in any order), as two drawings
+ *  being compared do. What it changes is its own to put back */
+export type Played = Pick<CompiledScene, 'rendered' | 'id'> & { paint?(svg: SVGSVGElement, ms: number): void };
 export interface PlayerOptions {
-  scene: Pick<CompiledScene, 'rendered' | 'id'>;
+  scene: Played;
   /** none: the drawing alone, with nothing to play */
   timeline?: Timeline;
   /** what a screen reader calls it */
@@ -38,7 +41,7 @@ export interface Player {
   readonly root: HTMLElement;
   readonly transport: Transport;
   /** another drawing, or another document: the place is kept (transport's rebind). Faults are refused, and what plays goes on */
-  set(scene: Pick<CompiledScene, 'rendered' | 'id'>, timeline?: Timeline, mode?: 'light' | 'dark'): boolean;
+  set(scene: Played, timeline?: Timeline, mode?: 'light' | 'dark'): boolean;
   /** show one moment, still: no clock, no controls (a screenshot, a link) */
   freeze(ms: number): void;
   /** to a beat and through it, stopping before the next */
@@ -218,7 +221,7 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
     for (const el of [back, next, dots]) el.hidden = !some;
     say.hidden = !said; list.hidden = !said;
     amb.hidden = !tr.timeline.loops;
-    still.hidden = !asked || calm || (tr.duration <= 0 && !tr.timeline.loops) || (!controls && !o.autoplay && !tr.timeline.loops);
+    still.hidden = !asked || calm || (tr.duration <= 0 && !tr.timeline.loops) || (!controls && !o.autoplay && !tr.timeline.loops && !scene.paint);
     alone.hidden = still.hidden;
     if (!controls && !still.hidden) alone.append(still);
     bar.max = String(Math.round(tr.duration));
@@ -263,7 +266,7 @@ export function mountPlayer(host: HTMLElement | ShadowRoot, o: PlayerOptions): P
   function show() {
     const S = frozen !== undefined ? tr.timeline.at(frozen, { ambient: frozen }) : resting ? lit(tr.timeline.at(tr.duration, { ambient: 'off' })) : off ? tr.timeline.at(tr.time, { ambient: 'off' }) : tr.state();
     if (aimed) { svg.setAttribute('viewBox', own); aimed = false; }
-    paint(svg, S, scene.rendered, { styles: 'cssom' });
+    if (scene.paint) scene.paint(svg, frozen ?? (resting ? tr.duration : tr.time)); else paint(svg, S, scene.rendered, { styles: 'cssom' });
     aim(S);
     root.dataset.time = String(Math.round(frozen ?? tr.time));
     if (frozen !== undefined) marks(tr.timeline.beatAt(frozen)); else caption();

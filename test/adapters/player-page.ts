@@ -26,6 +26,15 @@ const api: { [k: string]: any; player?: Player } = {
     api.player?.dispose(); now = 0; waiting = undefined;
     api.player = mountPlayer(shadow, { scene: scene(o.mode).s, timeline: doc ? tl(doc, o.mode) : undefined, clock, ...o });
   },
+  /** one that paints itself: the times it was asked for, in order, and whether each was on the drawing that is there. (Its Timeline has a state, which
+   *  would show if it were painted too) */
+  asked: [] as number[], on: [] as boolean[],
+  own(o: Partial<PlayerOptions> = {}, length = 900, text?: string) {
+    api.player?.dispose(); now = 0; waiting = undefined; api.asked = []; api.on = [];
+    const self = (t?: string) => ({ ...scene(o.mode, t).s, paint(svg: SVGSVGElement, ms: number) { api.asked.push(ms); api.on.push(svg === shadow.querySelector('.iso-play-stage svg')); svg.setAttribute('data-ms', String(Math.round(ms))); } });
+    api.self = self;
+    api.player = mountPlayer(shadow, { scene: self(text), timeline: { ok: true, diags: [], duration: length, beats: [], markers: {}, ambient: 'on', loops: false, at: () => ({ items: Object.fromEntries(scene().s.layout.items.map(p => [p.id, { opacity: 0.5, dx: 9 }])) }), cues: () => undefined, beatAt: () => undefined, startOf: () => undefined }, clock, ...o });
+  },
   set: (doc: unknown, mode: 'light' | 'dark' = 'light') => api.player!.set(scene(mode).s, tl(doc, mode), mode),
   go(ms: number, n = 1) { for (let i = 0; i < n; i++) { now += ms; const f = waiting; waiting = undefined; f?.(); } },
   q: (s: string) => shadow.querySelector(s) as HTMLElement,

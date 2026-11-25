@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stillsIn } from '../src/cli/stills.ts';
+import { compile } from '../src/iso-systems/compile.ts';
+import { drawDiff } from '../src/iso-objects/diff-look.ts';
 import { renderSvg } from '../src/iso-systems/render.ts';
 
 const THEME = readFileSync(new URL('../themes/default.yaml', import.meta.url), 'utf8');
@@ -51,4 +53,21 @@ test('isodiag build PAGE.html writes it beside, or where asked; with a fault it 
   assert.equal(run('build', 'p.html').ok, true); assert.equal(readFileSync(join(dir, 'p.built.html'), 'utf8'), stillsIn(PAGE, THEME).html); assert.equal(readFileSync(join(dir, 'p.html'), 'utf8'), PAGE);
   assert.equal(run('build', 'p.html', '-o', 'q.html').ok, true); assert.ok(existsSync(join(dir, 'q.html')));
   const r = run('build', 'bad.html'); assert.equal(r.ok, false); assert.match(r.err, /line 1/); assert.equal(existsSync(join(dir, 'bad.built.html')), false);
+});
+
+test('compared: the still is the second drawing with what changed marked in it, as it rests; faults say which of the two', () => {
+  const two = (a: string, b: string, attrs = 'compare controls') => `<isometric-diagram ${attrs}>${inScript(a)}${inScript(b)}</isometric-diagram>`, B = Y('After').replace('right-of: a, gap: 3', 'right-of: a, gap: 5, label: Moved');
+  const svgOf = (r: { html: string }) => /<svg data-isometric-still="" [\s\S]*?<\/svg>/.exec(r.html)?.[0], plain = (svg: string) => svg.replace('data-isometric-still="" ', '').split('still1-').join('');
+  const scene = (t: string, o: object) => compile(t, THEME, { resolveVars: true, strict: 'throw', ...o }).scenes[0];
+  for (const [attrs, o] of [['compare', { mode: 'light' }], ['controls compare mode="dark"', { mode: 'dark' }], ['compare="" treatment="mono"', { mode: 'light', treatment: 'mono' }]] as const) {
+    const r = stillsIn(two(Y('Before'), B, attrs), THEME), want = drawDiff(scene(Y('Before'), o), scene(B, o)).rendered.svg;
+    assert.deepEqual([r.problems, r.drawn], [[], 1], attrs); assert.equal(plain(svgOf(r)!), want, attrs); assert.match(want, /data-item="mark:b"/);
+    assert.equal(stillsIn(r.html, THEME).html, r.html, 'again, the same');
+  }
+  // not in an attribute's value, nor a longer name: the first script's still, as ever
+  for (const attrs of ['label="compare"', 'data-compare', "label='to compare with'"]) assert.equal(plain(svgOf(stillsIn(two(Y('Before'), B, attrs), THEME))!), renderSvg(Y('Before'), { theme: THEME }), attrs);
+  const says = (page: string) => { const r = stillsIn(page, THEME); assert.equal(r.drawn, 0); assert.equal(r.html, page); return r.problems.join(); };
+  assert.match(says(`<isometric-diagram compare>${inScript(Y('One'))}</isometric-diagram>`), /compares two drawings, and there is one/);
+  assert.match(says(two(Y('One').replace('right-of: a', 'right-of: nope'), B)), /line 1: before: .*nope/); assert.match(says(two(Y('One'), B.replace('right-of: a', 'right-of: nope'))), /after: .*nope/);
+  assert.match(says(two(Y('One'), B, 'compare scene="none"')), /before: no scene "none"/); assert.match(says(two(Y('One'), B, 'compare treatment="sepia"')), /no treatment "sepia"/);
 });

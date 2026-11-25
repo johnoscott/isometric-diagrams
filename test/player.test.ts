@@ -185,6 +185,41 @@ test('Motion off: with no controls where it could move by itself; not for a stil
   assert.equal(await shown('B.mount({ autoplay: true })'), false, 'nobody asked');
 }));
 
+test('a drawing that paints itself: at the time there is, wherever it is asked, in place of the Timeline\'s state; its zoom, its frames and another drawing as ever', opts, page(async d => {
+  const ms = () => d.ev<number>('return Number(B.q(".iso-play-stage svg").dataset.ms);');
+  await d.ev('B.own({ zoom: true });');
+  assert.equal(await ms(), 0); assert.ok((await d.ev<boolean[]>('return B.on;')).every(Boolean), 'on the drawing that is there');
+  for (const t of [300, 0, 900, 450]) { await d.ev(`B.player.transport.seek(${t});`); assert.equal(await ms(), t); }
+  await d.ev('B.player.transport.seek(0);'); await press(d, '.iso-play-btn.play'); await d.ev('B.go(200);'); assert.equal(await ms(), 200); await d.ev('B.go(5000);'); assert.equal(await ms(), 900); assert.equal(await d.ev('return B.player.transport.playing;'), false);
+  // nothing of a state is painted on it: its parts are as they were drawn
+  assert.equal(await d.ev('return B.q(".iso-play-stage svg").querySelectorAll("[data-item][transform],[data-item][opacity]").length;'), 0);
+  // closer, it is asked again, and its view is the reader's
+  const n = await d.ev<number>('return B.asked.length;');
+  await press(d, '.z-in'); assert.ok((await d.ev<number>('return B.asked.length;')) > n); assert.equal(await ms(), 900); assert.notEqual(await d.ev('return B.q(".iso-play-stage svg").getAttribute("viewBox");'), await d.ev('return B.player && B.self().rendered.viewBox.join(" ");'));
+  // (fitted again: the reader's own view is kept when the same drawing is drawn anew)
+  await press(d, '.z-fit'); assert.equal(await d.ev('return B.q(".iso-play-stage svg").getAttribute("viewBox");'), await d.ev('return B.self().rendered.viewBox.join(" ");'));
+  // another that paints itself, and back to one that is painted
+  await d.ev('B.player.set(B.self(), B.player.transport.timeline); B.player.transport.seek(123);'); assert.equal(await ms(), 123); assert.equal(await d.ev('return B.on.at(-1);'), true);
+  await d.ev('B.set(B.doc); B.player.transport.seek(1000);'); assert.equal((await d.state()).same, ''); assert.equal(await d.ev('return B.q(".iso-play-stage svg").dataset.ms ?? null;'), null, 'not asked any more');
+  // one moment, still
+  await d.ev('B.own(); B.player.freeze(350); B.go(1000);'); assert.equal(await ms(), 350);
+}));
+
+test('a drawing that paints itself, for a reader who asked for less motion: a Motion off button, with no controls too, and off is its end; with respect, its end until Play', opts, page(async d => {
+  const ms = () => d.ev<number>('return Number(B.q(".iso-play-stage svg").dataset.ms);'), shown = () => d.ev<boolean>('const b = B.q(".iso-play-btn.still"); return !!b && getComputedStyle(b).display !== "none" && b.getClientRects().length > 0;');
+  await calmer(d);
+  await d.ev('B.own({ controls: false });'); assert.equal(await shown(), true);
+  await press(d, '.iso-play-btn.still'); assert.equal(await ms(), 900, 'off: its end'); await d.ev('B.player.transport.play(); B.go(300);'); assert.equal(await ms(), 900);
+  await press(d, '.iso-play-btn.still'); assert.equal(await ms(), 0); await d.ev('B.go(100);'); assert.equal(await ms(), 100);
+  await d.ev('B.own({ controls: false }, 0);'); assert.equal(await shown(), false, 'no length: nothing to stop');
+  await d.ev('B.own({ reducedMotion: "respect" });'); assert.equal(await ms(), 900); await press(d, '.iso-play-btn.play'); await d.ev('B.go(40);'); assert.notEqual(await ms(), 900);
+  // and one that is painted, with no controls, nothing that loops and no autoplay, has no button, as ever
+  await d.ev('B.own({ controls: false, scene: { ...B.self(), paint: undefined } });'); assert.equal(await shown(), false);
+  await d.ev('B.own({ controls: false, scene: { ...B.self(), paint: undefined }, autoplay: true });'); assert.equal(await shown(), true);
+  await d.ev('B.mount({ controls: false, ambient: "off" }); const t = B.player.transport.timeline;'); assert.equal(await shown(), await d.ev('return B.player.transport.timeline.loops;'));
+  await calmer(d, 'no-preference'); await d.ev('B.own({ controls: false });'); assert.equal(await shown(), false, 'nobody asked');
+}));
+
 test('one plays at a time: the one most in view; a reader\'s pause is kept', opts, page(async d => {
   // two, a tall gap between them, on the page's own clock
   await d.ev('B.shadow.replaceChildren(); B.two = []; for (let i = 0; i < 2; i++) { B.player = undefined; B.mount({ autoplay: "visible", clock: undefined }); B.two.push(B.player); B.player = undefined; const gap = document.createElement("div"); gap.className = "gap"; gap.style.height = "1600px"; B.shadow.append(gap); } scrollTo(0, 0);');

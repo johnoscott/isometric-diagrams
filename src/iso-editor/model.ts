@@ -24,6 +24,18 @@ export interface Command {
   select?: Path[];
 }
 
+/** What a host says of a step, kept with it through undo and redo. The model reads none of it. */
+export type StepMeta = Readonly<Record<string, string>>;
+/** A step of the history, as a host sees it: made anew at each reading (compare ids, not objects). Its id is never another step's, and is kept
+ *  by undo and redo. */
+export interface HistoryEntry { readonly id: number; readonly label: string; readonly origin: Origin; readonly meta?: StepMeta }
+export interface ApplyOptions {
+  /** the id of an undo step it is part of, where it can be (see apply) */
+  joins?: number;
+  /** what the host says of the step. One that is joined keeps its own only where this says the same: otherwise it is the step of two */
+  meta?: StepMeta;
+}
+
 /** What a view needs to know about a change. */
 export interface Change {
   kind: 'do' | 'undo' | 'redo' | 'load';
@@ -38,6 +50,12 @@ export interface Change {
   source?: string;
   /** where paths moved (a rename), so views can carry their own state (expanded rows) along */
   remap?(p: Path): Path | null;
+  /** the step it made, joined, undid or redid (none: load) */
+  entry?: HistoryEntry;
+  /** the text before it */
+  before: { readonly length: number };
+  /** it put one whole text in place of another (a file opened, a replacement, a paste over everything); not into an empty one */
+  whole: boolean;
 }
 
 /** The selection changed, and which view changed it (a view doesn't react to its own). */
@@ -47,6 +65,7 @@ interface Entry {
   id: number;
   label: string;
   origin: Origin;
+  meta?: StepMeta;
   steps: Step[];
   /** the inverse of each step, in the order they undo (last step first) */
   inverse: Step[];
@@ -62,6 +81,13 @@ interface Entry {
   /** typing: the pane it came from (typing joins only typing from the same pane) */
   source?: string;
 }
+
+/** a step, as a host sees it */
+const seen = (e: Entry): HistoryEntry => Object.freeze({ id: e.id, label: e.label, origin: e.origin, ...(e.meta ? { meta: e.meta } : {}) });
+const sameMeta = (a: StepMeta | undefined, b: StepMeta | undefined): boolean => {
+  const x = Object.entries(a ?? {}), y = b ?? {};
+  return x.length === Object.keys(y).length && x.every(([k, v]) => y[k] === v);
+};
 
 export const HISTORY_DEPTH = 500;
 const COALESCE_MS = 1000;
@@ -104,7 +130,14 @@ export class EditorModel {
   onSelect(fn: (c: SelectionChange) => void): () => void { this.selListeners.add(fn); return () => this.selListeners.delete(fn); }
 
   on(fn: (c: Change) => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
-  private emit(c: Change) { for (const fn of this.listeners) fn(c); }
+  private emit(c: Omit<Change, 'before' | 'whole' | 'entry'>, length: number, e?: Entry) {
+    const first = c.steps.length === 1 ? c.steps[0][0] : undefined;
+    const change: Change = { ...c, before: { length }, whole: c.kind === 'load' || (!!first && length > 0 && first.start === 0 && first.end === length), ...(e ? { entry: seen(e) } : {}) };
+    for (const fn of this.listeners) fn(change);
+  }
+  /** what can be undone, oldest first; and what can be redone, the next one last. Already changed when a listener hears of a change */
+  get undoEntries(): readonly HistoryEntry[] { return this.undoStack.map(seen); }
+  get redoEntries(): readonly HistoryEntry[] { return this.redoStack.map(seen); }
 
   /** A new file: the text, an empty history, clean. */
   load(text: string, origin: Origin = 'file') {
@@ -114,20 +147,21 @@ export class EditorModel {
     this._good = undefined;
     this.set(text);
     this.cleanId = 0;
-    this.emit({ kind: 'load', origin, label: 'Open', steps: [[{ start: 0, end: old.length, text }]], version: this._version });
+    this.emit({ kind: 'load', origin, label: 'Open', steps: [[{ start: 0, end: old.length, text }]], version: this._version }, old.length);
   }
 
   private set(text: string) { this._text = text; this._doc = undefined; this._version++; }
 
   // ---------- doing ----------
 
-  /** Run a command: build it against the text, apply its steps, push it. Returns false if it changed nothing. `joins`
+  /** Run a command: build it against the text, apply its steps, push it. Returns false, with no step, if the text is as it was. `joins`
    *  (0.12.5): the id of an undo step it is part of, when that is the last one, nothing was undone since and the file
    *  wasn't saved at it (the saved text must stay a step of its own to come back to). */
-  apply(cmd: Command, origin: Origin = 'api', joins?: number): boolean {
+  apply(cmd: Command, origin: Origin = 'api', options?: number | ApplyOptions): boolean {
+    const { joins, meta } = typeof options === 'number' ? { joins: options, meta: undefined } : options ?? {};
     this.seal();
-    const splice = cmd.build(this._text);
-    if (!splice.steps.some(s => s.length)) return false;
+    const splice = cmd.build(this._text), length = this._text.length;
+    if (!splice.steps.some(s => s.length) || splice.steps.reduce((t, s) => applyStep(t, s), this._text) === this._text) return false;
     const before = { paths: this.selection, text: this.textSel };
     const { inverse } = this.run(splice.steps);
     const remap = cmd.remap ?? ((p: Path) => p);
@@ -136,15 +170,22 @@ export class EditorModel {
     const top = this.undoStack[this.undoStack.length - 1];
     if (top && joins !== undefined && top.id === joins && !this.redoStack.length && top.id !== this.cleanId) {
       top.label = cmd.joined?.(top.label) ?? top.label;
+      if (!sameMeta(top.meta, meta)) top.meta = undefined;
       top.steps.push(...splice.steps);
       top.inverse.unshift(...inverse);
       top.after = { paths: this.selection, text: this.textSel };
       top.time = this.now();
       top.fallback ||= !!splice.fallback;
-    } else this.push({ id: this.nextId++, label: cmd.label, origin, steps: splice.steps, inverse, before, after: { paths: this.selection, text: this.textSel }, time: this.now(), fallback: !!splice.fallback, open: false });
-    this.emit({ kind: 'do', origin, label: cmd.label, steps: splice.steps, version: this._version, remap: cmd.remap });
+    } else this.push({ id: this.nextId++, label: cmd.label, origin, ...(meta ? { meta: Object.freeze({ ...meta }) } : {}), steps: splice.steps, inverse, before, after: { paths: this.selection, text: this.textSel }, time: this.now(), fallback: !!splice.fallback, open: false });
+    this.emit({ kind: 'do', origin, label: cmd.label, steps: splice.steps, version: this._version, remap: cmd.remap }, length, this.undoStack[this.undoStack.length - 1]);
     for (const fn of this.selListeners) fn({ paths: this.selection, origin });
     return true;
+  }
+
+  /** Put one whole text in place of another, as one step (its undo is byte for byte): the step (always truthy: `if (replace(…))` says whether it did), or false, with none, where it is the same. This is the
+   *  model's own, for a host that has one; an editor's setText(text, { undoable: true }) is this and what the editor does around it (the view). */
+  replace(text: string, o: { label?: string; origin?: Origin; meta?: StepMeta } = {}): HistoryEntry | false {
+    return this.apply({ label: o.label ?? 'Replace everything', build: t => ({ steps: [[{ start: 0, end: t.length, text }]] }), select: [] }, o.origin ?? 'api', { meta: o.meta }) && seen(this.undoStack[this.undoStack.length - 1]);
   }
 
   /**
@@ -164,6 +205,7 @@ export class EditorModel {
       joins = one!.start === top!.caret && !one!.text.includes('\n') && !(/[\w-]/.test(prevChar) && /^[^\w-]/.test(one!.text));
     }
     if (joins && kind === 'delete') joins = one!.end === top!.caret;
+    const length = this._text.length;
     const { inverse } = this.run([step]);
     if (joins) {
       top!.steps.push(step);
@@ -180,7 +222,7 @@ export class EditorModel {
       });
     }
     if (sel.after !== undefined) this.textSel = sel.after;
-    this.emit({ kind: 'do', origin: 'text', label: 'Typing', steps: [step], version: this._version, source });
+    this.emit({ kind: 'do', origin: 'text', label: 'Typing', steps: [step], version: this._version, source }, length, this.undoStack[this.undoStack.length - 1]);
   }
 
   /** End the typing group being added to (a caret jump, a pause, leaving the text pane, a save). */
@@ -217,11 +259,12 @@ export class EditorModel {
     this.seal();
     const e = this.undoStack.pop();
     if (!e) return false;
+    const length = this._text.length;
     this.run(e.inverse);
     this.redoStack.push(e);
     this.selection = e.before.paths;
     this.textSel = e.before.text;
-    this.emit({ kind: 'undo', origin: 'history', label: e.label, steps: e.inverse, version: this._version, textSel: e.before.text });
+    this.emit({ kind: 'undo', origin: 'history', label: e.label, steps: e.inverse, version: this._version, textSel: e.before.text }, length, e);
     for (const fn of this.selListeners) fn({ paths: this.selection, origin: 'history' });
     return true;
   }
@@ -229,11 +272,12 @@ export class EditorModel {
   redo(): boolean {
     const e = this.redoStack.pop();
     if (!e) return false;
+    const length = this._text.length;
     this.run(e.steps);
     this.undoStack.push(e);
     this.selection = e.after.paths;
     this.textSel = e.after.text;
-    this.emit({ kind: 'redo', origin: 'history', label: e.label, steps: e.steps, version: this._version, textSel: e.after.text });
+    this.emit({ kind: 'redo', origin: 'history', label: e.label, steps: e.steps, version: this._version, textSel: e.after.text }, length, e);
     for (const fn of this.selListeners) fn({ paths: this.selection, origin: 'history' });
     return true;
   }

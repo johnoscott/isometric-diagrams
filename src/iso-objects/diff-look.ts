@@ -57,8 +57,8 @@ function hash(t: string): string {
 
 // ---- a drawing's text: its tags, its wrappers, its ids ----
 const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g;
-/** every id it defines, and what refers to it, with `by` in front */
-const renamed = (svg: string, by: string) => svg.replace(TAG, (m, close: string, name: string, attrs: string, self: string) => (close ? m
+/** every id it defines, and what refers to it, with `by` in front (compare's too) */
+export const renamed = (svg: string, by: string) => svg.replace(TAG, (m, close: string, name: string, attrs: string, self: string) => (close ? m
   : `<${name}${attrs.replace(/\s((?:xlink:)?href|id)="(#?)([^"]*)"/g, (a, k: string, h: string, v: string) => (k === 'id' && !h ? ` id="${by}${v}"` : h ? ` ${k}="#${by}${v}"` : a)).replace(/url\(#([^)]*)\)/g, (_, v: string) => `url(#${by}${v})`)}${self ? '/' : ''}>`));
 interface Wrapper { what: 'item' | 'route'; id: string; part: string; inside: string }
 /** its wrappers, as they are painted, and its defs, by id */
@@ -92,6 +92,15 @@ function marksOf(t: ThingChange, was: Placed, now: Placed, as: (id: unknown) => 
   return { changed: t.fields.some(f => f !== 'size') || (grew && !same(SIZE)), moved: !!t.by && (!grew || !same(PLACE)) };
 }
 
+/** what is marked of the things in both, by the second's ids */
+export function markedIn(a: CompiledScene, b: CompiledScene, diff: SceneDiff, renames?: Record<string, string>): { id: string; was: Placed; now: Placed; by: [number, number] | undefined; changed: boolean; moved: boolean }[] {
+  const wasOf = new Map<string, string>();
+  for (const x of [...diff.things, ...diff.routes]) if (x.was !== undefined) wasOf.set(x.was, x.id);
+  for (const [f, t] of Object.entries(renames ?? {})) if (!diff.removed.things.includes(f) && (diff.same.things.includes(t) || diff.same.routes.includes(t))) wasOf.set(f, t);
+  const as = (v: unknown) => (typeof v === 'string' ? wasOf.get(v) ?? v : v);
+  return diff.things.map(t => { const was = a.layout.byId.get(t.was ?? t.id)!, now = b.layout.byId.get(t.id)!; return { id: t.id, was, now, by: t.by, ...marksOf(t, was, now, as) }; });
+}
+
 /** The second drawing, with what changed since the first marked in it. */
 export function drawDiff(a: CompiledScene, b: CompiledScene, o: DiffLookOptions = {}): DiffDrawing {
   const ra = resolved(a, 'first'), rb = resolved(b, 'second');
@@ -107,19 +116,13 @@ export function drawDiff(a: CompiledScene, b: CompiledScene, o: DiffLookOptions 
   const at = (pts: P2[]) => pts.map(q => q.map(n1).join(',')).join(' ');
   const wrap = (name: string, svg: string, part = 'block') => tag('g', { 'data-item': name, 'data-part': part }, svg);
   const ring = (p: Placed, k: DiffKind, opacity?: number) => tag('polygon', { points: at(silhouette(p.box)), ...stroke(k, opacity) });
-  const wasOf = new Map<string, string>();
-  for (const x of [...diff.things, ...diff.routes]) if (x.was !== undefined) wasOf.set(x.was, x.id);
-  for (const [f, t] of Object.entries(o.as ?? {})) if (!diff.removed.things.includes(f) && (diff.same.things.includes(t) || diff.same.routes.includes(t))) wasOf.set(f, t);
-  const as = (v: unknown) => (typeof v === 'string' ? wasOf.get(v) ?? v : v);
-
   // ---- things ----
   let under = '', over = '', altered = diff.routes.length;
   for (const i of diff.added.things) over += wrap(`mark:${i}`, ring(b.layout.byId.get(i)!, 'added'));
-  for (const t of diff.things) {
-    const was = a.layout.byId.get(t.was ?? t.id)!, now = b.layout.byId.get(t.id)!, m = marksOf(t, was, now, as);
-    if (m.moved) over += wrap(`from:${t.id}`, ring(was, 'moved', FROM));
+  for (const m of markedIn(a, b, diff, o.as)) {
+    if (m.moved) over += wrap(`from:${m.id}`, ring(m.was, 'moved', FROM));
     // (both: changed where it is, and the outline where it was says that it moved)
-    if (m.changed || m.moved) { altered++; over += wrap(`mark:${t.id}`, ring(now, m.changed ? 'changed' : 'moved')); }
+    if (m.changed || m.moved) { altered++; over += wrap(`mark:${m.id}`, ring(m.now, m.changed ? 'changed' : 'moved')); }
   }
   // ---- connectors: a band under the line, as the line's own colour and dash are its kind's ----
   const band = (name: string, d: string | undefined, k: DiffKind) => {
