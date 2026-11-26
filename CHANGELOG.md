@@ -2,6 +2,12 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.24.0 — a grid keeps off what is pinned
+
+- A grid (and so `layout: compact`) no longer lays things on top of a pinned child (`at:`): a thing that would come within its gap of
+  a pinned one steps past it. In 0.23.0 it could, for example after an editor's drag pinned one thing.
+- Without pins, every grid is exactly as 0.23.0 laid it out.
+
 ## 0.23.0 — a compact layout, and the 3D to 2D move as a drawing
 
 - **`layout: compact`** (a scene) **and `flow: grid`** (a container): things without a place of their own go in rows, as many to a row as

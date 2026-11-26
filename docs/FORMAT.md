@@ -78,7 +78,7 @@ paragraphs.
 | `aria` | | The scene's accessible description (default: the title). Say what the picture shows. |
 | `regions`, `nodes`, `routes`, `notes`, `steps` | | The contents, below. |
 | `gap` | | Default distance between items placed next to each other, in grid units. Default 2. |
-| `flow` | | `row` (default), `column` or `grid` (0.23.0): where an item with no placement goes. A grid puts them in rows, as many to a row as makes the block smallest in the isometric view (the least width + depth, then the most square). |
+| `flow` | | `row` (default), `column` or `grid` (0.23.0): where an item with no placement goes. A grid puts them in rows, as many to a row as makes the block smallest in the isometric view (the least width + depth, then the most square). A pinned item (`at`) keeps its place, and the grid keeps off it, by the gap (0.24.0). |
 | `layout` | | `compact` (0.23.0): every container without a `flow` of its own is a `grid`, so the drawing comes out about square instead of long, and reads at a larger size when fitted. A placed item (`at`, `right-of` …) keeps its place. Without it, as before. |
 | `legend` | | `auto` (default: the kinds used), `false`, or a list of kinds, plus `fence`, `vm`, `tunnel`. |
 | `loop` | | The player wraps from the last step to the first. Default `true`. |

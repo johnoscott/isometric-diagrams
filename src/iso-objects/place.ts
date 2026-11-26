@@ -166,6 +166,9 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
     const less = (a: number[], b: number[]) => { const i = a.findIndex((v, j) => Math.abs(v - b[j]) > 1e-9); return i >= 0 && a[i] < b[i]; };
     if (flow === 'grid') {
       const flows = placed.filter(k => { const raw = (k.node ?? k.region)!; return !raw.at && !REL.some(r => raw[r] !== undefined && byId.get(raw[r]!) && sib.has(byId.get(raw[r]!)!)); });
+      // (0.24.0) what is pinned (at:) is not in the grid's rows, and the grid keeps off it too: a thing that would come within its gap
+      // of a pinned one steps right, past it, pass after pass (with no pins nothing steps: the grid is 0.23.0's to the last digit)
+      const pins = placed.flatMap(k => { const a = (k.node ?? k.region)!.at, L = local.get(k)!; return a ? [[a[0], a[1], a[0] + L.w, a[1] + L.d]] : []; });
       let best: { score: number[]; at: Map<Placed, { x: number; y: number }> } | undefined;
       for (let cols = 1; cols <= flows.length; cols++) {
         const at = new Map<Placed, { x: number; y: number }>();
@@ -173,7 +176,7 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
         for (let i = 0; i < flows.length; i += cols) {
           const row = flows.slice(i, i + cols), rowD = Math.max(...row.map(k => local.get(k)!.d));
           let x = 0;
-          row.forEach((k, j) => { const L = local.get(k)!; if (j) x += gapOf((k.node ?? k.region)!); at.set(k, { x, y: y + (rowD - L.d) / 2 }); x += L.w; });
+          row.forEach((k, j) => { const L = local.get(k)!, g = gapOf((k.node ?? k.region)!); if (j) x += g; const ky = y + (rowD - L.d) / 2; for (const _ of pins) for (const q of pins) if (x < q[2] + g && x + L.w > q[0] - g && ky < q[3] + g && ky + L.d > q[1] - g) x = q[2] + g; at.set(k, { x, y: ky }); x += L.w; });
           W = Math.max(W, x); y += rowD + (i + cols < flows.length ? gapOf((flows[i + cols].node ?? flows[i + cols].region)!) : 0);
         }
         const score = [W + y, Math.abs(W - y), Math.ceil(flows.length / cols)];
