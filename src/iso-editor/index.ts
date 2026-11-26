@@ -59,7 +59,7 @@ export { flatCanvas } from './ui/flat-canvas.ts';
 export type { PartCtx, Attention, EditorPart } from './ui/part.ts';
 export type { Checked, MountKit } from './ui/mount-kit.ts';
 export { mountEditor } from './ui/mount.ts';
-export type { Theme, SaveResult, HostHooks, EditorOptions, ShellWords, ShellFeatures, ShellCanvas, EditorSetup, EditorState, Editor } from './ui/mount.ts';
+export type { Theme, SaveResult, HostHooks, EditorOptions, ShellWords, ShellFeatures, ShellCanvas, EditorSetup, EditorState, Editor, EditorBusy, EditorCanvas, DrawnBox } from './ui/mount.ts';
 export { PROTOCOL, isMessage } from './window/protocol.ts';
 export type { Refused, Capabilities, BaseToHost, BaseToWindow } from './window/protocol.ts';
 export { setupFor, PLAIN_WORDS, PLAIN_KEYMAP } from './ui/setup.ts';

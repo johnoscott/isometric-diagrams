@@ -1,0 +1,6 @@
+{
+ "note": "isometric-diagram.js (scripts/build-iso.ts's playerIso), bytes; each is checked within 3% (test/dist-iso.test.ts). Recorded at 0.22.0, on review: what 0.21.0 built (compare in it). Re-record only on review, with the reason here",
+ "at": "0.22.0",
+ "min": 477755,
+ "gzip": 132761
+}

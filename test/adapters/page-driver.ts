@@ -28,6 +28,8 @@ export interface Driver {
   until(cond: string, what: string, ms?: number): Promise<void>;
   /** a DevTools protocol call (screenshots, emulation) */
   cdp(method: string, params?: object): Promise<{ result?: { value?: unknown }; data?: string; [k: string]: unknown }>;
+  /** (0.22.0) the browser's process, for a test of the driver itself */
+  readonly pid: number | undefined;
 }
 
 /** Chrome, and its DevTools port. One that starts and never opens its port (a busy runner): another, on a profile of its own, three at most. */
@@ -45,8 +47,10 @@ export async function launch(chrome: string, size: string): Promise<{ proc: Chil
   throw new Error('Chrome gave no DevTools port, three times');
 }
 
-/** page: index.html of its own (default: one that loads page.js), and its CSP (null: none) */
-export async function drivePage(chrome: string, js: Uint8Array, handle: string, run: (d: Driver) => Promise<void>, size = '1280,860', page: { html?: string; csp?: string | null } = {}): Promise<void> {
+/** page: index.html of its own (default: one that loads page.js), and its CSP (null: none). (0.22.0) limitMs: how long any one call
+ *  to the page may take (default a minute); past it Chrome is closed and the call fails, naming what it waited for, so a page that
+ *  never answers is a red with a name, never a run that doesn't end */
+export async function drivePage(chrome: string, js: Uint8Array, handle: string, run: (d: Driver) => Promise<void>, size = '1280,860', page: { html?: string; csp?: string | null; limitMs?: number } = {}): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'adapter-page-'));
   writeFileSync(join(dir, 'page.js'), js);
   writeFileSync(join(dir, 'index.html'), page.html ?? '<!doctype html><html><head><meta charset="utf-8"><title>page</title></head><body style="margin:0"><div id="app" style="height:100vh"></div><script type="module" src="page.js"></script></body></html>');
@@ -70,9 +74,23 @@ export async function drivePage(chrome: string, js: Uint8Array, handle: string, 
     let id = 0;
     const waiting = new Map<number, (d: { result?: unknown; error?: { message: string } }) => void>();
     sock.onmessage = m => { const d = JSON.parse(String(m.data)); if (d.id && waiting.has(d.id)) { waiting.get(d.id)!(d); waiting.delete(d.id); } };
-    const cdp = (method: string, params = {}) => new Promise<{ result?: { value?: unknown }; exceptionDetails?: { exception?: { description?: string } } }>((r, j) => { const n = ++id; waiting.set(n, d => (d.error ? j(new Error(d.error.message)) : r(d.result as never))); sock.send(JSON.stringify({ id: n, method, params })); });
+    const limit = page.limitMs ?? 60_000;
+    let stuck: string | undefined;
+    sock.onclose = () => { for (const [n, f] of [...waiting]) { waiting.delete(n); f({ error: { message: stuck ?? 'Chrome closed its connection' } }); } };
+    const cdp = (method: string, params: Record<string, unknown> = {}, label = method) => new Promise<{ result?: { value?: unknown }; exceptionDetails?: { exception?: { description?: string } } }>((r, j) => {
+      if (stuck) { j(new Error(`page-driver: ${stuck}`)); return; }
+      const n = ++id;
+      const t = setTimeout(() => {
+        waiting.delete(n);
+        stuck = `no answer in ${Math.round(limit / 1000)} s to ${label}; Chrome is closed`;
+        proc?.kill('SIGKILL');
+        j(new Error(`page-driver: ${stuck}`));
+      }, limit);
+      waiting.set(n, d => { clearTimeout(t); if (d.error) j(new Error(d.error.message)); else r(d.result as never); });
+      sock.send(JSON.stringify({ id: n, method, params }));
+    });
     const ev = async <T>(body: string): Promise<T> => {
-      const r = await cdp('Runtime.evaluate', { expression: `(async () => { const B = window[${JSON.stringify(handle)}], E = B?.editor, I = E?.internal; const tick = (ms = 60) => new Promise(r => setTimeout(r, ms)); ${body} })()`, awaitPromise: true, returnByValue: true });
+      const r = await cdp('Runtime.evaluate', { expression: `(async () => { const B = window[${JSON.stringify(handle)}], E = B?.editor, I = E?.internal; const tick = (ms = 60) => new Promise(r => setTimeout(r, ms)); ${body} })()`, awaitPromise: true, returnByValue: true }, `the page: ${body.replace(/\s+/g, ' ').slice(0, 100)}`);
       if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'in the page');
       return r.result?.value as T;
     };
@@ -84,10 +102,10 @@ export async function drivePage(chrome: string, js: Uint8Array, handle: string, 
     };
     await cdp('Page.enable'); await cdp('Runtime.enable');
     await cdp('Page.navigate', { url: base + 'index.html' });
-    await run({ ev, until, cdp: cdp as Driver['cdp'] });
+    await run({ ev, until, cdp: cdp as Driver['cdp'], pid: proc.pid });
   } finally {
     ws?.close();
-    proc?.kill();
+    proc?.kill('SIGKILL');
     server.close();
   }
 }

@@ -191,6 +191,59 @@ export interface Editor {
   setText(text: string, o: { fit?: boolean; undoable: true; label?: string; meta?: StepMeta }): HistoryEntry | false;
   setReadOnly(ro: boolean): void; setTheme(t: Theme): void;
   addFeatures(names: readonly string[]): Promise<void>; fit(): void; dispose(): void;
+
+  // ---- (0.22.0) EXPERIMENTAL: the handle a host uses instead of `internal`. It may change in a minor release until it is marked
+  // stable; the changelog says so when it does. ----
+  /** the editor's own element, the same for the mount's life */
+  readonly element: HTMLElement;
+  /** the one model: the text, the selection, the history */
+  readonly model: EditorModel;
+  readonly readOnly: boolean;
+  /** what the person is in the middle of, that a host's change would cut across; false when nothing. drag: a thing being moved, or
+   *  dropped from the palette (not a pan, a marquee or a click); link: a connection being drawn; rename: a name being typed in place;
+   *  typing: the focus in the text, or in a field of the properties or the outline. Only the editor's own: a host's pane beside it
+   *  (a chat box of its own) is never busy */
+  readonly busy: EditorBusy;
+  /** told each time `busy` changes; gives back what stops it */
+  onBusy(fn: (busy: EditorBusy) => void): () => void;
+  /** which panes show */
+  readonly view: 'text' | 'canvas' | 'both';
+  /** remember: kept as the person's choice for next time (default: not, so a host's change is never kept) */
+  setView(view: 'text' | 'canvas' | 'both', o?: { remember?: boolean }): void;
+  /** what ⌘S does: the host's onSave; whether it saved (no onSave, read-only, or refused: false; a conflict shows its bar) */
+  save(): Promise<boolean>;
+  /** check the text now, as 150 ms after a change does; resolves when its problems are shown and its drawing begun (then canvas.drawn()) */
+  check(): Promise<void>;
+  /** a line in the editor's status for 6 s; it fires nothing and saves nothing */
+  showNote(text: string, tone?: 'info' | 'warn' | 'bad'): void;
+  /** the canvas, where it is mounted; the same for the mount's life */
+  readonly canvas: EditorCanvas | undefined;
+}
+/** (0.22.0, experimental) see Editor.busy */
+export type EditorBusy = 'drag' | 'link' | 'rename' | 'typing' | false;
+/** (0.22.0, experimental) a box in the drawing's coordinates */
+export interface DrawnBox { x: number; y: number; w: number; h: number }
+/** (0.22.0, experimental) the canvas, for a host */
+export interface EditorCanvas {
+  /** the stage, the same element for the mount's life: each drawing is a child of it */
+  readonly element: HTMLElement;
+  readonly mode: '3d' | '2d';
+  /** resolves once drawn in that mode: false where there is no 2D, or it was disposed. remember as setView's (default: not) */
+  setMode(mode: '3d' | '2d', o?: { remember?: boolean }): Promise<boolean>;
+  /** a scale: 1 is 100% */
+  readonly zoom: number;
+  /** resolves when the text as it is now is drawn and the view still (after the person's drag, if one is under way): true, or false
+   *  where it can't be drawn. It never rejects */
+  drawn(): Promise<boolean>;
+  /** the drawing as it stands now, or undefined before the first */
+  drawing(): SVGSVGElement | undefined;
+  /** a thing's drawn elements and its box, by its path in the text as it is now: after a rename or a move an old path finds nothing
+   *  ([] and undefined), so read the path again (model.selection, a Change's remap) rather than keep it */
+  elementsOf(path: readonly (string | number)[]): Element[];
+  boxOf(path: readonly (string | number)[]): DrawnBox | undefined;
+  /** everything, or that box, fitted */
+  fit(box?: DrawnBox): void;
+  focus(): void;
 }
 
 /** P3: the editor with the features given (the core alone: the shell, the model, the reader and the tree; read-only
@@ -265,7 +318,7 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
   const canvas: ShellCanvas = !F.canvas ? noCanvas(S.noCanvas) : F.canvas.canvasView($('canvas'), doc, {
     problems: () => state.problems, note: (t: string, tone?: 'info' | 'warn' | 'bad') => note(t, tone), showInText: (p: Path) => showInText(p),
     showInTree: (p: Path) => { $('tab-outline').click(); doc.select([p], 'menu'); tree.focus(); },
-    onZoom: (pct: number) => { $('st-zoom').textContent = `${pct}%`; }, onHint: (t: string) => { $('st-hint').textContent = t; },
+    onZoom: (pct: number) => { $('st-zoom').textContent = `${pct}%`; }, onHint: (t: string) => { $('st-hint').textContent = t; }, onBusy: () => pokeBusy(),
     clipItems: () => clip.items(), store,
     ...S.canvasOpts?.(() => part!.api),
   } as never);
@@ -461,11 +514,13 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
   // ---------- problems and the plan: from the host's plan(text); the reader only draws ----------
   let timer = 0;
   let disposed = false;
+  let checkedVersion = -1;
   async function check() {
     clearTimeout(timer);
     const text = doc.text, version = doc.version;
     const r = await K.check(text, state.plan, note);
     if (disposed || doc.version !== version) return;
+    checkedVersion = version;
     state.plan = r.extra;
     state.problems = r.problems;
     state.read = r.read;
@@ -643,6 +698,54 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
     return run;
   }
 
+  // ---------- (0.22.0) what the person is in the middle of, for a host ----------
+  const C = canvas as unknown as { busy?: 'drag' | 'link'; drawnNow?(): Promise<boolean>; setMode?(m: '3d' | '2d', remember?: boolean): void; mode?: '3d' | '2d'; flat?: unknown; zoom?: number; stage?: HTMLElement; boxFor?(p: Path): DrawnBox | undefined; elementsOf?(p: Path): Element[]; fitAll?(b?: DrawnBox): void; };
+  function busyNow(): EditorBusy {
+    if (disposed) return false;
+    const c = C.busy;
+    if (c) return c;
+    if (root.querySelector('.rename-field')) return 'rename';
+    let a = document.activeElement as HTMLElement | null;
+    while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement as HTMLElement;
+    if (a && root.contains(a) && (isTextTarget(a) || ((a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable) && !!a.closest(`#${$('sel-body').id}, #${$('outline').id}`)))) return 'typing';
+    return false;
+  }
+  const busyFns = new Set<(b: EditorBusy) => void>();
+  let busyWas: EditorBusy = false;
+  function pokeBusy() {
+    if (!busyFns.size) return;
+    const b = busyNow();
+    if (b === busyWas) return;
+    busyWas = b;
+    for (const fn of [...busyFns]) { try { fn(b); } catch (e) { console.error(e); } }
+  }
+  for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'keydown', 'keyup'] as const) on(window, ev, () => pokeBusy(), { capture: true });
+  on(root, 'focusin', () => pokeBusy()); on(root, 'focusout', () => queueMicrotask(pokeBusy));
+  const sameBox = (b?: DrawnBox) => b && b.w > 0 && b.h > 0 ? b : undefined;
+  const hostCanvas: EditorCanvas | undefined = F.canvas && C.stage ? {
+    get element() { return C.stage!; },
+    get mode() { return C.mode ?? '3d'; },
+    async setMode(m, o = {}) {
+      if (disposed) return false;
+      if (C.mode !== m) C.setMode?.(m, !!o.remember);      // (no 2D in this domain: it stays, and says false)
+      if (C.mode !== m) return false;
+      return (await C.drawnNow?.()) ?? false;
+    },
+    get zoom() { return C.zoom ?? 1; },
+    async drawn() {
+      try {
+        if (disposed) return false;
+        if (checkedVersion !== doc.version) await check();
+        return (await C.drawnNow?.()) ?? false;
+      } catch { return false; }
+    },
+    drawing() { const all = C.stage!.querySelectorAll<SVGSVGElement>(':scope > svg.scene'); return all[all.length - 1]; },
+    elementsOf(path) { return disposed ? [] : [...(C.elementsOf?.(path as Path) ?? [])]; },
+    boxOf(path) { return sameBox(C.boxFor?.(path as Path)); },
+    fit(box) { if (disposed) return; if (box) C.fitAll?.(box); else canvas.fit(); },
+    focus() { canvas.focus(); },
+  } : undefined;
+
   const internal: Record<string, unknown> = {
     root, doc, get pane() { return pane; }, tree, canvas, props, clip, state, check, save, note, setView, showBanner, hideBanner,
     keySheet: sheet, setTheme, setDensity, setBottomTab,
@@ -665,6 +768,17 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
     setReadOnly,
     setTheme,
     addFeatures,
+    get element() { return root; },
+    get model() { return doc; },
+    get readOnly() { return state.readOnly; },
+    get busy() { return busyNow(); },
+    onBusy(fn) { busyFns.add(fn); busyWas = busyNow(); return () => { busyFns.delete(fn); }; },
+    get view() { return state.view; },
+    setView(v, o = {}) { if (!disposed) setView(v, !!o.remember); },
+    save: () => (disposed ? Promise.resolve(false) : save()),
+    check: () => (disposed ? Promise.resolve() : check()),
+    showNote(text, tone) { if (!disposed) note(text, tone); },
+    get canvas() { return hostCanvas; },
     fit() { if (!disposed) canvas.fit(); },
     dispose() {
       if (disposed) return;

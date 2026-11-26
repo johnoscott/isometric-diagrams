@@ -2,6 +2,21 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.22.0 — the editor's handle for a host
+
+Changes you'll notice:
+
+- **In the editors, a host's change of the view or of 3D and 2D isn't kept as the person's choice** (before, a change of 3D and 2D was).
+
+New, **experimental** (it may change in a minor release until it is marked stable):
+
+- **A handle for a host of `mountEditor`:** the model, whether it is read-only, what the person is in the middle of (`busy`, `onBusy`), the view,
+  save, check, a note; and the canvas: its mode, zoom, `drawn()`, the drawing, a thing's elements and box by its path, fit and focus.
+
+Fixed:
+
+- After a text that couldn't be drawn, undoing to the same text left the "can't draw" notice over the drawing.
+
 ## 0.21.0 — two drawings compared
 
 Changes you'll notice:

@@ -383,6 +383,9 @@ test('/transport and /player (0.16.0): the transport alone; <isometric-diagram>,
   const b = await playerIso(mkdtempSync(join(tmpdir(), 'iso-player-'))), src = Object.keys(b.metafile.inputs).filter(i => i.startsWith('src/'));
   assert.deepEqual(src.filter(i => !/^src\/(iso-core|iso-objects|iso-viewer|iso-systems|player)\//.test(i)), []);
   console.log(`# isometric-diagram.js: ${b.bytes} bytes, ${b.gzip} gzipped`);
+  // (0.22.0) and within 3% of what is recorded (test/baseline/player-size.json, re-recorded only on review)
+  const want = JSON.parse(readFileSync(new URL('./baseline/player-size.json', import.meta.url), 'utf8')) as { min: number; gzip: number };
+  assert.deepEqual([b.bytes <= want.min * 1.03, b.gzip <= want.gzip * 1.03], [true, true], `isometric-diagram.js: ${b.bytes} bytes (recorded ${want.min}), ${b.gzip} gzipped (recorded ${want.gzip}): over 3%`);
   const P = await import(pathToFileURL(join(OUT, 'isometric-diagram.js')).href), T = await import(pathToFileURL(join(OUT, 'js/iso-viewer/transport.js')).href);
   assert.deepEqual([typeof P.IsometricDiagram, typeof P.mountPlayer, typeof P.PLAY_CSS, typeof T.transport], ['function', 'function', 'string', 'function']);
 });

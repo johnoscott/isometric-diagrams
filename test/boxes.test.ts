@@ -895,6 +895,86 @@ test('boxes/1 in Chrome (0.21.0): setText undoable', { skip: chrome ? false : 'n
   });
 });
 
+// 0.22.0 (experimental): the handle a host uses instead of `internal`: what it says, what the person is in the middle of (and only
+// that), views and modes a host sets that aren't kept, drawn() that says whether it could draw, paths read as they are now, and a
+// disposed editor that answers without throwing.
+test('boxes/1 in Chrome (0.22.0): the host\'s handle', { skip: chrome ? false : 'no Chrome', timeout: 180000 }, async () => {
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>page</title></head><body data-sections data-stored="{}" style="margin:0"><div id="app" style="height:100vh"></div><input id="host-chat" aria-label="a host's own box"><div class="monaco-editor"><textarea id="host-code" aria-label="a host's own text"></textarea></div><script type="module" src="page.js"></script></body></html>`;
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until, cdp }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    // (headless, a page's focus fires no focus events unless it is told it has the window's focus, as a person's page has)
+    await cdp('Emulation.setFocusEmulationEnabled', { enabled: true });
+    // what it says
+    assert.deepEqual(await ev(`return [E.element === I.root, E.model === I.doc, E.readOnly, E.view === I.state.view, E.busy, !!E.canvas, E.canvas.element === I.canvas.stage, E.canvas.mode, E.canvas.zoom === I.canvas.zoom && E.canvas.zoom > 0 && E.canvas.zoom < 5];`), [true, true, false, true, false, true, true, '3d', true]);
+    await ev(`E.setReadOnly(true);`); assert.equal(await ev(`return E.readOnly;`), true); await ev(`E.setReadOnly(false);`);
+    // drawn, and what it draws by path; the last drawing
+    assert.equal(await ev(`return E.canvas.drawn();`), true);
+    assert.deepEqual(await ev(`const svg = E.canvas.drawing(), all = I.canvas.stage.querySelectorAll(':scope > svg.scene'); const els = E.canvas.elementsOf(['boxes', 'c']), b = E.canvas.boxOf(['boxes', 'c']); return [svg === all[all.length - 1], els.length > 0 && els.every(e => svg.contains(e) && e.closest('[data-id="c"]')), b.w > 0 && b.h > 0, E.canvas.elementsOf(['boxes', 'nope']).length, E.canvas.boxOf(['boxes', 'nope']) ?? null];`), [true, true, true, 0, null]);
+    // the newest drawing, where there are two (as in a switch of view)
+    assert.equal(await ev(`const old = E.canvas.drawing().cloneNode(false); old.dataset.old = ''; E.canvas.element.prepend(old); const d = E.canvas.drawing(); old.remove(); return d.dataset.old === undefined;`), true);
+    // a path read as it is now: after a rename the old one finds nothing
+    await ev(`E.setText(E.getText().replace(/^  c:/m, '  cc:').replace(/to: c }/, 'to: cc }'), { undoable: true }); return 0;`); assert.equal(await ev(`return E.canvas.drawn();`), true);
+    assert.deepEqual(await ev(`return [E.canvas.elementsOf(['boxes', 'c']).length, E.canvas.boxOf(['boxes', 'c']) ?? null, E.canvas.elementsOf(['boxes', 'cc']).length > 0];`), [0, null, true]);
+    await ev(`E.model.undo(); return 0;`); assert.equal(await ev(`return E.canvas.drawn();`), true);
+    // what can't be drawn: false, never a rejection; then it draws again
+    await ev(`E.setText('format: boxes/1\\nboxes: [', { undoable: true }); return 0;`); assert.equal(await ev(`return E.canvas.drawn();`), false);
+    await ev(`E.model.undo(); return 0;`); assert.equal(await ev(`return E.canvas.drawn();`), true, 'drawn again');
+    assert.equal(await ev(`return document.querySelector('.canvas-empty').hidden;`), true, 'and the notice gone: the same drawing as before it (it was left, before 0.22.0)');
+    assert.equal(await ev(`const f = I.canvas.drawnNow; I.canvas.drawnNow = () => Promise.reject(new Error('x')); try { return await E.canvas.drawn(); } finally { I.canvas.drawnNow = f; }`), false, 'never a rejection');
+    // views and modes: a host's aren't kept, unless it asks; the person's are
+    const kept = () => ev<Record<string, string>>(`return { ...B.stored };`);
+    await ev(`E.setView('canvas'); return 0;`); assert.equal(await ev(`return E.view;`), 'canvas'); assert.equal((await kept()).view, undefined, 'a host\'s view isn\'t kept');
+    assert.equal(await ev(`return E.canvas.setMode('2d');`), true); assert.equal(await ev(`return E.canvas.mode;`), '2d'); assert.equal((await kept())['canvas-view'], undefined, 'nor its mode');
+    assert.equal(await ev(`return E.canvas.setMode('3d', { remember: true });`), true); assert.equal((await kept())['canvas-view'], '3d');
+    await ev(`document.querySelector('.view-seg .seg[data-v="2d"]').click(); await tick(300); return 0;`); assert.equal((await kept())['canvas-view'], '2d', 'the person\'s is'); await ev(`return E.canvas.setMode('3d');`);
+    await ev(`E.setView('both', { remember: true }); return 0;`); assert.equal((await kept()).view, 'both');
+    // fit a box; focus
+    const zAll = await ev<number>(`E.canvas.fit(); await E.canvas.drawn(); return E.canvas.zoom;`), zC = await ev<number>(`E.canvas.fit(E.canvas.boxOf(['boxes', 'c'])); await E.canvas.drawn(); return E.canvas.zoom;`);
+    assert.ok(zC > zAll * 1.3, `a box fitted is closer: ${zC} against ${zAll}`); await ev(`E.canvas.fit(); await E.canvas.drawn(); return 0;`);
+    await ev(`E.canvas.focus(); return 0;`); assert.equal(await ev(`return document.activeElement === E.canvas.element;`), true);
+    // what the person is in the middle of, as it changes: typing in the text, never in the host's own box; a pan isn't; moving a thing is
+    await ev(`window.heard = []; window.off = E.onBusy(b => heard.push(b)); return 0;`);
+    await ev(`document.getElementById('host-chat').focus(); await tick(); return 0;`); assert.equal(await ev(`return E.busy;`), false, 'a host\'s own box is never busy');
+    await ev(`document.getElementById('host-code').focus(); await tick(); return 0;`); assert.equal(await ev(`return E.busy;`), false, 'nor its own text');
+    await ev(`E.model.select([['boxes', 'c']], 'canvas'); await tick(150); const f = document.querySelector('#se-sel-body input, #se-sel-body textarea'); if (!f) throw new Error('no field in the properties'); f.focus(); await tick(50); return 0;`); assert.equal(await ev(`return E.busy;`), 'typing', 'a field of the properties');
+    await ev(`E.canvas.focus(); await tick(50); return 0;`); assert.equal(await ev(`return E.busy;`), false);
+    const m = (type: string, x: number, y: number) => cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+    const empty = await ev<{ x: number; y: number }>(`const r = E.canvas.element.getBoundingClientRect(); return { x: r.left + 30, y: r.bottom - 30 };`);
+    await m('mousePressed', empty.x, empty.y); for (let i = 1; i <= 5; i++) await m('mouseMoved', empty.x + i * 10, empty.y - i * 6);
+    assert.equal(await ev(`return E.busy;`), false, 'a pan is not'); await m('mouseReleased', empty.x + 50, empty.y - 30);
+    // (the view still first: with motion, selecting it may bring it into view, smoothly)
+    await ev(`E.model.select([['boxes', 'c']], 'canvas'); await tick(100); await E.canvas.drawn(); return 0;`);
+    const c = await ev<{ x: number; y: number }>(`const r = E.canvas.elementsOf(['boxes', 'c'])[0].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };`);
+    await m('mousePressed', c.x, c.y); for (let i = 1; i <= 6; i++) await m('mouseMoved', c.x + i * 12, c.y + i * 4);
+    assert.equal(await ev(`return E.busy;`), 'drag', 'a thing moved is');
+    await m('mouseReleased', c.x + 72, c.y + 24); assert.equal(await ev(`await E.canvas.drawn(); return E.busy;`), false);
+    // a rename in place
+    await ev(`E.model.select([['boxes', 'c']], 'canvas'); E.canvas.focus(); I.canvas.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true })); await tick(150); return 0;`);
+    assert.equal(await ev(`return !!document.querySelector('.rename-field') && E.busy;`), 'rename');
+    await ev(`document.querySelector('.rename-field input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await tick(100); E.canvas.focus(); await tick(50); return 0;`);
+    // something dragged out of the palette, before it is dropped
+    const [p0, p1] = await ev<number[][]>(`const b = document.querySelector('.palette .pal-item').getBoundingClientRect(), s = E.canvas.element.getBoundingClientRect(); return [[b.left + 8, b.top + 8], [s.left + s.width * .6, s.top + s.height * .8]];`);
+    await m('mousePressed', p0[0], p0[1]); await m('mouseMoved', p0[0] + 12, p0[1] + 6);
+    assert.equal(await ev(`await tick(80); return E.busy;`), 'drag', 'a palette entry dragged, not yet over the canvas');
+    for (let i = 1; i <= 6; i++) await m('mouseMoved', p0[0] + (p1[0] - p0[0]) * i / 6, p0[1] + (p1[1] - p0[1]) * i / 6);
+    assert.equal(await ev(`return E.busy;`), 'drag', 'and over it');
+    await cdp('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await m('mouseReleased', p1[0], p1[1]); assert.equal(await ev(`await tick(100); await E.canvas.drawn(); return E.busy;`), false, 'and not once it is let go');
+    assert.deepEqual(await ev(`off(); return heard;`), ['typing', false, 'drag', false, 'rename', false, 'drag', false]);
+    // what is stopped hears nothing more
+    await ev(`document.querySelector('#se-sel-body input, #se-sel-body textarea')?.focus() ?? E.model.select([['boxes', 'c']], 'canvas'); await tick(100); return 0;`);
+    assert.equal(await ev(`return heard.length;`), 8);
+    // a note, a check and a save
+    await ev(`E.showNote('From the host', 'warn'); return 0;`); assert.equal(await ev(`return document.querySelector('#se-note .c-body').textContent;`), 'From the host');
+    assert.equal(await ev(`await E.check(); return 0;`), 0);
+    assert.deepEqual(await ev(`const n = B.saved.length, r = await E.save(); return [r, B.saved.length - n, I.doc.dirty];`), [true, 1, false]);
+    await ev(`E.setReadOnly(true); return 0;`); assert.equal(await ev(`return E.save();`), false); await ev(`E.setReadOnly(false); return 0;`);
+    // disposed: everything answers, nothing throws
+    assert.deepEqual(await ev(`const cv = E.canvas; E.dispose(); return [await cv.drawn(), await cv.setMode('2d'), await E.save(), await E.check() ?? null, E.busy, cv.elementsOf(['boxes', 'a']).length];`), [false, false, false, null, false, 0]);
+    assert.deepEqual(await ev(`return { violations: B.violations, errors: B.errors };`), { violations: [], errors: [] });
+  }, '1280,860', { html });
+});
+
 // 0.12.6: what Fit fits has the connectors in it: one that goes round a thing, past everything drawn, is inside the stage, in 3D and 2D.
 test('boxes/1 in Chrome (0.12.6): Fit counts the connectors', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
   await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {

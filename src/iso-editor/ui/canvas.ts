@@ -156,6 +156,8 @@ export interface CanvasOpts<M, D extends CanvasDrawing, A extends object = objec
   onZoom(pct: number): void;
   /** the navigation modes, for the status bar */
   onHint?(text: string): void;
+  /** (0.22.0) told when the canvas's part of what the person is in the middle of may have changed (a drag, a drop, a link) */
+  onBusy?(): void;
   /** Copy, Cut and Paste for the menu */
   clipItems?(): MenuItem[];
   /** where the navigation modes are kept between visits (the host's storage); none: for this mount only */
@@ -225,12 +227,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   try { Object.assign(nav, JSON.parse(opts.store?.get('canvas-nav') ?? '{}')); } catch { /* defaults */ }
   if (K.flat && opts.store?.get('canvas-view') === '2d') mode = '2d';
   /** switch the view: the drawing again in the other one, fitted (a 2D layout and a 3D one share no coordinates) */
-  function setMode(m: '3d' | '2d') {
+  // (0.22.0) remember: the person's own choice, kept for next time; a host's isn't
+  function setMode(m: '3d' | '2d', remember = true) {
     if (!K.flat || m === mode) return;
     endMorph();
     const was = mode;
     mode = m;
-    opts.store?.set('canvas-view', m);
+    if (remember) opts.store?.set('canvas-view', m);
     paintNav();
     // the drawing on the stage stays there, under the new one, to morph from (0.7.5)
     if (svg && cd && svg.parentNode === stage) morphFrom = { svg, mode: was };
@@ -254,12 +257,19 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
 
   /** Draw the file (after each change the reader accepted). */
   let disposed = false;
+  // (0.22.0) how many drawings are on their way, for drawn()
+  let renders = 0;
   async function render(s3: M | undefined, data: unknown) {
+    renders++;
+    try { await renderOnce(s3, data); } finally { renders--; }
+  }
+  async function renderOnce(s3: M | undefined, data: unknown) {
     if (disposed) return;
     if (!s3) { showEmpty(T.unreadable); return; }
     const key = JSON.stringify(data);
     // nothing new to draw: repaint the marks, unless a drag is showing its grid (it repaints when it ends)
-    if (key === lastKey && svg) { if (!pinDrag()) paintOverlay(); if (toFit) { toFit = false; fitItems(); } return; }
+    // (0.22.0: the same drawing again, after a text that couldn't be drawn, takes that notice away too)
+    if (key === lastKey && svg) { empty.hidden = true; if (!pinDrag()) paintOverlay(); if (toFit) { toFit = false; fitItems(); } return; }
     if (mode === '2d' && !flatImpl) {
       try { await loadFlat(); } catch (e) { mode = '3d'; paintNav(); opts.note(`The 2D view couldn't load: ${(e as Error).message}`, 'warn'); }
     }
@@ -1040,10 +1050,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   /** end a pin drag: the drop commits one command; an overlap, a cancel or no move puts the drawing back */
   /** drops whose pin isn't written yet (the grid fading out first) */
   let dropping = 0;
+  /** (0.22.0) palette entries being dragged out */
+  let palDragging = 0;
   async function endPin(commit: boolean) {
     if (!pinDrag()) return;
     dropping++;
-    try { await endDrop(commit); } finally { dropping--; }
+    try { await endDrop(commit); } finally { dropping--; opts.onBusy?.(); }
   }
   async function endDrop(commit: boolean) {
     const g = pinDrag();
@@ -1514,13 +1526,14 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       };
       const mv = (ev: PointerEvent) => {
         if (!dragged && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
-        dragged = true;
+        if (!dragged) { dragged = true; palDragging++; opts.onBusy?.(); }
         last = ev;
         if (frame) return;
         const go = () => { if (!frame) return; cancelAnimationFrame(frame); frame = 0; if (last) step(last); };
         frame = requestAnimationFrame(go); setTimeout(go, 32);
       };
       const done = (ev: PointerEvent, drop: boolean) => {
+        if (dragged) { palDragging--; queueMicrotask(() => opts.onBusy?.()); }
         b.removeEventListener('pointermove', mv); b.removeEventListener('pointerup', upH); b.removeEventListener('pointercancel', cancelH); removeEventListener('keydown', esc, true);
         cancelAnimationFrame(frame); frame = 0;
         if (drop && dragged) step(ev);
@@ -1667,13 +1680,21 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     render, setTheme, paintOverlay, fit: fitItems, fitNext() { toFit = true; }, fitAll: fit, actual, zoomAt, itemsBox, routesBox, get moved() { return V.moved; }, settled, get zoom() { return V.zoom; },
     dispose() { endMorph(); endWay(); clearTimeout(relayout); V.dispose(); disposed = true; },
     focus: () => stage.focus(),
+    /** (0.22.0) the canvas's part of what the person is in the middle of: a thing moved, or dropped from the palette; a connection drawn */
+    get busy(): 'drag' | 'link' | undefined { return pinDrag() || dropping || palDragging ? 'drag' : linking ? 'link' : undefined; },
+    /** (0.22.0) once what was given to render is drawn and the view still (after a drag, when it ends): whether it is drawn */
+    async drawnNow(): Promise<boolean> {
+      while (!disposed && (renders || pendingAfterDrag || pinDrag() || dropping)) await new Promise(r => setTimeout(r, 16));
+      await settled();
+      return !disposed && !!svg && empty.hidden === true;
+    },
     /** for the tests */
     get view() { return V.view; },
     get doc() { return cd; },
     /** the view (3D or 2D), and the 2D layout while it shows */
     get mode() { return mode; }, setMode, get flat() { return flat?.layout; },
     stage, key, scale: () => scale(), nav, paintNav, outlinesFor, footprints, get drag() { return pinDrag(); }, get lastMarquee() { return lastMarquee; },
-    boxFor, pageXYOf: (p: Path) => { const b = boxFor(p); const r = viewEl.getBoundingClientRect(); const k = scale(); return b && V.view ? { x: r.left + (b.x + b.w / 2 - V.view.x) * k, y: r.top + (b.y + b.h / 2 - V.view.y) * k } : undefined; },
+    boxFor, /** (0.22.0) a path's own drawn elements, on the drawing as it stands */ elementsOf: (p: Path) => (svg && cd ? elementsFor(toPointer(p)) : []), pageXYOf: (p: Path) => { const b = boxFor(p); const r = viewEl.getBoundingClientRect(); const k = scale(); return b && V.view ? { x: r.left + (b.x + b.w / 2 - V.view.x) * k, y: r.top + (b.y + b.h / 2 - V.view.y) * k } : undefined; },
   };
   // the layer's calls, as they are (its getters stay getters)
   if (layer) Object.defineProperties(base, Object.getOwnPropertyDescriptors(layer.api));
