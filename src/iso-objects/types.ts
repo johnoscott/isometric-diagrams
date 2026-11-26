@@ -33,11 +33,13 @@ export interface RawNode extends RawPlacement {
   variants?: Record<string, RawVariant>;
 }
 /** what a look may change: never the thing's box, so nothing else moves */
+/** row: one after another along x; column: along y; (0.23.0) grid: in rows, as many to a row as makes the most square block */
+export type Flow = 'row' | 'column' | 'grid';
 export interface RawVariant { role?: string; ghost?: boolean; label?: string; sub?: string; face?: string; deco?: RawDeco[] }
 export interface RawGate { side: Side; at?: number; width?: number; height?: number; node?: string }
 export interface RawRegion extends RawPlacement {
   id: string; kind: RegionKindName; label?: string; 'label-style'?: 'face' | 'face-right' | 'floor' | 'none'; ghost?: boolean;
-  role?: string; size?: number[]; padding?: number; height?: number; z?: number; flow?: 'row' | 'column';
+  role?: string; size?: number[]; padding?: number; height?: number; z?: number; flow?: Flow;
   gate?: RawGate; around?: string[]; regions?: RawRegion[]; nodes?: RawNode[]; motion?: RawMotion;
   variants?: Record<string, RawVariant>;
 }
@@ -46,7 +48,9 @@ export interface RawNote {
   dir?: 'x' | 'y'; anchor?: 'start' | 'middle' | 'end'; dx?: number; dy?: number; appears?: StepRef; disappears?: StepRef;
 }
 export interface RawScene {
-  id: string; title: string; caption?: string; aria?: string; gap?: number; flow?: 'row' | 'column';
+  id: string; title: string; caption?: string; aria?: string; gap?: number; flow?: Flow;
+  /** (0.23.0) compact: every container without a flow of its own lays its children out as a grid (the most square block) */
+  layout?: 'compact';
   regions?: RawRegion[]; nodes?: RawNode[]; routes?: unknown[]; notes?: RawNote[]; steps?: unknown[];
   legend?: 'auto' | false | string[]; badges?: boolean; loop?: boolean; after?: string;
   grid?: GridDef; assemble?: boolean; dim?: 'flows' | 'all';

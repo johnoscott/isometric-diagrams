@@ -2,6 +2,23 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.23.0 — a compact layout, and the 3D to 2D move as a drawing
+
+- **`layout: compact`** (a scene) **and `flow: grid`** (a container): things without a place of their own go in rows, as many to a row as
+  makes the drawing smallest in the isometric view, so a long drawing comes out about square and reads larger when fitted. Placed
+  things keep their places; a drawing that asks for neither is as before.
+- **`flatStill`:** a drawing's 2D view as one self-contained SVG, in light, dark, or black and white (where a card whose colour has a
+  pattern carries a strip of it).
+- **`morphDrawing`:** the move from a drawing's 3D view to its 2D view, or back, as a frame for any point of the way (`svgAt(t)`, or
+  `at(t)` as data), with no page needed: for a video, or a frame of your own. It follows the 3D | 2D switch's morph, measured against it
+  in Chrome.
+- Known: the 3D | 2D switch's own morph draws black and white without its hatching. Tried in Chrome only: Safari and Firefox are untried.
+
+## 0.22.1 — what each step touched
+
+- For a host of the editor's model: each history entry says what its command touched (`touched`).
+- The space editor's space/3.2 draft is **experimental**: its key names will change; don't write 3.2 files for production.
+
 ## 0.22.0 — the editor's handle for a host
 
 Changes you'll notice:

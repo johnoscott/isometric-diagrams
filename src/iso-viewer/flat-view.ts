@@ -61,16 +61,15 @@ export function flatSvg(L: FlatLayout, opts: { id: string; title?: string; style
 }
 
 /** the 2D view's stylesheet: its fonts (the ones flat.ts's FLAT_FONTS measures), its faces in the theme's role colours,
- *  and each link kind's colour and dash. Unscoped: a page scopes it as it scopes the drawing's (view-css.ts). */
-export function flatCss(styles: Record<string, FlatStyle> = {}): string {
+ *  and each link kind's colour and dash. Unscoped: a page scopes it as it scopes the drawing's (view-css.ts).
+ *  `page: false`: without what only a page has a use for (the pointer, the keyboard's focus, the page's own font): a still's */
+export function flatCss(styles: Record<string, FlatStyle> = {}, o: { page?: boolean } = {}): string {
+  const page = (rule: string) => (o.page === false ? '' : rule);
   // a theme token by name ("send"), or a colour as CSS writes it ("#2a64d6", "hsl(…)", "var(--x)")
   const col = (c: string | undefined) => (!c ? 'var(--ink)' : c.startsWith('#') || c.includes('(') ? c : `var(--${c})`);
   let css = `
-.flat{font-family:inherit}
-.flat .card{cursor:pointer;outline:none}
-.flat .card .face{fill:hsl(var(--h) var(--s) var(--l-top));stroke:hsl(var(--h) var(--s) var(--l-edge) / .55);stroke-width:1}
-.flat .card:hover .face,.flat .card:focus-visible .face{fill:hsl(var(--h) var(--s) calc(var(--l-top) + 6%))}
-.flat .card.ghost{opacity:.4}
+${page('.flat{font-family:inherit}\n.flat .card{cursor:pointer;outline:none}\n')}.flat .card .face{fill:hsl(var(--h) var(--s) var(--l-top));stroke:hsl(var(--h) var(--s) var(--l-edge) / .55);stroke-width:1}
+${page('.flat .card:hover .face,.flat .card:focus-visible .face{fill:hsl(var(--h) var(--s) calc(var(--l-top) + 6%))}\n')}.flat .card.ghost{opacity:.4}
 .flat .card .lt{font-size:13px;font-weight:600;fill:var(--ink)}
 .flat .card .st{font-size:10px;fill:var(--ink);opacity:.8}
 .flat .panel .face{fill:color-mix(in srgb,hsl(var(--h) var(--s) var(--l-top)) 22%,var(--surface));stroke:color-mix(in srgb,hsl(var(--h) var(--s) var(--l-top)) 40%,var(--line));stroke-width:1}

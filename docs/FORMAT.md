@@ -78,7 +78,8 @@ paragraphs.
 | `aria` | | The scene's accessible description (default: the title). Say what the picture shows. |
 | `regions`, `nodes`, `routes`, `notes`, `steps` | | The contents, below. |
 | `gap` | | Default distance between items placed next to each other, in grid units. Default 2. |
-| `flow` | | `row` (default) or `column`: where an item with no placement goes. |
+| `flow` | | `row` (default), `column` or `grid` (0.23.0): where an item with no placement goes. A grid puts them in rows, as many to a row as makes the block smallest in the isometric view (the least width + depth, then the most square). |
+| `layout` | | `compact` (0.23.0): every container without a `flow` of its own is a `grid`, so the drawing comes out about square instead of long, and reads at a larger size when fitted. A placed item (`at`, `right-of` …) keeps its place. Without it, as before. |
 | `legend` | | `auto` (default: the kinds used), `false`, or a list of kinds, plus `fence`, `vm`, `tunnel`. |
 | `loop` | | The player wraps from the last step to the first. Default `true`. |
 | `dim` | | What a step dims: `flows` (default: routes, their labels and marks) or `all` (nodes, regions and badges too). |
@@ -133,7 +134,7 @@ regions:
 | `padding` | | Room around the contents when fitting. Defaults: slab 1.2, fence 0.7, vm and platform 0.6, pad 0.6, cloud 0.8. |
 | `height` | | Thickness or wall height. Defaults: slab top at 0.35, pad 0.2, vm 0.45, platform 0.7, fence walls 0.8. |
 | `z` | | Lift above the floor it stands on (tunnels float at 0.2). |
-| `flow` | | `row` or `column` for its contents. |
+| `flow` | | `row`, `column` or `grid` for its contents. |
 | `gate` | fence only | `side` (required: n, e, s, w), `at` (0–1 along the wall, default 0.5), `width` (default 2), `height`, `node` (a node id: the fence puts that node in the gap). |
 | `motion` | | How it, and what it holds, arrives and leaves. See [MOTION.md](MOTION.md). |
 | `variants` | | Other looks of it, by name, for a motion to switch to: `{ asleep: { role, ghost, label, sub } }`. See [MOTION.md](MOTION.md#looks). |
@@ -192,7 +193,7 @@ Each item is placed in its container's frame (the scene, a region, or a node wit
 | `align` | `center` (default), `start` or `end`, on the other axis. |
 | `shift: [dx, dy]` | A nudge after placement. |
 | `in: REGION` | For a scene-level item: put it inside a region instead of writing it there. |
-| *(none)* | After the item written before it, in the container's `flow` (a row by default); the first goes at the padding. |
+| *(none)* | After the item written before it, in the container's `flow` (a row by default; in a `grid`, in rows, in the order written); the first goes at the padding. |
 
 Relative placement works between items in the same container; a reference to an item elsewhere is an error that
 says where each one is. Overlapping nodes, and nodes sticking out of a sized region, are warnings.

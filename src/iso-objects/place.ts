@@ -8,7 +8,7 @@
 import type { Box } from '../iso-core/kernel.ts';
 import { type KindCatalog, regionKind, nodeKind, nodeKindOr, wallHeight } from './kinds.ts';
 import { didYouMean, type Diag } from '../iso-core/errors.ts';
-import type { Placed, RawNode, RawRegion, RawScene, Theme } from './types.ts';
+import type { Flow, Placed, RawNode, RawRegion, RawScene, Theme } from './types.ts';
 
 export interface Located { locate(path: string, opts?: { key?: boolean }): { line: number; col: number } }
 
@@ -121,7 +121,9 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
     return [w, d, h];
   }
 
-  function layoutContainer(c: Placed | undefined, kids: Placed[], padding: number, flow: 'row' | 'column', fixed: boolean): { w: number; d: number } {
+  // (0.23.0) a container with no flow of its own: the scene's compact layout's grid, else a row
+  const flowOf = (f: Flow | undefined): Flow => f ?? (scene.layout === 'compact' ? 'grid' : 'row');
+  function layoutContainer(c: Placed | undefined, kids: Placed[], padding: number, flow: Flow, fixed: boolean): { w: number; d: number } {
     // children first, so their sizes are known
     for (const k of kids) layoutItem(k);
     const placed = kids.filter(k => !k.placedBy);
@@ -158,12 +160,34 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
     };
     // keep the written order where nothing forces otherwise
     placed.forEach(visit);
+    // (0.23.0) a grid: what flows (no at, nothing it is placed beside) in rows, as many to a row as gives the smallest width + depth
+    // (the most square block, which an isometric view draws smallest); ties, the more square, then the fewer rows
+    const inGrid = new Map<Placed, { x: number; y: number }>();
+    const less = (a: number[], b: number[]) => { const i = a.findIndex((v, j) => Math.abs(v - b[j]) > 1e-9); return i >= 0 && a[i] < b[i]; };
+    if (flow === 'grid') {
+      const flows = placed.filter(k => { const raw = (k.node ?? k.region)!; return !raw.at && !REL.some(r => raw[r] !== undefined && byId.get(raw[r]!) && sib.has(byId.get(raw[r]!)!)); });
+      let best: { score: number[]; at: Map<Placed, { x: number; y: number }> } | undefined;
+      for (let cols = 1; cols <= flows.length; cols++) {
+        const at = new Map<Placed, { x: number; y: number }>();
+        let y = 0, W = 0;   // (the container's fit, below, puts it inside its padding, as for any flow)
+        for (let i = 0; i < flows.length; i += cols) {
+          const row = flows.slice(i, i + cols), rowD = Math.max(...row.map(k => local.get(k)!.d));
+          let x = 0;
+          row.forEach((k, j) => { const L = local.get(k)!; if (j) x += gapOf((k.node ?? k.region)!); at.set(k, { x, y: y + (rowD - L.d) / 2 }); x += L.w; });
+          W = Math.max(W, x); y += rowD + (i + cols < flows.length ? gapOf((flows[i + cols].node ?? flows[i + cols].region)!) : 0);
+        }
+        const score = [W + y, Math.abs(W - y), Math.ceil(flows.length / cols)];
+        if (!best || less(score, best.score)) best = { score, at };
+      }
+      if (best) for (const [k, p] of best.at) inGrid.set(k, p);
+    }
 
     for (const k of order) {
       const raw = (k.node ?? k.region)!, L = local.get(k)!;
       const rel = REL.find(r => raw[r] !== undefined && byId.get(raw[r]!) && sib.has(byId.get(raw[r]!)!));
       if (raw.at && rel) err(`${k.path}/at`, `"${k.id}" has both "at" and "${rel}"; "at" wins`, undefined, true, 'warning');
       if (raw.at) { L.x = raw.at[0]; L.y = raw.at[1]; }
+      else if (inGrid.has(k)) { const p = inGrid.get(k)!; L.x = p.x; L.y = p.y; }
       else if (rel) relTo(L, local.get(byId.get(raw[rel]!)!)!, rel, gapOf(raw), raw.align ?? 'center');
       else {
         // flow after the item written before it
@@ -197,13 +221,13 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
     if (p.type === 'node') {
       const [w, d, h] = nodeSize(p);
       local.set(p, { x: 0, y: 0, w, d, h, z: p.node!.z ?? 0 });
-      if (p.children.length) layoutContainer(p, p.children, 0, 'row', true);
+      if (p.children.length) layoutContainer(p, p.children, 0, 'row', true);   // (what stands on a node: as written)
       return;
     }
     const r = p.region!;
     const pad = r.padding ?? regionKind(catalog, r.kind)?.pad!;
     const fixed = !!r.size;
-    const fit = layoutContainer(p, p.children, pad, r.flow ?? 'row', fixed);
+    const fit = layoutContainer(p, p.children, pad, flowOf(r.flow), fixed);
     let w = r.size ? r.size[0] : Math.max(fit.w, pad * 2 + 0.5);
     let d = r.size ? r.size[1] : Math.max(fit.d, pad * 2 + 0.5);
     if (!r.size && r.gate) {
@@ -215,7 +239,7 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
     local.set(p, { x: 0, y: 0, w, d, h, z: 0 });
   }
 
-  layoutContainer(undefined, roots, 0, scene.flow ?? 'row', true);
+  layoutContainer(undefined, roots, 0, flowOf(scene.flow), true);
 
   // ---- 4. absolute boxes, top-down ----
   function absolute(p: Placed, ox: number, oy: number, floor: number) {

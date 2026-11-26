@@ -28,7 +28,11 @@ export interface Command {
 export type StepMeta = Readonly<Record<string, string>>;
 /** A step of the history, as a host sees it: made anew at each reading (compare ids, not objects). Its id is never another step's, and is kept
  *  by undo and redo. */
-export interface HistoryEntry { readonly id: number; readonly label: string; readonly origin: Origin; readonly meta?: StepMeta }
+export interface HistoryEntry {
+  readonly id: number; readonly label: string; readonly origin: Origin; readonly meta?: StepMeta;
+  /** (0.22.1) the paths its command said it touched, each once (a joined step: all of them); none for typing, nor for a whole text put in */
+  readonly touched?: readonly (readonly (string | number)[])[];
+}
 export interface ApplyOptions {
   /** the id of an undo step it is part of, where it can be (see apply) */
   joins?: number;
@@ -66,6 +70,7 @@ interface Entry {
   label: string;
   origin: Origin;
   meta?: StepMeta;
+  touched?: Path[];
   steps: Step[];
   /** the inverse of each step, in the order they undo (last step first) */
   inverse: Step[];
@@ -83,7 +88,9 @@ interface Entry {
 }
 
 /** a step, as a host sees it */
-const seen = (e: Entry): HistoryEntry => Object.freeze({ id: e.id, label: e.label, origin: e.origin, ...(e.meta ? { meta: e.meta } : {}) });
+const seen = (e: Entry): HistoryEntry => Object.freeze({ id: e.id, label: e.label, origin: e.origin, ...(e.meta ? { meta: e.meta } : {}), ...(e.touched ? { touched: Object.freeze(e.touched.map(p => Object.freeze([...p]))) } : {}) });
+/** paths, each once, in their order */
+const onceEach = (ps: readonly Path[]): Path[] => { const k = new Set<string>(); return ps.filter(p => { const j = JSON.stringify(p); return !k.has(j) && !!k.add(j); }).map(p => [...p]); };
 const sameMeta = (a: StepMeta | undefined, b: StepMeta | undefined): boolean => {
   const x = Object.entries(a ?? {}), y = b ?? {};
   return x.length === Object.keys(y).length && x.every(([k, v]) => y[k] === v);
@@ -170,13 +177,14 @@ export class EditorModel {
     const top = this.undoStack[this.undoStack.length - 1];
     if (top && joins !== undefined && top.id === joins && !this.redoStack.length && top.id !== this.cleanId) {
       top.label = cmd.joined?.(top.label) ?? top.label;
+      if (cmd.touched?.length) top.touched = onceEach([...(top.touched ?? []), ...cmd.touched]);
       if (!sameMeta(top.meta, meta)) top.meta = undefined;
       top.steps.push(...splice.steps);
       top.inverse.unshift(...inverse);
       top.after = { paths: this.selection, text: this.textSel };
       top.time = this.now();
       top.fallback ||= !!splice.fallback;
-    } else this.push({ id: this.nextId++, label: cmd.label, origin, ...(meta ? { meta: Object.freeze({ ...meta }) } : {}), steps: splice.steps, inverse, before, after: { paths: this.selection, text: this.textSel }, time: this.now(), fallback: !!splice.fallback, open: false });
+    } else this.push({ id: this.nextId++, label: cmd.label, origin, ...(meta ? { meta: Object.freeze({ ...meta }) } : {}), ...(cmd.touched?.length ? { touched: onceEach(cmd.touched) } : {}), steps: splice.steps, inverse, before, after: { paths: this.selection, text: this.textSel }, time: this.now(), fallback: !!splice.fallback, open: false });
     this.emit({ kind: 'do', origin, label: cmd.label, steps: splice.steps, version: this._version, remap: cmd.remap }, length, this.undoStack[this.undoStack.length - 1]);
     for (const fn of this.selListeners) fn({ paths: this.selection, origin });
     return true;
