@@ -151,6 +151,8 @@ export const boxesAdapter: DomainAdapter = {
     return { at: ['links'], value: { from: from.name, to: to.name } };
   },
   // (0.10.1) a palette drop onto a tray or a zone puts the new box in it; a box holds nothing
+  // (0.28.0) a box's size, for the canvas's resize handles (it offers them only on what it draws as a group: a tray or a zone)
+  sizeAt: group => (group.length === 2 && group[0] === 'boxes' ? [...group, 'size'] : undefined),
   dropInto(target, value, _kind, data) {
     const boxes = isMap(data) && isMap(data.boxes) ? data.boxes : {};
     const t = boxes[target.name];

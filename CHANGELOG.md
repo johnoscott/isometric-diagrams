@@ -2,6 +2,18 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.28.0 — a drag grows its group; resize handles
+
+- **A drag grows the group it is in:** a thing dragged past the right or front edge of a group that fits what it holds isn't held
+  there; the group grows under it, its floor as it was drawn dashed, within 2 cells of the furthest the pointer has been. One undo
+  step, the pin as before; no size is written. A group with a size of its own holds it at its edges, as before, and says so.
+- **Resize handles:** given the adapter's `sizeAt(group)` (where a group's size is written), the selected group has handles: its
+  front-right corner, and the middles of its right and front sides. They snap to whole cells (⌥: half), stop at what the group
+  holds, and write the size as one step; a double click on one, or **Fit to contents** in the group's menu, takes it away.
+- Growing and resizing on the left and back sides wait for a decision (`GROW_SIDES`, in the canvas).
+- `snapMove` takes `parent.grow` (the sides that grow, and how far the thing has been); `minSizeFor`, `resizeTo` and `GROW_REACH`
+  are exported with it.
+
 ## 0.27.1 — the history's log taken mid-word
 
 - `revisionLog(model)` no longer closes the typing group being added to: a host may take the log after every keystroke and the

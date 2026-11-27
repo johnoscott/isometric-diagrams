@@ -21,6 +21,8 @@
 .iso-canvas .overlay .hover { fill: var(--iso-sel-faint); stroke: var(--iso-sel); stroke-width: 1; stroke-linejoin: round; vector-effect: non-scaling-stroke; opacity: .55; }
 .iso-canvas .overlay .route-ring { fill: none; stroke: var(--iso-sel); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .35; vector-effect: non-scaling-stroke; }
 .iso-canvas .overlay .route-hover { fill: none; stroke: var(--iso-sel); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .18; vector-effect: non-scaling-stroke; }
+/* (0.28.0) a group's floor as it was before the drag grew it */
+.iso-canvas .overlay .grow-was { fill: none; stroke: var(--iso-sel); stroke-width: 1.4; stroke-dasharray: 6 4; stroke-opacity: .85; pointer-events: none; }
 .iso-canvas .overlay .marquee { fill: var(--iso-sel-fill); stroke: var(--iso-sel); stroke-width: 1.2; stroke-dasharray: 5 4; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .iso-canvas .overlay .dgrid { fill: none; stroke: var(--iso-sel); stroke-width: 1; opacity: .42; vector-effect: non-scaling-stroke; }
 .iso-canvas .overlay .dgrid.sub { opacity: .24; stroke-dasharray: 2 3; }
@@ -31,6 +33,11 @@
 .iso-canvas .overlay .edge { fill: none; stroke: var(--iso-sel); stroke-width: 4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .iso-canvas .overlay .connect-handle { fill: var(--surface, #fff); stroke: var(--iso-sel); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: all; cursor: crosshair; }
 .iso-canvas .overlay .connect-handle:hover { fill: var(--iso-sel); }
+/* (0.28.0) a selected group's resize handles, and the floor a resize would give it (red-dashed where it is held at what it holds) */
+.iso-canvas .overlay .size-handle { fill: var(--surface, #fff); stroke: var(--iso-sel); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: all; }
+.iso-canvas .overlay .size-handle:hover, .iso-canvas .overlay .size-handle.on { fill: var(--iso-sel); }
+.iso-canvas .overlay .size-to { fill: var(--iso-sel-fill); stroke: var(--iso-sel); stroke-width: 1.4; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.iso-canvas .overlay .size-to.held { stroke: var(--iso-bad, #c92a2a); }
 .iso-canvas .overlay .connect-line { stroke: var(--iso-sel); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .iso-canvas .overlay .connect-line.ok { stroke-dasharray: none; }
 .iso-canvas .overlay .badge circle { fill: var(--iso-bad); stroke: none; }

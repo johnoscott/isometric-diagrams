@@ -1011,3 +1011,83 @@ test('boxes/1 in Chrome (0.12.6): Fit counts the connectors', { skip: chrome ? f
     assert.deepEqual(await ev(`return { violations: B.violations, errors: B.errors };`), { violations: [], errors: [] });
   });
 });
+
+test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed where it was; resize handles; fit to contents', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
+    const P = `const P = (el, type, x, y, alt = false) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 5, altKey: alt }));`;
+    // grow: a, dragged to the front past the shelf's edge (a shelf that fits what it holds; b stands beside it, to its right): no edge
+    // holds it, the shelf grows, its old floor dashed
+    const grow = await ev<{ dashed: boolean; hint: string; steps: number; wrong: string[] }>(`${P} const c = I.canvas, at = c.pageXYOf(['boxes', 'a']); const el = document.elementFromPoint(at.x, at.y);
+      // at each step: the dashed floor and the words exactly while the shelf is bigger than when the drag began, never otherwise
+      const wrong = []; let steps = 0;
+      const check = () => { const g = c.drag, b = g?.parent?.box, b0 = g?.parent?.box0; if (!b || !b0 || !g.move || !g.shown || g.shown[0] !== g.move.at[0] || g.shown[1] !== g.move.at[1]) return;   // (the trial drawn for where it is)
+        const grown = b.x1 - b.x0 > b0.x1 - b0.x0 + 1e-6 || b.y1 - b.y0 > b0.y1 - b0.y0 + 1e-6, dashed = !!document.querySelector('.iso-canvas .overlay .grow-was'), words = /which grows with it/.test(document.querySelector('#se-st-hint')?.textContent ?? '');
+        steps++; if (dashed !== grown || words !== grown) wrong.push(JSON.stringify({ at: g.move?.at, grown, dashed, words })); };
+      P(el, 'pointerdown', at.x, at.y); let dashed = false, hint = '';
+      for (let i = 1; i <= 14; i++) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(80); check(); dashed ||= !!document.querySelector('.iso-canvas .overlay .grow-was'); hint = document.querySelector('#se-st-hint')?.textContent || hint; }
+      // pulled back in and out again: the same, at every step
+      for (let i = 13; i >= 0; i--) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(80); check(); }
+      for (let i = 1; i <= 14; i++) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(80); check(); }
+      P(c.stage, 'pointerup', at.x - 168, at.y + 98); return { dashed, hint, steps, wrong };`);
+    assert.equal(grow.dashed, true, "the shelf's floor as it was, dashed, while it grew");
+    assert.match(grow.hint, /^Moving a within Shelf, which grows with it · /, 'the group named once, and what it does');
+    assert.deepEqual(grow.wrong, [], 'the dashed floor and the words exactly while the shelf has grown, at every step');
+    assert.ok(grow.steps >= 15, `${grow.steps} steps checked (the trial drawn for where it was)`);
+    await until(`/a: \\{ at: \\[/.test(E.getText())`, 'a pinned where it was dropped');
+    assert.doesNotMatch(await ev<string>(`return E.getText();`), /size:/, 'a group that fits what it holds keeps fitting: no size written');
+    await ev(`I.doc.undo(); await tick(100); return 0;`);
+    await until(`!/x-editor/.test(E.getText())`, 'one undo step');
+    // a shelf with room inside it (b deeper than a): a short way to the front, nothing grows (no dashed floor, no words); further, it
+    // does. Both seen, and at every step the two agree with what the shelf did
+    const roomy = await ev<{ seen: boolean[]; wrong: string[] }>(`${P} E.setText(E.getText().replace('  b: { in: shelf, label: B }', '  b: { in: shelf, label: B, size: [2, 4, 1] }'), { fit: true }); await tick(300);
+      const c = I.canvas, at = c.pageXYOf(['boxes', 'a']), el = document.elementFromPoint(at.x, at.y), seen = new Set(), wrong = [];
+      const check = () => { const g = c.drag, b = g?.parent?.box, b0 = g?.parent?.box0; if (!b || !b0 || !g.move || !g.shown || g.shown[0] !== g.move.at[0] || g.shown[1] !== g.move.at[1]) return;   // (the trial drawn for where it is)
+        const grown = b.x1 - b.x0 > b0.x1 - b0.x0 + 1e-6 || b.y1 - b.y0 > b0.y1 - b0.y0 + 1e-6, dashed = !!document.querySelector('.iso-canvas .overlay .grow-was'), words = /which grows with it/.test(document.querySelector('#se-st-hint')?.textContent ?? '');
+        seen.add(grown); if (dashed !== grown || words !== grown) wrong.push(JSON.stringify({ at: g.move.at, grown, dashed, words })); };
+      P(el, 'pointerdown', at.x, at.y);
+      for (let i = 1; i <= 16; i++) { P(c.stage, 'pointermove', at.x - i * 6, at.y + i * 3.5); await tick(80); check(); }
+      for (let i = 15; i >= 0; i--) { P(c.stage, 'pointermove', at.x - i * 6, at.y + i * 3.5); await tick(80); check(); }
+      I.canvas.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); P(c.stage, 'pointerup', at.x, at.y); await tick(100);
+      return { seen: [...seen].sort(), wrong };`);
+    assert.deepEqual(roomy.seen, [false, true], 'a short way, nothing grew; further, it did');
+    assert.deepEqual(roomy.wrong, [], 'the dashed floor and the words exactly while it has grown');
+    await ev(`E.setText(${JSON.stringify(TEXT)}, { fit: true }); await tick(300); return 0;`);
+
+    // the handles: the shelf selected, three handles (the front-right corner, the right side, the front side; left and back wait)
+    await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(100); return 0;`);
+    await until(`document.querySelectorAll('.iso-canvas .overlay .size-handle').length === 3`, 'three handles');
+    assert.deepEqual(await ev<string[]>(`return [...document.querySelectorAll('.iso-canvas .overlay .size-handle')].map(h => h.dataset.handle).sort();`), ['corner', 'front', 'right']);
+    // the corner, dragged out: a size written, as one step
+    await ev(`${P} const h = document.querySelector('.iso-canvas .overlay .size-handle[data-handle="corner"]').getBoundingClientRect(), x = h.x + h.width / 2, y = h.y + h.height / 2;
+      P(document.querySelector('.iso-canvas .overlay .size-handle[data-handle="corner"]'), 'pointerdown', x, y);
+      for (let i = 1; i <= 6; i++) { P(I.canvas.stage, 'pointermove', x + i * 10, y + i * 12); await tick(40); }
+      P(I.canvas.stage, 'pointerup', x + 60, y + 72); return 0;`);
+    await until(`/shelf: \\{ kind: tray, label: Shelf, size: \\[\\d+(\\.5)?, \\d+(\\.5)?\\] \\}/.test(E.getText())`, 'the size written');
+    const sized = await ev<string>(`return /size: (\\[[^\\]]*\\])/.exec(E.getText())[1];`);
+    assert.equal(await ev<string>(`return I.doc.undoLabel;`), 'Resize Shelf');
+    // the right side, dragged far in: stopped at what it holds, never smaller
+    await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(100); return 0;`);
+    await until(`document.querySelector('.iso-canvas .overlay .size-handle[data-handle="right"]')`, 'the right handle');
+    const held = await ev<{ hint: string; red: boolean }>(`${P} const el = document.querySelector('.iso-canvas .overlay .size-handle[data-handle="right"]'), h = el.getBoundingClientRect(), x = h.x + h.width / 2, y = h.y + h.height / 2;
+      P(el, 'pointerdown', x, y); for (let i = 1; i <= 10; i++) { P(I.canvas.stage, 'pointermove', x - i * 40, y - i * 20); await tick(30); }
+      const r = { hint: document.querySelector('#se-st-hint')?.textContent ?? '', red: !!document.querySelector('.iso-canvas .overlay .size-to.held') };
+      P(I.canvas.stage, 'pointerup', x - 400, y - 200); return r;`);
+    assert.match(held.hint, /no smaller/); assert.equal(held.red, true, 'the floor it would have, red where it is held');
+    const narrow = await ev<string>(`await tick(100); return /size: (\\[[^\\]]*\\])/.exec(E.getText())?.[1] ?? '';`);
+    assert.notEqual(narrow, sized, 'narrower');
+    // fit to contents: in the menu while it has a size; a double click on a handle takes it away
+    // (the menu key: the shelf's own menu; a right click on its middle would land on a box standing on it)
+    await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(100); I.canvas.focus();
+      I.canvas.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true })); await tick(100); return 0;`);
+    assert.ok((await ev<string[]>(`return [...document.querySelectorAll('.menu[role="menu"] .mi-label')].map(x => x.textContent);`)).includes('Fit to contents'), 'Fit to contents, while it has a size');
+    await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await tick(50); return 0;`);
+    await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(100); const el = document.querySelector('.iso-canvas .overlay .size-handle[data-handle="corner"]'), h = el.getBoundingClientRect();
+      I.canvas.stage.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, clientX: h.x + h.width / 2, clientY: h.y + h.height / 2 })); return 0;`);
+    await until(`!/size:/.test(E.getText())`, 'the size taken away: it fits again');
+    assert.match(await ev<string>(`return I.doc.undoLabel;`), /^Fit Shelf to what it holds$/);
+
+    const bad = await ev<{ violations: string[]; errors: string[] }>(`return { violations: B.violations, errors: B.errors };`);
+    assert.deepEqual(bad, { violations: [], errors: [] });
+  });
+});

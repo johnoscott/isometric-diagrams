@@ -47,7 +47,7 @@ export { regionRole, renderScene, wallsOf, LABEL_BUDGET } from './scene.ts';
 export type { RenderedScene, RenderWarning, SceneInput } from './scene.ts';
 export { PAGE_CSS, drawingCss, baseCss, MARKS_CSS, PLAYER_UI_CSS, GRID_CSS, PLAYER_CSS } from './css.ts';
 export { noSource, compileRaw } from './compile.ts';
-export { screenToGrid, localAt, boxSilhouette, floorOf, paddingOf, snapMove, overlaps } from './geometry.ts';
+export { screenToGrid, localAt, boxSilhouette, floorOf, paddingOf, snapMove, overlaps, GROW_REACH, minSizeFor, resizeTo, type ResizeHandle } from './geometry.ts';
 export type { Move } from './geometry.ts';
 export type { CompiledScene, Compiled } from './compile.ts';
 export { FLAT_DEFAULTS, FLAT_FONTS, metricsMeasure, boardErrors, placeBoard, layoutFlat, flatHit } from './flat.ts';

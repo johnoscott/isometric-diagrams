@@ -128,6 +128,9 @@ export interface DomainAdapter {
    *  target, and the words for it ("in subnet app"), or undefined (the target doesn't hold it). The canvas asks what is
    *  under the drop, innermost first; none: a drop is pinned where it lands */
   dropInto?(target: ObjectRef, value: unknown, kind: string, data: unknown): { value: unknown; label?: string } | undefined;
+  /** (0.28.0) where a group's size is written (its value [w, d]), or undefined (that one isn't resized on the canvas). None: no
+   *  resize handles. The canvas writes it, and takes it away for "Fit to contents" */
+  sizeAt?(group: Path): Path | undefined;
 
   /** the top-level key order: where a new section goes */
   topOrder: readonly string[];

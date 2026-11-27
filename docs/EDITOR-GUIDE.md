@@ -224,6 +224,17 @@ Three optional pieces. Give one and the editor offers it; leave it out and nothi
   innermost first, and the first that holds it takes it; with none, the drop is pinned where it lands. In 3D the palette
   drags the thing itself (0.14.0), in a trial drawing of the file with it, so the grid, the target and what it lands in are
   seen before the drop; in a container it is pinned where it is dropped, unless that is the layout's own place for it.
+- **Growing a group** (0.28.0): a thing dragged past the right or front edge of a group that fits what it holds (no `size`) isn't
+  held there: the group grows under it, cell by cell, its floor as it was drawn dashed, within 2 cells of the furthest the pointer
+  has been (`GROW_REACH`). The drop is the pin, one undo step; no `size` is written, so the group keeps fitting. A group with a size
+  holds it at its edges, as before ("fixed size: resize it to fit more"). Left and back wait for a decision: `GROW_SIDES` in
+  `src/iso-editor/ui/canvas.ts` says which sides grow, and which handles a resize has.
+- **Resize handles** (0.28.0), on the adapter: `sizeAt(group)` returns the path a group's `size` ([w, d]) is written at, or
+  `undefined` (that one isn't resized). Given it, the one selected group shows handles on its floor: the front-right corner (width
+  and depth), and the middles of its right side (width) and front side (depth); 44 px targets on a touch screen. A drag snaps to
+  whole cells (⌥: half), never below what the group holds needs (it stops there: "no smaller"), and writes the size as one step
+  ("Resize <group>"). A double click on a handle, or **Fit to contents** in the group's menu, takes the size away (it fits again).
+  Esc cancels a resize.
 - **Making way** (0.14.0): a drag held still over a taken cell makes what is there step aside (after 700 ms; `dragMotion:
   'respect'` on the view leaves out the jiggle and the glide under Reduce Motion). What moved is pinned, in the same undo step.
 - **Group**, on the adapter: `group(members, data)` returns the new container (`at`, the base of its `name`, its
@@ -322,6 +333,7 @@ Its `index.html` gives the editor a sized element: `<div id="app" style="height:
 | connecting by drag, Connect to… (0.10.0) | `adapter.connect` |
 | Group, ⌘G (0.10.0) | `adapter.group` |
 | a palette drop that lands inside a container (0.10.1) | `adapter.dropInto` |
+| a selected group's resize handles, Fit to contents (0.28.0) | `adapter.sizeAt` |
 | palette sections under collapsible headers (0.11.0) | `view.palette[].section` |
 | the palette docked at the canvas's left, searchable (0.12.0) | `view.paletteLayout: 'docked'` |
 | the palette's entries as what they make (0.14.0) | `view.paletteLook: 'object'` |

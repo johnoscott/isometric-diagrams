@@ -133,6 +133,7 @@ export function setupFor<R, D extends CanvasDrawing>(a: DomainAdapter, v: Domain
     ...(a.connect ? { connect: (f: ObjectRef, t: ObjectRef, d: unknown) => a.connect!(f, t, d) } : {}),
     ...(a.group ? { group: (m: ObjectRef[], d: unknown) => a.group!(m, d) } : {}),
     ...(a.dropInto ? { dropOnto: (t: ObjectRef, v: unknown, k: string, d: unknown) => a.dropInto!(t, v, k, d) } : {}),
+    ...(a.sizeAt ? { resize: { at: (p: Path) => a.sizeAt!(p) } } : {}),
     trial: (text, theme) => { const r = read(text); return r.read === undefined || r.diags.some(d => d.severity === 'error') ? undefined : v.draw(r.read as R, (r.read as { data?: unknown }).data, theme); },
   };
   if (v.paletteLook === 'object') canvas.looks = paletteLooks(canvas);
