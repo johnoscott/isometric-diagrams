@@ -2,6 +2,16 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.27.0 — the editor's history kept beside its text
+
+- **The editor's history can be kept beside its text and given back after a reload:** `revisionLog(model)` is the undo and redo
+  history as data (JSON), with a hash of the text it belongs to; `restoreLog(model, log)` gives it back to that text only, and only
+  when every step, tried on a copy, undoes and redoes to it exactly. Else it says why (`{ ok: false, why }`) and nothing changes.
+  The restored text is clean; steps beyond the model's depth (500) are left out, oldest first; new steps' ids follow the log's.
+  The text pane's own selection is not kept. Where and when a host keeps the log is its own choice.
+- `revisionLog`, `restoreLog`, `textHash` and the types `RevisionLog` and `LoggedStep` are exported with the editor's model, from a
+  module of their own (`history-log.ts`), so an editor that keeps no history bundles none of it.
+
 ## 0.26.0 — a compact-layout toggle in the canvas's menu
 
 - The editor canvas's kit takes an optional `compact: { on(data) }`. Given it, the canvas's menu (on the background) offers "Turn

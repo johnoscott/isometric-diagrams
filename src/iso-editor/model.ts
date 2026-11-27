@@ -65,7 +65,8 @@ export interface Change {
 /** The selection changed, and which view changed it (a view doesn't react to its own). */
 export interface SelectionChange { paths: Path[]; origin: Origin }
 
-interface Entry {
+/** @internal a step as the model keeps it */
+export interface Entry {
   id: number;
   label: string;
   origin: Origin;
@@ -297,4 +298,15 @@ export class EditorModel {
   get dirty() { return (this.undoStack[this.undoStack.length - 1]?.id ?? 0) !== this.cleanId; }
   /** the labels on the stack, oldest first (for tests and a history list) */
   get history() { return this.undoStack.map(e => e.label); }
+
+  // ---------- keeping the history (0.27.0: src/iso-editor/history-log.ts) ----------
+
+  /** @internal the stacks as they are, for history-log.ts (read only there) */
+  _stacks(): { undo: readonly Entry[]; redo: readonly Entry[] } { this.seal(); return { undo: this.undoStack, redo: this.redoStack }; }
+  /** @internal put a history in place (history-log.ts's restore, after it has proven it): the text is clean at its last step */
+  _put(undo: Entry[], redo: Entry[]) {
+    this.undoStack = undo.slice(-this.depth); this.redoStack = redo.slice(-this.depth);
+    this.nextId = Math.max(this.nextId, ...[...undo, ...redo].map(e => e.id + 1));
+    this.cleanId = this.undoStack[this.undoStack.length - 1]?.id ?? 0;
+  }
 }
