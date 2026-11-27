@@ -2,6 +2,11 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.27.1 — the history's log taken mid-word
+
+- `revisionLog(model)` no longer closes the typing group being added to: a host may take the log after every keystroke and the
+  typing still joins into one undo step (in 0.27.0 each keystroke became a step of its own if the log was taken between them).
+
 ## 0.27.0 — the editor's history kept beside its text
 
 - **The editor's history can be kept beside its text and given back after a reload:** `revisionLog(model)` is the undo and redo

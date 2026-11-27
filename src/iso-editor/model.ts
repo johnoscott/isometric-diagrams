@@ -301,8 +301,9 @@ export class EditorModel {
 
   // ---------- keeping the history (0.27.0: src/iso-editor/history-log.ts) ----------
 
-  /** @internal the stacks as they are, for history-log.ts (read only there) */
-  _stacks(): { undo: readonly Entry[]; redo: readonly Entry[] } { this.seal(); return { undo: this.undoStack, redo: this.redoStack }; }
+  /** @internal the stacks as they are, for history-log.ts (read only there). (0.27.1) Reading them doesn't seal the typing group being
+   *  added to: a host may take the log after every keystroke and typing still joins into one step */
+  _stacks(): { undo: readonly Entry[]; redo: readonly Entry[] } { return { undo: this.undoStack, redo: this.redoStack }; }
   /** @internal put a history in place (history-log.ts's restore, after it has proven it): the text is clean at its last step */
   _put(undo: Entry[], redo: Entry[]) {
     this.undoStack = undo.slice(-this.depth); this.redoStack = redo.slice(-this.depth);

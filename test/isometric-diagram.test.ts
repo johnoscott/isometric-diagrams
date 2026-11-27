@@ -298,6 +298,10 @@ const view = (d: Driver) => d.ev<{ vb: string; times: number; closer: boolean; f
 const FITTED = { closer: false, fit: false, out: false, in: true, own: true };
 const fitted = async (d: Driver, what: string) => { const { vb: _, times: __, ...x } = await view(d); assert.deepEqual(x, FITTED, what); };
 const LONG = `<p>before</p><isometric-diagram id="e" label="Built"><script type="text/yaml">\n${MOVING}</script></isometric-diagram><div style="height:3000px" id="long"></div>`;
+/** (0.27.1) the page at its top, and staying there: a wheel's smooth scroll may still be under way when it is put back, and carry
+ *  it down again after a fixed wait (CI, 27 Nov: scrollY 40 where 0 was due). Put back at each frame it has moved, until it has read 0
+ *  for three frames running (2 s at most) */
+const TOP = `for (let n = 0, k = 0; n < 3 && k < 120; k++) { if (scrollY !== 0) { scrollTo(0, 0); n = 0; } else n++; await new Promise(r => requestAnimationFrame(r)); }`;
 const tallPage = (d: Driver) => d.ev(`document.querySelector('#long')?.style.setProperty('height', '3000px'); scrollTo(0, 0); await tick(80); ${OWN}`);
 
 for (const bars of [false, true]) test(`zoom: on the page the wheel scrolls it, and says once how to zoom; with ⌘ or Ctrl it zooms about the pointer, 1 to 8 times${bars ? ' (scrollbars that take room)' : ''}`, opts, page(LONG, async d => {
@@ -307,8 +311,8 @@ for (const bars of [false, true]) test(`zoom: on the page the wheel scrolls it, 
   const said = () => d.ev<[boolean, string, string]>(`${FULL} const h = r.querySelector('.iso-zoom-hint'); return [getComputedStyle(h).visibility === 'visible', h.textContent, /Mac/.test(navigator.platform) ? '⌘ + scroll to zoom' : 'Ctrl + scroll to zoom'];`);
   const [on, words, want] = await said(); assert.equal(on, true, 'the hint'); assert.equal(words, want); await fitted(d, 'the wheel alone');
   await d.until(`getComputedStyle(document.querySelector('isometric-diagram').shadowRoot.querySelector('.iso-zoom-hint')).visibility === 'hidden'`, 'and it goes', 6000);
-  await d.ev('scrollTo(0, 0); await tick(80);'); await wheel(d, p, 40); assert.equal((await said())[0], false, 'once a page');
-  await d.ev('scrollTo(0, 0); await tick(80);');
+  await d.ev(TOP); await wheel(d, p, 40); assert.equal((await said())[0], false, 'once a page');
+  await d.ev(TOP);
   for (const mod of [META, CTRL]) {
     const q = await spot(d, 0.5, 0.5), was = await d.ev<number[]>(`${ZOOM} return at(${q.x}, ${q.y});`);
     await wheel(d, q, -60, mod); await wheel(d, q, -60, mod);
@@ -322,7 +326,7 @@ for (const bars of [false, true]) test(`zoom: on the page the wheel scrolls it, 
     for (let i = 0; i < 14; i++) await wheel(d, q, -2000, mod);
     const most = await view(d); near(most.times, 8, 0.02, 'the most'); assert.equal(most.in, false);
     // closer, the wheel alone still scrolls the page
-    await wheel(d, q, 40); await d.until('scrollY > 0', 'closer, the page scrolls'); await d.ev('scrollTo(0, 0); await tick(80);'); near((await view(d)).times, 8, 0.02);
+    await wheel(d, q, 40); await d.until('scrollY > 0', 'closer, the page scrolls'); await d.ev(TOP); near((await view(d)).times, 8, 0.02);
     for (let i = 0; i < 14; i++) await wheel(d, q, 2000, mod);
     await fitted(d, 'all the way out');
   }
