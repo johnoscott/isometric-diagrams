@@ -9,6 +9,8 @@ import type { Board } from '../iso-objects/flat.ts';
 
 export type ViewMode = '3d' | '2d';
 const NS = 'http://www.w3.org/2000/svg';
+/** (0.30.0) layers made so far: each one's patterns are named apart */
+let layers = 0;
 
 /** a 3D drawing's connectors marked with the ends they join (data-a, data-b), as the 2D ones are: a board's link may be
  *  drawn to a panel, so its ends are the board's when given */
@@ -55,8 +57,9 @@ export function morphSvgs(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVGS
 export const clamp = (v: number) => Math.max(0, Math.min(1, v));
 export const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** an element and everything in it, with its computed paint inlined (the layer is outside the views' stylesheets) */
-function paintedClone(el: Element): Element {
+/** an element and everything in it, with its computed paint inlined (the layer is outside the views' stylesheets). (0.30.0) A paint that
+ *  is a reference (a black-and-white pattern: url(#…)) goes through `keep`, which gives the layer's own copy of what it names */
+function paintedClone(el: Element, keep: (paint: string, from: Element) => string = p => p): Element {
   const c = el.cloneNode(true) as Element;
   const src = [el, ...el.querySelectorAll('*')], dst = [c, ...c.querySelectorAll('*')];
   src.forEach((s, i) => {
@@ -64,6 +67,7 @@ function paintedClone(el: Element): Element {
     d.removeAttribute('class');
     d.removeAttribute('tabindex');
     for (const p of ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-opacity', 'opacity', 'font-size', 'font-weight', 'font-family', 'letter-spacing', 'paint-order', 'stroke-linejoin', 'text-anchor']) d.style.setProperty(p, cs.getPropertyValue(p));
+    for (const p of ['fill', 'stroke']) { const v = d.style.getPropertyValue(p); if (v.startsWith('url(')) d.style.setProperty(p, keep(v, s)); }
   });
   return c;
 }
@@ -83,12 +87,14 @@ const toward = (a: Rect, b: Rect, t: number) => {
   return `matrix(${sx} 0 0 ${sy} ${tx} ${ty})`;
 };
 /** the top face of a 3D thing (its four corners, in the root's pixels), if it has one */
-function topFace(g: Element, origin: DOMRect): { pts: [number, number][]; fill: string } | undefined {
+function topFace(g: Element, origin: DOMRect): { pts: [number, number][]; fill: string; pattern?: string } | undefined {
   const poly = g.querySelector('polygon.top') as SVGPolygonElement | null;
   if (!poly) return undefined;
   const m = poly.getScreenCTM()!, pts: [number, number][] = [];
   for (let i = 0; i < poly.points.numberOfItems; i++) { const p = poly.points.getItem(i); pts.push([m.a * p.x + m.c * p.y + m.e - origin.left, m.b * p.x + m.d * p.y + m.f - origin.top]); }
-  return pts.length === 4 ? { pts, fill: getComputedStyle(poly).fill } : undefined;
+  // (0.30.0) in black and white, a patterned face has its pattern drawn over it, straight after it (mono-paint.ts)
+  const over = poly.nextElementSibling?.classList.contains('mono-pattern') ? getComputedStyle(poly.nextElementSibling).fill : undefined;
+  return pts.length === 4 ? { pts, fill: getComputedStyle(poly).fill, ...(over?.startsWith('url(') ? { pattern: over } : {}) } : undefined;
 }
 
 /** a morph's layer: append `svg` to the root; `at(t)` paints it t (0 to 1) of the way, in any order (no clock) */
@@ -98,6 +104,19 @@ export interface MorphLayer { svg: SVGSVGElement; at(t: number): void }
 export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVGSVGElement, from: ViewMode): MorphLayer {
   const origin = root.getBoundingClientRect();
   const layer = document.createElementNS(NS, 'svg') as SVGSVGElement;
+  // (0.30.0) the patterns its clones paint with, copied into the layer under ids of its own: a reference to another svg's defs (a view
+  // hidden, or two views with the same ids) paints nothing, and black and white lost its hatching (M6.B4)
+  const defs = document.createElementNS(NS, 'defs'), copied = new Map<Element, string>(), tag = `dual-morph-${++layers}`;
+  layer.appendChild(defs);
+  const keep = (paint: string, from: Element) => {
+    const id = /url\(\s*["']?[^"')]*#([^"')]+)["']?\s*\)/.exec(paint)?.[1];
+    const svg = id ? ((from as SVGElement).ownerSVGElement ?? from.closest('svg')) : null;
+    const src = id ? (svg?.querySelector(`[id="${CSS.escape(id)}"]`) ?? from.ownerDocument.getElementById(id)) : null;
+    if (!src) return paint;
+    let mine = copied.get(src);
+    if (!mine) { mine = `${tag}-${copied.size}`; const c = src.cloneNode(true) as Element; c.id = mine; defs.appendChild(c); copied.set(src, mine); }
+    return `url(#${mine})`;
+  };
   layer.setAttribute('class', 'dual-morph');
   layer.setAttribute('aria-hidden', 'true');
   layer.style.cssText = `position:absolute;left:0;top:0;width:${origin.width}px;height:${Math.max(origin.height, fromSvg.getBoundingClientRect().height, toSvg.getBoundingClientRect().height)}px;overflow:visible;pointer-events:none`;
@@ -117,14 +136,14 @@ export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVG
   const connsOut = document.createElementNS(NS, 'g'), connsIn = document.createElementNS(NS, 'g');
   const cOut = inUser(fromSvg), cIn = inUser(toSvg);
   // (an editor's overlay marks carry data-for too: never theirs)
-  for (const e of fromSvg.querySelectorAll('[data-a],[data-for]')) if (!e.closest('.overlay')) cOut.appendChild(paintedClone(e));
-  for (const e of toSvg.querySelectorAll('[data-a],[data-for]')) if (!e.closest('.overlay')) cIn.appendChild(paintedClone(e));
+  for (const e of fromSvg.querySelectorAll('[data-a],[data-for]')) if (!e.closest('.overlay')) cOut.appendChild(paintedClone(e, keep));
+  for (const e of toSvg.querySelectorAll('[data-a],[data-for]')) if (!e.closest('.overlay')) cIn.appendChild(paintedClone(e, keep));
   connsOut.appendChild(cOut); connsIn.appendChild(cIn);
   const drawIn = [...cIn.querySelectorAll('path')].map(p => { const len = (p as SVGPathElement).getTotalLength?.() ?? 0; return { p: p as SVGPathElement, len }; });
   const inLabels = [...cIn.children].filter(e => e.tagName.toLowerCase() === 'text') as SVGElement[];
   // panels below cards: the 2D order (panels by depth, then cards), the 3D one's by its painter's order
   const order = [...(from === '2d' ? A : B).keys()];
-  const items: { a?: Rect; b?: Rect; src?: SVGGElement; dst?: SVGGElement; face?: SVGPolygonElement; faceFrom?: [number, number][]; faceTo?: [number, number][]; faceFill?: [string, string] }[] = [];
+  const items: { a?: Rect; b?: Rect; src?: SVGGElement; dst?: SVGGElement; face?: SVGPolygonElement; facePat?: SVGPolygonElement; faceFrom?: [number, number][]; faceTo?: [number, number][]; faceFill?: [string, string] }[] = [];
   const shapes = document.createElementNS(NS, 'g');
   for (const id of new Set([...order, ...A.keys(), ...B.keys()])) {
     const ea = A.get(id), eb = B.get(id);
@@ -132,13 +151,13 @@ export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVG
     if (ea) {
       it.a = union(ea.map(e => rectIn(e, origin)));
       const g = document.createElementNS(NS, 'g') as SVGGElement, u = inUser(fromSvg);
-      for (const e of ea) u.appendChild(paintedClone(e));
+      for (const e of ea) u.appendChild(paintedClone(e, keep));
       g.appendChild(u); it.src = g;
     }
     if (eb) {
       it.b = union(eb.map(e => rectIn(e, origin)));
       const g = document.createElementNS(NS, 'g') as SVGGElement, u = inUser(toSvg);
-      for (const e of eb) u.appendChild(paintedClone(e));
+      for (const e of eb) u.appendChild(paintedClone(e, keep));
       g.appendChild(u); it.dst = g;
     }
     // the 3D top face becomes the 2D card (or comes from it)
@@ -156,9 +175,12 @@ export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVG
       it.face = poly;
       it.faceFrom = from === '3d' ? ordered : flat; it.faceTo = from === '3d' ? flat : ordered;
       it.faceFill = from === '3d' ? [top.fill, f2] : [f2, top.fill];
+      // (0.30.0) its black-and-white pattern goes with it (the 2D card brings its own strip of it)
+      if (top.pattern) { const pp = document.createElementNS(NS, 'polygon') as SVGPolygonElement; pp.style.fill = keep(top.pattern, g3!); pp.style.stroke = 'none'; it.facePat = pp; }
     }
     if (it.src) shapes.appendChild(it.src);
     if (it.face) shapes.appendChild(it.face);
+    if (it.facePat) shapes.appendChild(it.facePat);
     if (it.dst) shapes.appendChild(it.dst);
     items.push(it);
   }
@@ -185,7 +207,10 @@ export function buildLayer(root: HTMLElement, fromSvg: SVGSVGElement, toSvg: SVG
           const pts = it.faceFrom!.map((p, i) => [p[0] + (it.faceTo![i][0] - p[0]) * mid, p[1] + (it.faceTo![i][1] - p[1]) * mid]);
           it.face.setAttribute('points', pts.map(p => p.join(',')).join(' '));
           it.face.style.fill = mix(it.faceFill![0], it.faceFill![1], mid);
-          it.face.setAttribute('opacity', String(mid < 0.08 ? mid / 0.08 : mid > 0.92 ? (1 - mid) / 0.08 : 1));
+          const fo = mid < 0.08 ? mid / 0.08 : mid > 0.92 ? (1 - mid) / 0.08 : 1;
+          it.face.setAttribute('opacity', String(fo));
+          // its pattern: the 3D face's, as much as the face is still the 3D one
+          if (it.facePat) { it.facePat.setAttribute('points', it.face.getAttribute('points')!); it.facePat.setAttribute('opacity', String(fo * (from === '3d' ? 1 - mid : mid))); }
         }
       }
     },

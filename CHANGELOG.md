@@ -2,6 +2,13 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.29.1 — the morph keeps its hatching in black and white
+
+- **The 3D | 2D switch's morph keeps its black-and-white hatching** (M6.B4, known since 0.23.0). Its layer painted its clones with
+  references to the patterns in the views' own definitions, which a layer of its own couldn't reach; it now copies what its clones
+  paint with (patterns, a gradient) into the layer, under ids of its own, and the face that moves between the 3D top and the 2D card
+  carries its pattern too.
+
 ## 0.29.0 — growing left and back, both ways, built and off
 
 - **Growing a group on its left and back sides, both ways, built and off** until a decision (`GROW_SIDES.left`, `.back`, and
