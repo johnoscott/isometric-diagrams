@@ -15,12 +15,22 @@ import { h, icon, type IconName } from './icons.ts';
 import { openMenu, type MenuItem } from './menu.ts';
 import { run, type Actions } from './actions.ts';
 import { connectionsOf, nearestOn } from '../connections.ts';
-import { screenToGrid, localAt, boxSilhouette, floorOf, snapMove, overlaps, paddingOf, minSizeFor, resizeTo, type Move, type ResizeHandle } from '../../iso-objects/geometry.ts';
+import { screenToGrid, localAt, boxSilhouette, floorOf, snapMove, overlaps, paddingOf, type Move } from '../../iso-objects/geometry.ts';
+import { resizeSides, minSizeFrom, growLeftBack, type GrowLeftBack, type ResizeSides } from '../../iso-objects/resize.ts';
 
 /** (0.28.0) which sides of a group that fits what it holds grow when a thing is dragged past them, and which corners of a selected
  *  group have a resize handle. Left and back wait for the owner's answer (group drag, question 2: growing that way moves the others'
  *  pins so nothing else moves on screen, or the whole group shifts): turning them on needs that pin-moving work as well. */
-export const GROW_SIDES = { right: true, front: true, left: false, back: false } as const;
+export const GROW_SIDES: { readonly right: boolean; readonly front: boolean; readonly left: boolean; readonly back: boolean; readonly leftBack: GrowLeftBack } =
+  { right: true, front: true, left: false, back: false, leftBack: 'pins' };
+/** (0.29.0) the same sides, as the tests set them (both left/back variants are built and tested, and off until the owner answers) */
+/** (0.29.0) a selected group's resize handles: the sides each moves, and where it stands on the floor (x0, y0, x1, y1: the floor) */
+const HANDLES: [string, ResizeSides, (f: { x0: number; y0: number; x1: number; y1: number }) => [number, number]][] = [
+  ['corner', { right: true, front: true }, f => [f.x1, f.y1]], ['right', { right: true }, f => [f.x1, (f.y0 + f.y1) / 2]], ['front', { front: true }, f => [(f.x0 + f.x1) / 2, f.y1]],
+  ['left', { left: true }, f => [f.x0, (f.y0 + f.y1) / 2]], ['back', { back: true }, f => [(f.x0 + f.x1) / 2, f.y0]],
+  ['corner-lb', { left: true, back: true }, f => [f.x0, f.y0]], ['corner-rb', { right: true, back: true }, f => [f.x1, f.y0]], ['corner-lf', { left: true, front: true }, f => [f.x0, f.y1]],
+];
+export const growSidesForTest = (o: Partial<typeof GROW_SIDES>) => Object.assign(GROW_SIDES as { -readonly [K in keyof typeof GROW_SIDES]: (typeof GROW_SIDES)[K] }, o);
 import { regionKind, type KindCatalog } from '../../iso-objects/kinds.ts';
 import type { CompiledScene } from '../../iso-objects/compile.ts';
 import { iso, C, S } from '../../iso-core/kernel.ts';
@@ -194,7 +204,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
    *  started from the menu, so the next click ends it */
   let linking: { from: ObjectRef; x?: number; y?: number; over?: string; pick?: boolean } | undefined;
   /** (0.28.0) a resize handle being dragged: the group, which handle, where the press was, and the size it started at, may go to, and has */
-  let sizing: { path: Path; at: Path; label: string; handle: ResizeHandle; x0: number; y0: number; size0: [number, number]; min: [number, number]; size: [number, number]; held: boolean; floor: { x0: number; y0: number; z: number } } | undefined;
+  let sizing: { path: Path; at: Path; label: string; handle: string; sides: ResizeSides; x0: number; y0: number; size0: [number, number]; min: [number, number]; size: [number, number]; held: boolean; shift: [number, number]; floor: { x0: number; y0: number; z: number } } | undefined;
   host.classList.add('canvas');
   // the stage holds the drawing, and takes the focus, the keys and the pointer
   const stage = h('div', { class: `${ui.rootClass} canvas-stage`, tabindex: '0', role: 'application', 'aria-label': T.stage });
@@ -533,8 +543,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const item = id === undefined ? undefined : cd.scene.layout.byId.get(id);
     const at = item?.region ? K.resize.at(doc.selection[0]) : undefined;
     if (!item?.region || !at) return undefined;
-    return { path: doc.selection[0], at, box: item.box, z: item.box.z0, label: item.region.label ?? id!, size: item.region.size as number[] | undefined,
-      min: (step: number) => minSizeFor(item.box, item.children.map(c => c.box), paddingOf(K.catalog, item.region), step) };
+    const pad = paddingOf(K.catalog, item.region), pin = groupPin(cd, id!), named = new Map([...pinIds(cd)].map(([n, i]) => [i, n]));
+    return { path: doc.selection[0], at, box: item.box, z: item.box.z0, label: item.region.label ?? id!, size: item.region.size as number[] | undefined, pin,
+      min: (sides: ResizeSides, step: number) => minSizeFrom(item.box, item.children.map(c => c.box), pad, sides, step),
+      /** what it holds that can be pinned, where it stands in it (a left or back resize moves these, so they stay put on screen) */
+      held: () => item.children.flatMap(c => { const n = named.get(c.id), w = localAt(cd!.scene, c.id); return n && w ? [{ name: n, at: w }] : []; }),
+      /** the handles it has: right and front always (GROW_SIDES); left and back when they are on, and it can be pinned (they move it) */
+      handles: () => HANDLES.filter(([, sd]) => (!sd.right || GROW_SIDES.right) && (!sd.front || GROW_SIDES.front) && (!sd.left || (GROW_SIDES.left && !!pin)) && (!sd.back || (GROW_SIDES.back && !!pin))) };
   }
   /** (0.28.0) a group's size written, or taken away (back to fitting what it holds), as one step */
   const sizeCmd = (g: { at: Path }, size: [number, number] | undefined, label: string): Command => (size ? setCmd(g.at, size, label) : { ...deleteCmd(g.at), label });
@@ -578,25 +593,24 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const grp = sizableGroup();
     if (grp && !linking) {
       const k = scale(), { box: b, z } = grp, P = (x: number, y: number) => iso(x, y, z);
-      const fw = sizing ? sizing.size[0] : b.x1 - b.x0, fd = sizing ? sizing.size[1] : b.y1 - b.y0, x1 = b.x0 + fw, y1 = b.y0 + fd;
+      // the floor it has, or (resizing) would have: a left or back side moves its corner by the shift
+      const x0 = b.x0 - (sizing?.shift[0] ?? 0), y0 = b.y0 - (sizing?.shift[1] ?? 0);
+      const f = { x0, y0, x1: x0 + (sizing ? sizing.size[0] : b.x1 - b.x0), y1: y0 + (sizing ? sizing.size[1] : b.y1 - b.y0) };
       if (sizing) {
         const t = d.createElementNS(SVGNS, 'polygon');
         t.setAttribute('class', `size-to${sizing.held ? ' held' : ''}`);
-        t.setAttribute('points', [P(b.x0, b.y0), P(x1, b.y0), P(x1, y1), P(b.x0, y1)].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '));
+        t.setAttribute('points', [P(f.x0, f.y0), P(f.x1, f.y0), P(f.x1, f.y1), P(f.x0, f.y1)].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '));
         overlay.append(t);
       }
-      const at: [ResizeHandle, number, number][] = [];
-      if (GROW_SIDES.right && GROW_SIDES.front) at.push(['corner', x1, y1]);
-      if (GROW_SIDES.right) at.push(['right', x1, (b.y0 + y1) / 2]);
-      if (GROW_SIDES.front) at.push(['front', (b.x0 + x1) / 2, y1]);
+      const at: [string, number, number][] = grp.handles().map(([h, , pos]) => [h, ...pos(f)] as [string, number, number]);
       const half = (matchMedia('(pointer: coarse)').matches ? 22 : 6) / k;
       for (const [h, gx, gy] of at) {
         const [px, py] = P(gx, gy), r = d.createElementNS(SVGNS, 'rect');
         r.setAttribute('class', `size-handle${sizing?.handle === h ? ' on' : ''}`); r.dataset.handle = h;
         r.setAttribute('x', String(px - half)); r.setAttribute('y', String(py - half)); r.setAttribute('width', String(half * 2)); r.setAttribute('height', String(half * 2)); r.setAttribute('rx', String(half / 3));
-        r.style.pointerEvents = 'all'; r.style.cursor = h === 'corner' ? 'nwse-resize' : h === 'right' ? 'ew-resize' : 'ns-resize';
+        r.style.pointerEvents = 'all'; r.style.cursor = h.startsWith('corner') ? 'nwse-resize' : h === 'right' || h === 'left' ? 'ew-resize' : 'ns-resize';
         const t = d.createElementNS(SVGNS, 'title');
-        t.textContent = `Drag to resize ${grp.label}${h === 'corner' ? '' : h === 'right' ? ' (its width)' : ' (its depth)'} · double click: fit to what it holds`;
+        t.textContent = `Drag to resize ${grp.label}${h.startsWith('corner') ? '' : h === 'right' || h === 'left' ? ' (its width)' : ' (its depth)'} · double click: fit to what it holds`;
         r.append(t); overlay.append(r);
       }
     }
@@ -663,7 +677,11 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     start?: [number, number]; shown?: [number, number]; z0?: number; size?: [number, number];
     parent?: { id: string; w: number; d: number; pad: number; box: { x0: number; y0: number; x1: number; y1: number }; label: string;
       /** (0.28.0) a group that fits what it holds: the sides it grows on, how far the thing has been (snapMove), and its box when the drag began */
-      grow?: { right?: boolean; front?: boolean; reach?: [number, number] }; box0?: { x0: number; y0: number; x1: number; y1: number } };
+      grow?: { right?: boolean; front?: boolean; left?: boolean; back?: boolean; reach?: [number, number]; reachLo?: [number, number] }; box0?: { x0: number; y0: number; x1: number; y1: number };
+      /** (0.29.0) the group's own pin (its name, and where it stands in its parent): what growing left or back moves */
+      pin?: { name: string; at: [number, number] } };
+    /** (0.29.0) growing left or back: the shift (in cells) of the trial drawn and of the one being made, and the pins the drop writes */
+    shiftShown?: [number, number]; shiftNext?: [number, number]; pinSet?: [string, [number, number]][];
     /** (0.14.0) how far the view was moved to keep the container still on screen (a trial may lay it out elsewhere) */
     shifted?: [number, number];
     move?: Move; invalid?: boolean; step?: number; origCd?: D; gridShown?: boolean;
@@ -710,7 +728,8 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (hd && grp) {
       capture(e); e.preventDefault();
       const size0: [number, number] = [grp.box.x1 - grp.box.x0, grp.box.y1 - grp.box.y0];
-      sizing = { path: grp.path, at: grp.at, label: grp.label, handle: hd.dataset.handle as ResizeHandle, x0: x, y0: y, size0, min: grp.min(e.altKey ? 0.5 : 1), size: size0, held: false, floor: { x0: grp.box.x0, y0: grp.box.y0, z: grp.z } };
+      const h = hd.dataset.handle!, sides = HANDLES.find(([n]) => n === h)![1];
+      sizing = { path: grp.path, at: grp.at, label: grp.label, handle: h, sides, x0: x, y0: y, size0, min: grp.min(sides, e.altKey ? 0.5 : 1), size: size0, held: false, shift: [0, 0], floor: { x0: grp.box.x0, y0: grp.box.y0, z: grp.z } };
       paintOverlay();
       return;
     }
@@ -756,7 +775,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
         const b = item.box, par = item.parent;
         drag = {
           kind: 'pin', x0: x, y0: y, name, label: part?.label, id, ptr, narrow, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], beside: besideOf(cd, id),
-          parent: par ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: par.box, label: par.region?.label ?? par.id, ...growOf(par.region, par.box) } : undefined,
+          parent: par ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: par.box, label: par.region?.label ?? par.id, ...growOf(par.region, par.box, groupPin(cd, par.id)) } : undefined,
           origCd: cd,
         };
       }
@@ -766,8 +785,8 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const { x, y } = pageXY(e);
     if (sizing) {
       const k = scale(), step = e.altKey ? 0.5 : 1;
-      const m = resizeTo(sizing.size0, screenToGrid((x - sizing.x0) / k, (y - sizing.y0) / k), sizing.handle, step, sizing.min);
-      sizing = { ...sizing, size: m.size, held: m.held };
+      const m = resizeSides(sizing.size0, screenToGrid((x - sizing.x0) / k, (y - sizing.y0) / k), sizing.sides, step, sizing.min);
+      sizing = { ...sizing, size: m.size, held: m.held, shift: m.shift };
       opts.onHint?.(`Resizing ${sizing.label} to ${m.size[0]} × ${m.size[1]} · ${step === 1 ? 'whole cells (⌥: half cells)' : 'half cells'}${m.held ? ` · it holds what it holds: no smaller` : ''} · Esc cancels`);
       paintOverlay();
       return;
@@ -854,13 +873,22 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   }
   /** (0.28.0) the thing dragged is past the edge its group had when the drag began (its inner edge: less its margin), on a side that
    *  grows: only then has the group grown with it (a re-layout alone, a pin in a flow, may make the group a little bigger: not that) */
-  const grownBy = (g: NonNullable<typeof drag>, foot: { x1: number; y1: number }) => {
+  const grownBy = (g: NonNullable<typeof drag>, foot: { x0: number; y0: number; x1: number; y1: number }) => {
     const p = g.parent, b0 = p?.box0;
-    return !!(p?.grow && b0 && ((p.grow.right && foot.x1 > b0.x1 - p.pad + 1e-6) || (p.grow.front && foot.y1 > b0.y1 - p.pad + 1e-6)));
+    return !!(p?.grow && b0 && ((p.grow.right && foot.x1 > b0.x1 - p.pad + 1e-6) || (p.grow.front && foot.y1 > b0.y1 - p.pad + 1e-6)
+      || (p.grow.left && foot.x0 < b0.x0 + p.pad - 1e-6) || (p.grow.back && foot.y0 < b0.y0 + p.pad - 1e-6)));
   };
   /** (0.28.0) a container that fits what it holds (no size of its own) grows on GROW_SIDES; one with a size is held at its edges */
-  const growOf = (r: { size?: unknown } | undefined, box: { x0: number; y0: number; x1: number; y1: number }) =>
-    r && !r.size && (GROW_SIDES.right || GROW_SIDES.front) ? { grow: { right: GROW_SIDES.right, front: GROW_SIDES.front }, box0: { ...box } } : {};
+  const growOf = (r: { size?: unknown } | undefined, box: { x0: number; y0: number; x1: number; y1: number }, pin?: { name: string; at: [number, number] }) => {
+    // (0.29.0) left and back only for a group that can be pinned: growing that way moves it (pinned where it stands, less the shift)
+    const left = GROW_SIDES.left && !!pin, back = GROW_SIDES.back && !!pin;
+    return r && !r.size && (GROW_SIDES.right || GROW_SIDES.front || left || back) ? { grow: { right: GROW_SIDES.right, front: GROW_SIDES.front, left, back }, box0: { ...box }, ...(pin ? { pin } : {}) } : {};
+  };
+  /** (0.29.0) a group's own pin: its name, and where it stands in its parent's frame (undefined: it can't be pinned) */
+  const groupPin = (d: D, id: string): { name: string; at: [number, number] } | undefined => {
+    const name = [...pinIds(d)].find(([, i]) => i === id)?.[0], at = localAt(d.scene, id);
+    return name && at ? { name, at } : undefined;
+  };
   let pinFrame = false, lastPin: { x: number; y: number; alt: boolean } | undefined, relayout = 0;
   const pinDrag = () => (drag?.kind === 'pin' && drag.moved ? drag : undefined);
   /** every pin's name, and the id of the element it moves */
@@ -873,7 +901,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   }
   /** where those are now: where they stood, or where they gave way to */
   const besideNow = (g: NonNullable<typeof drag>) => g.beside!.map(b => { const [dx, dy] = g.given?.get(b.id) ?? [0, 0]; return { ...b, x0: b.x0 + dx, x1: b.x1 + dx, y0: b.y0 + dy, y1: b.y1 + dy }; });
-  const footAt = (g: NonNullable<typeof drag>, [x, y]: [number, number]) => { const ox = g.parent ? g.parent.box.x0 : 0, oy = g.parent ? g.parent.box.y0 : 0; return { x0: ox + x, y0: oy + y, x1: ox + x + g.size![0], y1: oy + y + g.size![1] }; };
+  const footAt = (g: NonNullable<typeof drag>, [x, y]: [number, number]) => { const sh = g.shiftShown ?? [0, 0], ox = g.parent ? g.parent.box.x0 + sh[0] : 0, oy = g.parent ? g.parent.box.y0 + sh[1] : 0; return { x0: ox + x, y0: oy + y, x1: ox + x + g.size![0], y1: oy + y + g.size![1] }; };
   const motionOn = () => ui.dragMotion !== 'respect' || !matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** one step of a pin drag: snap, clamp, check, move the drawing, and lay it out again when the cell changes */
   function pinStep() {
@@ -887,7 +915,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const f0 = footAt(g, g.start!), grip = iso((f0.x0 + f0.x1) / 2, (f0.y0 + f0.y1) / 2, g.z0!);
     const d = p ? screenToGrid(p.x - grip[0], p.y - grip[1]) : screenToGrid((lastPin.x - g.x0) / k, (lastPin.y - g.y0) / k);
     const m = snapMove(g.start!, d, step, g.size!, g.parent);
-    if (g.parent?.grow) { const r = g.parent.grow.reach; g.parent.grow.reach = [Math.max(r?.[0] ?? m.at[0], m.at[0]), Math.max(r?.[1] ?? m.at[1], m.at[1])]; }
+    if (g.parent?.grow) { const r = g.parent.grow.reach, l = g.parent.grow.reachLo; g.parent.grow.reach = [Math.max(r?.[0] ?? m.at[0], m.at[0]), Math.max(r?.[1] ?? m.at[1], m.at[1])]; g.parent.grow.reachLo = [Math.min(l?.[0] ?? m.at[0], m.at[0]), Math.min(l?.[1] ?? m.at[1], m.at[1])]; }
     const foot = footAt(g, m.at);
     const changed = !g.move || g.move.at[0] !== m.at[0] || g.move.at[1] !== m.at[1];
     g.move = m;
@@ -942,11 +970,16 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   function stillOn(g: NonNullable<typeof drag>, next: D) {
     const now = g.parent && next.scene.layout.byId.get(g.parent.id)?.box;
     if (!g.parent || !now || !V.view) return;
-    const was = g.parent.box, dx = now.x0 - was.x0, dy = now.y0 - was.y0;
+    // (0.29.0) growing left or back moves the group by the shift on purpose: only the rest is drift, which the view takes up so the
+    // container stands still on screen (with 'shift', its other contents go with it; with 'pins', they stand where they were)
+    const prev = g.shiftShown ?? [0, 0], nxt = g.shiftNext ?? prev, ds = [nxt[0] - prev[0], nxt[1] - prev[1]];
+    const was = g.parent.box, rx = now.x0 - was.x0, ry = now.y0 - was.y0, dx = rx + ds[0], dy = ry + ds[1];
+    const bx = GROW_SIDES.leftBack === 'shift' ? rx : dx, by = GROW_SIDES.leftBack === 'shift' ? ry : dy;
     const b0 = g.parent.box0;
+    g.shiftShown = nxt;
     g.parent = { ...g.parent, box: now, w: Math.max(g.parent.w, now.x1 - now.x0), d: Math.max(g.parent.d, now.y1 - now.y0), ...(b0 ? { box0: { x0: b0.x0 + dx, y0: b0.y0 + dy, x1: b0.x1 + dx, y1: b0.y1 + dy } } : {}) };
+    if (Math.abs(bx) > 1e-9 || Math.abs(by) > 1e-9) g.beside = g.beside!.map(b => ({ ...b, x0: b.x0 + bx, x1: b.x1 + bx, y0: b.y0 + by, y1: b.y1 + by }));
     if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return;
-    g.beside = g.beside!.map(b => ({ ...b, x0: b.x0 + dx, x1: b.x1 + dx, y0: b.y0 + dy, y1: b.y1 + dy }));
     shiftView(g, (dx - dy) * C * S, (dx + dy) * 0.5 * S);
   }
   function shiftView(g: NonNullable<typeof drag>, x: number, y: number) {
@@ -1039,7 +1072,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     // what gave way, where it gave way to (a pin each)
     const gave: [string, [number, number]][] = [];
     for (const [id, [dx, dy]] of g.given ?? []) { const was = localAt(orig.scene, id)!; gave.push([nameOf.get(id)!, [was[0] + dx, was[1] + dy]]); }
-    const set: [string, [number, number]][] = [[g.name!, at], ...gave];
+    // (0.29.0) past the left or back margin of a group that grows that way: the pins that make it (growLeftBack)
+    const p = g.parent, lo = p ? Math.ceil(p.pad / (g.step ?? 1) - 1e-9) * (g.step ?? 1) : 0;
+    const lb = p?.grow && (p.grow.left || p.grow.back) ? growLeftBack({ name: g.name!, at: [p.grow.left ? at[0] : Math.max(at[0], lo), p.grow.back ? at[1] : Math.max(at[1], lo)], lo, step: g.step ?? 1, group: p.pin, mode: GROW_SIDES.leftBack,
+      others: g.beside!.flatMap(b => { const n = nameOf.get(b.id), w = localAt(orig.scene, b.id); return n && w && n !== p.pin?.name ? [{ name: n, at: w }] : []; }) }) : undefined;
+    g.shiftNext = lb?.shift ?? [0, 0]; g.pinSet = lb?.pins;
+    const set: [string, [number, number]][] = [...(lb?.pins ?? [[g.name!, at]]), ...gave];
     const lay = layWith(g);
     let next = lay(set);
     const have = new Set([...Object.keys(K.pins.of(lastData) ?? {}), ...set.map(([n]) => n)]);
@@ -1172,10 +1210,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const moved = m && (m.at[0] !== g.start![0] || m.at[1] !== g.start![1]);
     if (commit && m && moved && !g.invalid) {
       // the item, and the neighbours the move would have pushed, kept where they stand: one command, one undo step
-      const label = `Pin ${g.label ?? describe(fromPointer(g.ptr!))} at [${m.at.join(', ')}]`;
       let keep = g.keep ?? [];
       if (stale || !g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1]) try { keep = trialLayout(g).keep; } catch { /* drop it as it is */ }
-      run(doc, keep.length ? pinsCmd([[g.name!, m.at], ...keep], `${label}${wayWords(g, keep)}`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: m.at }, label)), 'canvas', opts.note);
+      // (0.29.0) grown left or back: the trial's pins (the thing, its group, and with 'pins' the rest), with the thing's own as its words
+      const pins = g.pinSet ?? [[g.name!, m.at] as [string, [number, number]]];
+      const label = `Pin ${g.label ?? describe(fromPointer(g.ptr!))} at [${pins[0][1].join(', ')}]${g.pinSet ? ` (${g.parent?.label} grows ${GROW_SIDES.leftBack === 'shift' ? 'and moves' : 'that way'})` : ''}`;
+      run(doc, keep.length || g.pinSet ? pinsCmd([...pins, ...keep], `${label}${wayWords(g, keep)}`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: m.at }, label)), 'canvas', opts.note);
       pendingAfterDrag = false;                            // the drop's own reading draws what came meanwhile too
       return;
     }
@@ -1250,7 +1290,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       const g: NonNullable<typeof drag> = {
         kind: 'pin', x0: at.x, y0: at.y, moved: true, name, id, start, shown: start, z0: b.z0, size: [b.x1 - b.x0, b.y1 - b.y0], origCd: home,
         // its container, as it was: what is drawn is moved to it (stillOn)
-        parent: par && inHome ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: inHome.box, label: par.region?.label ?? par.id, ...growOf(par.region, inHome.box) } : undefined,
+        parent: par && inHome ? { id: par.id, w: par.box.x1 - par.box.x0, d: par.box.y1 - par.box.y0, pad: paddingOf(K.catalog, par.region), box: inHome.box, label: par.region?.label ?? par.id, ...growOf(par.region, inHome.box, groupPin(home, par.id)) } : undefined,
         beside: besideOf(home, id, inHome), shifted: was?.shifted,
         fresh: { base: trial, name, path, plan, text },
         gridShown: was?.gridShown,
@@ -1306,7 +1346,14 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   function up(e: PointerEvent) {
     if (sizing) {
       const z = sizing; sizing = undefined;
-      if (z.size[0] !== z.size0[0] || z.size[1] !== z.size0[1]) run(doc, sizeCmd(z, z.size, `Resize ${z.label}`), 'canvas', opts.note);
+      if (z.size[0] !== z.size0[0] || z.size[1] !== z.size0[1]) {
+        const label = `Resize ${z.label}`, grp = sizableGroup(), sh = z.shift;
+        // (0.29.0) a left or back side: the group's own pin moves the other way, and what it holds with it, so the far edge and the
+        // contents stay where they are on screen
+        const q = (v: number) => Math.round(v * 1000) / 1000;   // (the layout's numbers, as the file writes them: 0.6, not 0.6000000000000001)
+        const pins: [string, [number, number]][] = (sh[0] || sh[1]) && grp?.pin ? [[grp.pin.name, [q(grp.pin.at[0] - sh[0]), q(grp.pin.at[1] - sh[1])]], ...grp.held().map(c => [c.name, [q(c.at[0] + sh[0]), q(c.at[1] + sh[1])]] as [string, [number, number]])] : [];
+        run(doc, pins.length ? seqCmd(label, [sizeCmd(z, z.size, label), pinsCmd(pins, label)]) : sizeCmd(z, z.size, label), 'canvas', opts.note);
+      }
       else paintOverlay();
       opts.onHint?.('');
       return;

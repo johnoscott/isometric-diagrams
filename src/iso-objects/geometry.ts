@@ -65,7 +65,7 @@ export interface Move {
  */
 export const GROW_REACH = 2;
 export function snapMove(start: [number, number], d: [number, number], step: number, size: [number, number],
-  parent?: { w: number; d: number; pad: number; grow?: { right?: boolean; front?: boolean; reach?: [number, number] } }): Move {
+  parent?: { w: number; d: number; pad: number; grow?: { right?: boolean; front?: boolean; left?: boolean; back?: boolean; reach?: [number, number]; reachLo?: [number, number] } }): Move {
   const snap = (v: number) => Math.round(v / step) * step;
   // the position lands on the grid (the lines drawn while dragging), not just moves by whole steps
   let x = snap(start[0] + d[0]), y = snap(start[1] + d[1]);
@@ -74,11 +74,15 @@ export function snapMove(start: [number, number], d: [number, number], step: num
     // the bounds are on the grid too (the layout snaps positions to it), inside the parent's margin
     const lo = Math.ceil(parent.pad / step - 1e-9) * step;
     const hiX = Math.floor((parent.w - parent.pad - size[0]) / step + 1e-9) * step, hiY = Math.floor((parent.d - parent.pad - size[1]) / step + 1e-9) * step;
-    if (x < lo) { x = lo; clamped.left = true; }
-    const g = parent.grow, far = (hi: number, reach: number | undefined) => Math.floor((Math.max(hi, reach ?? hi) + GROW_REACH) / step + 1e-9) * step;
+    const g = parent.grow;
+    // (0.29.0) the left and back sides, when they grow: past the margin, within GROW_REACH of the furthest it has been that way
+    const near = (r: number | undefined) => Math.ceil((Math.min(lo, r ?? lo) - GROW_REACH) / step - 1e-9) * step;
+    const minX = g?.left ? near(g.reachLo?.[0]) : lo, minY = g?.back ? near(g.reachLo?.[1]) : lo;
+    if (x < minX) { x = minX; clamped.left = !g?.left; }
+    const far = (hi: number, reach: number | undefined) => Math.floor((Math.max(hi, reach ?? hi) + GROW_REACH) / step + 1e-9) * step;
     const maxX = g?.right ? far(hiX, g.reach?.[0]) : hiX, maxY = g?.front ? far(hiY, g.reach?.[1]) : hiY;
     if (maxX >= lo && x > maxX) { x = maxX; clamped.right = !g?.right; }
-    if (y < lo) { y = lo; clamped.top = true; }
+    if (y < minY) { y = minY; clamped.top = !g?.back; }
     if (maxY >= lo && y > maxY) { y = maxY; clamped.bottom = !g?.front; }
   }
   const r = (v: number) => Math.round(v * 1000) / 1000;
@@ -89,26 +93,4 @@ export function snapMove(start: [number, number], d: [number, number], step: num
 export function overlaps(a: { x0: number; y0: number; x1: number; y1: number }, others: { x0: number; y0: number; x1: number; y1: number }[]): boolean {
   const e = 1e-6;
   return others.some(b => a.x0 < b.x1 - e && a.x1 > b.x0 + e && a.y0 < b.y1 - e && a.y1 > b.y0 + e);
-}
-
-/** (0.28.0) a group's resize handle: its front-right corner (width and depth), or the middle of its right side (width) or of its
- *  front side (depth). Left and back wait for the owner (canvas.ts GROW_SIDES). */
-export type ResizeHandle = 'corner' | 'right' | 'front';
-/** The smallest floor a group can have and still hold what it holds: its children's furthest extent, and its margin, from its corner
- *  (on the grid `step`; at least two margins and half a cell, as a fitting group is). Boxes in the same frame as `box`. */
-export function minSizeFor(box: { x0: number; y0: number }, children: { x1: number; y1: number }[], pad: number, step = 1): [number, number] {
-  const up = (v: number) => Math.ceil(v / step - 1e-9) * step;
-  const w = Math.max(pad * 2 + 0.5, ...children.map(c => c.x1 - box.x0 + pad)), d = Math.max(pad * 2 + 0.5, ...children.map(c => c.y1 - box.y0 + pad));
-  return [up(w), up(d)];
-}
-/** A drag of (dx, dy) grid units on a resize handle, from `size0`: the new floor, snapped to `step`, never below `min` (`held`: it
- *  stopped there). The corner changes both; the right side the width alone; the front side the depth alone. */
-export function resizeTo(size0: [number, number], d: [number, number], handle: ResizeHandle, step: number, min: [number, number]): { size: [number, number]; held: boolean } {
-  const snap = (v: number) => Math.round(v / step) * step;
-  let w = handle === 'front' ? size0[0] : snap(size0[0] + d[0]), dd = handle === 'right' ? size0[1] : snap(size0[1] + d[1]);
-  let held = false;
-  if (w < min[0]) { w = min[0]; held = handle !== 'front'; }
-  if (dd < min[1]) { dd = min[1]; held ||= handle !== 'right'; }
-  const r = (v: number) => Math.round(v * 1000) / 1000;
-  return { size: [r(w), r(dd)], held };
 }

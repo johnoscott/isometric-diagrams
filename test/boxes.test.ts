@@ -1091,3 +1091,71 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
     assert.deepEqual(bad, { violations: [], errors: [] });
   });
 });
+
+for (const mode of ['pins', 'shift'] as const) test(`boxes/1 in Chrome (0.29.0, off until the owner answers): growing left, "${mode}"`, { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
+    // the shelf pinned (a group needs a pin of its own to grow left: growing moves it), then the variant on
+    await ev(`E.setText(E.getText() + 'x-editor:\\n  layout:\\n    shelf: { at: [4, 2] }\\n', { fit: true }); await tick(400); B.growSides({ left: true, back: true, leftBack: '${mode}' }); return 0;`);
+    await until(`/shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText()) && I.canvas.pageXYOf(['boxes', 'b'])`, 'the shelf pinned');
+    const P = `const P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 6 }));`;
+    // a, dragged left (screen up and left: -x) past the shelf's left margin, and dropped: b's place on screen before and after
+    const r = await ev<{ b0: { x: number; y: number }; b1: { x: number; y: number }; bIn: number[]; dashed: boolean; hint: string }>(`${P} const c = I.canvas, at = c.pageXYOf(['boxes', 'a']), b0 = c.pageXYOf(['boxes', 'b']), el = document.elementFromPoint(at.x, at.y);
+      const L = c.doc.scene.layout.byId, bIn = [L.get('b').box.x0 - L.get('shelf').box.x0, L.get('b').box.y0 - L.get('shelf').box.y0];
+      P(el, 'pointerdown', at.x, at.y); let dashed = false, hint = '';
+      for (let i = 1; i <= 10; i++) { P(c.stage, 'pointermove', at.x - i * 9, at.y - i * 5.2); await tick(90); dashed ||= !!document.querySelector('.iso-canvas .overlay .grow-was'); hint = document.querySelector('#se-st-hint')?.textContent || hint; }
+      P(c.stage, 'pointerup', at.x - 90, at.y - 52); await tick(500); await I.canvas.drawn?.();
+      return { b0, b1: c.pageXYOf(['boxes', 'b']), bIn, dashed, hint };`);
+    assert.equal(r.dashed, true, 'the shelf grows left, its floor as it was dashed'); assert.match(r.hint, /within Shelf, which grows with it/);
+    await until(`/    a: \\{ at: \\[/.test(E.getText())`, 'the pins written');
+    const t = await ev<string>(`return E.getText();`);
+    const at = (n: string) => JSON.parse(new RegExp(`    ${n}: \\{ at: (\\[[^\\]]*\\])`).exec(t)?.[1] ?? 'null') as number[] | null;
+    const a = at('a')!, shelf = at('shelf')!;
+    assert.ok(a[0] >= 0.6 - 1e-9, `a comes in to the shelf's margin: ${a}`);
+    assert.ok(shelf[0] < 4, `the shelf moved left: ${shelf}`);
+    const moved = Math.hypot(r.b1.x - r.b0.x, r.b1.y - r.b0.y);
+    if (mode === 'pins') { assert.ok(at('b'), 'b pinned where it stands'); assert.ok(moved < 2, `b stays where it was on screen (${moved.toFixed(1)} px)`); }
+    else {
+      // b keeps its place in the shelf (pinned there by the drop if the re-layout would have moved it), so it moves with the shelf
+      const b = at('b'); if (b) assert.deepEqual(b.map(v => +v.toFixed(3)), r.bIn.map(v => +v.toFixed(3)), 'b, if pinned, where it stood in the shelf');
+      assert.ok(moved > 10, `b moves with the shelf (${moved.toFixed(1)} px)`);
+    }
+    assert.match(await ev<string>(`return I.doc.undoLabel;`), mode === 'pins' ? /\(Shelf grows that way\)/ : /\(Shelf grows and moves\)/);
+    await ev(`I.doc.undo(); await tick(200); return 0;`);
+    await until(`!/    a: \\{ at:/.test(E.getText()) && /shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText())`, 'one undo step takes it all back');
+    await ev(`B.growSides({ left: false, back: false, leftBack: 'pins' }); return 0;`);
+  });
+});
+
+test('boxes/1 in Chrome (0.29.0, off until the owner answers): the left and back resize handles keep the far edge and the contents still', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
+    await ev(`E.setText(E.getText() + 'x-editor:\\n  layout:\\n    shelf: { at: [4, 2] }\\n', { fit: true }); await tick(400); B.growSides({ left: true, back: true, leftBack: 'pins' }); return 0;`);
+    await until(`/shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText())`, 'the shelf pinned');
+    await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(150); return 0;`);
+    await until(`document.querySelectorAll('.iso-canvas .overlay .size-handle').length === 8`, 'eight handles');
+    // the left handle, dragged out (screen left and up: -x)
+    const r = await ev<{ a0: { x: number; y: number }; a1: { x: number; y: number } }>(`const P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 7 }));
+      const c = I.canvas, a0 = c.pageXYOf(['boxes', 'a']), el = document.querySelector('.iso-canvas .overlay .size-handle[data-handle="left"]'), h = el.getBoundingClientRect(), x = h.x + h.width / 2, y = h.y + h.height / 2;
+      P(el, 'pointerdown', x, y); for (let i = 1; i <= 6; i++) { P(c.stage, 'pointermove', x - i * 10, y - i * 5.8); await tick(50); } P(c.stage, 'pointerup', x - 60, y - 35); await tick(500);
+      return { a0, a1: c.pageXYOf(['boxes', 'a']) };`);
+    await until(`/shelf: \\{ kind: tray, label: Shelf, size: \\[/.test(E.getText())`, 'the size written');
+    const t = await ev<string>(`return E.getText();`);
+    const at = (n: string) => JSON.parse(new RegExp(`    ${n}: \\{ at: (\\[[^\\]]*\\])`).exec(t)?.[1] ?? 'null') as number[] | null;
+    assert.ok(at('shelf')![0] < 4, `the shelf's corner moved left: ${at('shelf')}`);
+    assert.ok(at('a') && at('b'), 'what it holds pinned, the other way');
+    assert.ok(Math.hypot(r.a1.x - r.a0.x, r.a1.y - r.a0.y) < 2, `a stays where it was on screen (${JSON.stringify(r)})`);
+    assert.equal(await ev<string>(`return I.doc.undoLabel;`), 'Resize Shelf');
+    await ev(`I.doc.undo(); await tick(200); return 0;`);
+    await until(`!/size:/.test(E.getText()) && !/    a: \\{ at:/.test(E.getText()) && /shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText())`, 'one undo step takes it all back');
+    // a group the layout places (no pin in the file): all eight too; a resize on its left pins it where it stood, less the shift
+    await ev(`E.setText(E.getText().replace(/x-editor:[\\s\\S]*$/, ''), { fit: true }); await tick(400); I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(150); return 0;`);
+    await until(`document.querySelectorAll('.iso-canvas .overlay .size-handle').length === 8`, 'eight handles on a group the layout places');
+    await ev(`const P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 8 }));
+      const c = I.canvas, el = document.querySelector('.iso-canvas .overlay .size-handle[data-handle="left"]'), h = el.getBoundingClientRect(), x = h.x + h.width / 2, y = h.y + h.height / 2;
+      P(el, 'pointerdown', x, y); for (let i = 1; i <= 6; i++) { P(c.stage, 'pointermove', x - i * 10, y - i * 5.8); await tick(50); } P(c.stage, 'pointerup', x - 60, y - 35); await tick(500); return 0;`);
+    await until(`/    shelf: \\{ at: \\[/.test(E.getText()) && /size: \\[/.test(E.getText())`, 'the shelf pinned and sized, in one step');
+    assert.equal(await ev<string>(`return I.doc.undoLabel;`), 'Resize Shelf');
+    await ev(`B.growSides({ left: false, back: false, leftBack: 'pins' }); return 0;`);
+  });
+});

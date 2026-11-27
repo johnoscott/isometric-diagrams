@@ -228,7 +228,12 @@ Three optional pieces. Give one and the editor offers it; leave it out and nothi
   held there: the group grows under it, cell by cell, its floor as it was drawn dashed, within 2 cells of the furthest the pointer
   has been (`GROW_REACH`). The drop is the pin, one undo step; no `size` is written, so the group keeps fitting. A group with a size
   holds it at its edges, as before ("fixed size: resize it to fit more"). Left and back wait for a decision: `GROW_SIDES` in
-  `src/iso-editor/ui/canvas.ts` says which sides grow, and which handles a resize has.
+  `src/iso-editor/ui/canvas.ts` says which sides grow, and which handles a resize has. Both ways of growing left and back are built
+  and off (0.29.0), chosen by `GROW_SIDES.leftBack`: `'pins'`, the group's other contents move the other way, so nothing but the
+  dragged thing and the edge moves on screen; or `'shift'`, the whole group moves with the edge, what it holds with it. Either way
+  the group is pinned where it stood, less the shift (`growLeftBack`), so only a group that can be pinned grows that way. Turned on,
+  the resize handles gain the left and back sides and the other three corners; a left or back handle keeps the far edge, and what the
+  group holds, where they are on screen (its size, its pin and its contents' pins, one step).
 - **Resize handles** (0.28.0), on the adapter: `sizeAt(group)` returns the path a group's `size` ([w, d]) is written at, or
   `undefined` (that one isn't resized). Given it, the one selected group shows handles on its floor: the front-right corner (width
   and depth), and the middles of its right side (width) and front side (depth); 44 px targets on a touch screen. A drag snaps to

@@ -2,6 +2,17 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.29.0 — growing left and back, both ways, built and off
+
+- **Growing a group on its left and back sides, both ways, built and off** until a decision (`GROW_SIDES.left`, `.back`, and
+  `.leftBack`: `'pins'`, the others' pins move so nothing else moves on screen, or `'shift'`, the whole group moves with the edge).
+  With them on, a drag past the left or back edge pins the group where it stood less the shift, and the thing at the margin; a
+  selected group also has left, back and the other three corner handles, which keep the far edge and its contents still. Nothing
+  changes while they are off: the right and front work as in 0.28.0.
+- `growLeftBack`, `resizeSides` and `minSizeFrom` are exported with the geometry, from a module of their own (`resize.ts`, where
+  `resizeTo` and `minSizeFor` now live too, exported as before), so a page that neither drags nor resizes carries none of it;
+  `snapMove`'s `parent.grow` takes `left`, `back` and `reachLo`.
+
 ## 0.28.0 — a drag grows its group; resize handles
 
 - **A drag grows the group it is in:** a thing dragged past the right or front edge of a group that fits what it holds isn't held

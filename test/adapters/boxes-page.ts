@@ -7,6 +7,7 @@ import { drawingCss, MARKS_CSS, GRID_CSS } from '../../src/iso-objects/css.ts';
 import { isoVars, scope } from '../../src/iso-viewer/view-css.ts';
 import { flatCss } from '../../src/iso-viewer/flat-view.ts';
 import { mountEditor } from '../../src/iso-editor/ui/mount.ts';
+import { growSidesForTest } from '../../src/iso-editor/ui/canvas.ts';
 import { setupFor, PLAIN_WORDS } from '../../src/iso-editor/ui/setup.ts';
 import { scopeCss } from '../../src/iso-editor/ui/scope-css.ts';
 import { boxesAdapter, boxesView, BOXES_CATALOG } from './boxes.ts';
@@ -60,5 +61,5 @@ const sectionedView = { ...view, palette: view.palette!.map(e => ({ ...e, sectio
 const storage = { get: (k: string) => stored[k] ?? null, set: (k: string, v: string | null) => { if (v === null) delete stored[k]; else stored[k] = v; } };
 const editor = mountEditor(el, { text: String(TEXT), onSave: async t => { saved.push(t); return { ok: true }; }, ...(sectioned ? { storage } : {}) },
   bare ? setupFor(plain, plainView) : setupFor(boxesAdapter, sectioned ? sectionedView : view));
-(window as unknown as { __boxes: unknown }).__boxes = { editor, saved, css: css.length, violations, errors, stored };
+(window as unknown as { __boxes: unknown }).__boxes = { editor, saved, css: css.length, violations, errors, stored, growSides: growSidesForTest };   // (0.29.0) the left/back variants, for the test
 document.title = 'ready';
