@@ -133,6 +133,9 @@ export interface CanvasKit<M, D extends CanvasDrawing> {
   /** what an object's own menu offers, beyond rename, duplicate and delete */
   objectItems(doc: EditorModel, path: Path, origin: 'canvas' | 'menu', note?: (t: string, tone?: 'bad') => void): MenuItem[];
   pins: { key: string; legacyKey?: string; of(data: unknown): Record<string, unknown> | undefined; keyOf(data: unknown): string; legacyOnly(data: unknown): boolean };
+  /** (0.26.0) the format's compact layout, kept with the pins (x-editor.compact): offered as a toggle in the canvas's menu, one
+   *  undo step each way. None: no toggle */
+  compact?: { on(data: unknown): boolean };
   /** the 2D view (0.6.4): offered as a 3D | 2D switch when given. `load` hands over its implementation (flat-canvas.ts;
    *  the canvas never names it, so a host without a 2D view bundles none of it). In 2D, selecting, the menu, renaming,
    *  deleting, adding from the palette (into a panel, or placed by the layout) and undo work as in 3D; pins (moving)
@@ -1284,6 +1287,12 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       items.push({ sep: true }, { label: 'Fit', keys: '0', onSelect: () => fitItems() }, { label: 'Fit the whole drawing', onSelect: () => fit() }, { label: 'Zoom 100%', keys: '1', onSelect: () => actual() });
       const hasPins = !!K.pins.of(doc.goodDoc.data);
       items.push({ label: 'Reset layout', icon: 'rotate-ccw', desc: 'Remove every pin (x-editor.layout)', disabled: ro || !hasPins, why: 'Nothing is pinned', onSelect: resetLayout });
+      if (K.compact) {
+        const on = K.compact.on(doc.goodDoc.data);
+        items.push(on
+          ? { label: 'Turn compact layout off', desc: 'Draw it as written (x-editor.compact)', disabled: ro, onSelect: () => setCompact(false) }
+          : { label: 'Turn compact layout on', desc: 'Things in rows, so it reads larger when fitted (x-editor.compact)', disabled: ro, onSelect: () => setCompact(true) });
+      }
       return items;
     }
     const one = sel.length === 1 ? sel[0] : undefined;
@@ -1554,6 +1563,13 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   });
   if (docked) host.prepend(palHome, palGrip); else host.append(palette);
 
+  /** (0.26.0) compact layout on or off: x-editor.compact, one undo step; off takes x-editor away too when that was all it held */
+  function setCompact(on: boolean) {
+    const key = K.pins.key, x = (doc.goodDoc.data as Record<string, Record<string, unknown>> | undefined)?.[key];
+    if (on) { run(doc, setCmd([key, 'compact'], true, 'Turn compact layout on'), 'canvas', opts.note); return; }
+    const only = x && Object.keys(x).every(k => k === 'compact');
+    run(doc, { ...deleteCmd(only ? [key] : [key, 'compact']), label: 'Turn compact layout off' }, 'canvas', opts.note);
+  }
   function resetLayout() {
     // wherever the pins are (x-editor, or the legacy key): removed, and their key too if it holds nothing else
     const key = K.pins.keyOf(doc.goodDoc.data);

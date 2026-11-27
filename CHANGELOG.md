@@ -2,6 +2,12 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.26.0 — a compact-layout toggle in the canvas's menu
+
+- The editor canvas's kit takes an optional `compact: { on(data) }`. Given it, the canvas's menu (on the background) offers "Turn
+  compact layout on" or "off", one undo step each way: on sets `compact: true` under the pins' key; off removes it, and the key
+  too when that was all it held. A kit without it shows no toggle, as before.
+
 ## 0.25.0 — no change here
 
 - Nothing in this repository changes: the release is for parts of the engine that are kept elsewhere.
