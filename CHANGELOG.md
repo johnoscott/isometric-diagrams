@@ -2,6 +2,10 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.25.0 — no change here
+
+- Nothing in this repository changes: the release is for parts of the engine that are kept elsewhere.
+
 ## 0.24.0 — a grid keeps off what is pinned
 
 - A grid (and so `layout: compact`) no longer lays things on top of a pinned child (`at:`): a thing that would come within its gap of

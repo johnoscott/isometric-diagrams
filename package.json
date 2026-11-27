@@ -2,7 +2,7 @@
   "name": "isometric-diagrams",
   "private": true,
   "license": "MIT",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "type": "module",
   "description": "A generic isometric diagram engine: layers for drawing, viewing and editing diagrams in 3D and 2D, and the isodiag/1 YAML format.",
   "engines": {
