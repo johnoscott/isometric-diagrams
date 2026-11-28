@@ -561,7 +561,15 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       handles: () => HANDLES.filter(([, sd]) => (!sd.right || GROW_SIDES.right) && (!sd.front || GROW_SIDES.front) && (!sd.left || (GROW_SIDES.left && !!pin)) && (!sd.back || (GROW_SIDES.back && !!pin))) };
   }
   /** (0.28.0) a group's size written, or taken away (back to fitting what it holds), as one step */
-  const sizeCmd = (g: { at: Path }, size: [number, number] | undefined, label: string): Command => (size ? setCmd(g.at, size, label) : { ...deleteCmd(g.at), label });
+  // (0.31.0) a size kept with the pins (a format's drawing only): written as a pin is, and its entry gone with it when that was all
+  const sizeCmd = (g: { at: Path }, size: [number, number] | undefined, label: string): Command => {
+    const pin = g.at[0] === PINS_KEY;
+    if (size) return pin ? withPinsMoved(setCmd(g.at, size, label)) : setCmd(g.at, size, label);
+    // taken away: with it, each map above it (to the pins key) that held nothing else, so the file is as it was before
+    let at = g.at;
+    while (pin && at.length > 1) { const up = at.slice(0, -1), m = up.reduce<any>((x, k) => x?.[k], doc.goodDoc.data); if (!m || typeof m !== 'object' || Object.keys(m).length !== 1) break; at = up; }
+    return { ...deleteCmd(at), label };
+  };
   function paintOverlay() {
     V.painted(V.view ? scale() : 0);
     if (!overlay || !svg) return;
@@ -717,7 +725,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     /** (0.31.0) a press on the move handle: the thing goes wherever it is dropped, into what is under it (moveInto) */
     freeOf?: ObjectRef;
     /** siblings that flow after the dragged item, pinned where they stand so the drag doesn't push them */
-    keep?: [string, [number, number]][]; sel0?: Path[]; add?: boolean; touch?: boolean; name?: string; label?: string; why?: string; id?: string; box?: { x: number; y: number; w: number; h: number }; moved?: boolean; ptr?: string; narrow?: string; line?: [number, number] } | undefined;
+    keep?: [string, [number, number]][]; sel0?: Path[]; add?: boolean; touch?: boolean; name?: string; label?: string; why?: string; id?: string; box?: { x: number; y: number; w: number; h: number }; moved?: boolean; ptr?: string; narrow?: string; line?: [number, number]; lineAt?: [number, number] } | undefined;
   let spaceKeyDown = false;
   const ifEvents = () => {
     stage.addEventListener('pointerdown', down);
@@ -959,9 +967,14 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     // a new thing is held by its floor's middle
     const f0 = footAt(g, g.start!), grip = iso((f0.x0 + f0.x1) / 2, (f0.y0 + f0.y1) / 2, g.z0!);
     const d0 = p ? screenToGrid(p.x - grip[0], p.y - grip[1]) : screenToGrid((lastPin.x - g.x0) / k, (lastPin.y - g.y0) / k);
-    const cm = lastPin.straight ? constrainMove(d0) : undefined, d = cm ? cm.d : d0;
+    const cm = lastPin.straight ? constrainMove(d0) : undefined;
     g.line = cm?.line;
-    const m = snapMove(g.start!, d, step, g.size!, g.parent);
+    // (0.32.0) ⇧: from where it stands on the grid (a start the layout put between cells, rounded), by whole steps along the line, so
+    // every place it takes is on the line, and the dotted line is drawn through that same start
+    const s0 = cm ? snapMove(g.start!, [0, 0], step, g.size!, g.parent).at : g.start!, [ux, uy] = cm?.line ?? [1, 0];
+    const t = cm ? Math.round((ux ? cm.d[0] / ux : cm.d[1] / uy) / step) * step : 0, d = cm ? [ux * t, uy * t] as [number, number] : d0;
+    g.lineAt = cm ? s0 : undefined;
+    const m = snapMove(s0, d, step, g.size!, g.parent);
     if (g.parent?.grow) { const r = g.parent.grow.reach, l = g.parent.grow.reachLo; g.parent.grow.reach = [Math.max(r?.[0] ?? m.at[0], m.at[0]), Math.max(r?.[1] ?? m.at[1], m.at[1])]; g.parent.grow.reachLo = [Math.min(l?.[0] ?? m.at[0], m.at[0]), Math.min(l?.[1] ?? m.at[1], m.at[1])]; }
     const foot = footAt(g, m.at);
     const changed = !g.move || g.move.at[0] !== m.at[0] || g.move.at[1] !== m.at[1];
@@ -1217,7 +1230,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     overlay.append(wrap);
     // (0.31.0) ⇧: the line the move is kept on, dotted, through where it started, across the floor it moves on
     if (g.line) {
-      const f0 = footAt(g, g.start!), cx = (f0.x0 + f0.x1) / 2, cy = (f0.y0 + f0.y1) / 2, [ux, uy] = g.line;
+      const f0 = footAt(g, g.lineAt ?? g.start!), cx = (f0.x0 + f0.x1) / 2, cy = (f0.y0 + f0.y1) / 2, [ux, uy] = g.line;
       const span = Math.max(area.x1 - area.x0, area.y1 - area.y0) + 4;
       const l = d.createElementNS(SVGNS, 'polyline');
       l.setAttribute('class', 'straight');
@@ -1583,7 +1596,10 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
   function movable(): ObjectRef | undefined {
     if (!K.moveInto || mode !== '3d' || !doc.doc.ok || doc.selection.length !== 1) return undefined;
     const ptr = toPointer(doc.selection[0]), r = resourceOf(ptr);
-    return r && r.path === ptr && cd && pinIds(cd).has(r.name) ? r : undefined;
+    if (!r || r.path !== ptr || !cd || !pinIds(cd).has(r.name)) return undefined;
+    // (0.32.0) only what the domain moves somewhere: one it takes nowhere has no handle
+    const v = doc.selection[0].reduce<any>((x, k) => x?.[k], doc.goodDoc.data);
+    return v && typeof v === 'object' && K.moveInto(r, v, undefined, doc.goodDoc.data) ? r : undefined;
   }
   function connectable(): ObjectRef | undefined {
     if (!K.connect || !doc.doc.ok || doc.selection.length !== 1) return undefined;

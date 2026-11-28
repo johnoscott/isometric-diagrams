@@ -230,6 +230,7 @@ Three optional pieces. Give one and the editor offers it; leave it out and nothi
   past any group's edges, and what is under the drop takes it, innermost first, as a palette drop (the thing itself is never asked,
   nor what it holds). The drawing is a trial of the file with it there; the drop writes the keys of its value that changed and its
   pin where it lands, one undo step; the layout makes room. Esc cancels. The space editor moves agents between sandboxes and the Mac.
+  (0.32.0) Only a thing `moveInto` takes somewhere (asked with `target` undefined) shows the handle.
 - **Growing a group** (0.28.0): a thing dragged past the right or front edge of a group that fits what it holds (no `size`) isn't
   held there: the group grows under it, cell by cell, its floor as it was drawn dashed, within 2 cells of the furthest the pointer
   has been (`GROW_REACH`). The drop is the pin, one undo step; no `size` is written, so the group keeps fitting. A group with a size
@@ -243,7 +244,9 @@ Three optional pieces. Give one and the editor offers it; leave it out and nothi
   and depth), and the middles of its right side (width) and front side (depth); 44 px targets on a touch screen. A drag snaps to
   whole cells (Ctrl: half), never below what the group holds needs (it stops there: "no smaller"), and writes the size as one step
   ("Resize <group>"). A double click on a handle, or **Fit to contents** in the group's menu, takes the size away (it fits again).
-  Esc cancels a resize.
+  Esc cancels a resize. (0.32.0) A size may be kept with the pins (a path under the pins key: the drawing's own, as the space
+  editor keeps a sandbox's in `x-editor.layout.NAME.size`): written as a pin is, and taken away with each map above it that held
+  nothing else.
 - **Making way** (0.14.0): a drag held still over a taken cell makes what is there step aside (after 700 ms; `dragMotion:
   'respect'` on the view leaves out the jiggle and the glide under Reduce Motion). What moved is pinned, in the same undo step.
 - **Group**, on the adapter: `group(members, data)` returns the new container (`at`, the base of its `name`, its

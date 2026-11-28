@@ -1189,7 +1189,8 @@ test('boxes/1 in Chrome (0.31.0): the owner\'s drag keys: ⇧ keeps the move on 
       const g = c.drag, free = [g.move.at[0] - g.start[0], g.move.at[1] - g.start[1]];
       // ⇧ pressed, the pointer still
       K('keydown', 'Shift', { shiftKey: true }); await tick(120);
-      const d = [g.move.at[0] - g.start[0], g.move.at[1] - g.start[1]], line = g.line ?? [];
+      // (0.32.0) from the start on the grid, which the line runs through
+      const o = g.lineAt ?? g.start, d = [g.move.at[0] - o[0], g.move.at[1] - o[1]], line = g.line ?? [];
       const on = !!g.line && Math.abs(d[0] * g.line[1] - d[1] * g.line[0]) < 1e-6;
       const dotted = !!document.querySelector('.iso-canvas .overlay .straight'), hintLine = /in a straight line/.test(document.querySelector('#se-st-hint')?.textContent ?? '');
       // ⇧ let go, Ctrl pressed: half cells, the pointer still
@@ -1319,3 +1320,28 @@ test('boxes/1 in Chrome (0.31.0): a slow machine\'s grow drag (the trial laid ou
   });
 });
 
+
+test('boxes/1 in Chrome (0.32.0): ⇧ from a start between cells: every place on the line through the start rounded, the dotted line through it too', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    // c pinned between cells (as a layout may put a thing), then dragged with ⇧ along the screen's horizontal (the grid's [1, -1])
+    await ev(`E.setText(${JSON.stringify(TEXT + 'x-editor:\n  layout:\n    c: { at: [0.3, 0.65] }\n')}, { fit: true }); await tick(400); return 0;`);
+    const r = await ev<{ start: number[]; lineAt: number[] | null; line: number[] | null; steps: number[][]; dot: boolean }>(`
+      const c = I.canvas, at = c.pageXYOf(['boxes', 'c']), el = document.elementFromPoint(at.x, at.y);
+      // (⇧ at the press adds to the selection: it is held from the first move on)
+      const P = (t, x, y) => (t === 'pointerdown' ? el : c.stage).dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 9, shiftKey: t !== 'pointerdown' }));
+      P('pointerdown', at.x, at.y); const steps = [];
+      for (let i = 1; i <= 12; i++) { P('pointermove', at.x + i * 9, at.y + (i % 3) - 1); await tick(60); if (c.drag?.move) steps.push([...c.drag.move.at]); }
+      const g = c.drag, res = { start: [...g.start], lineAt: g.lineAt ? [...g.lineAt] : null, line: g.line ? [...g.line] : null, steps, dot: !!document.querySelector('.iso-canvas .overlay .straight') };
+      c.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); P('pointerup', at.x, at.y); await tick(100);
+      return res;`);
+    assert.ok(!r.start.every(Number.isInteger), `it started between cells: ${r.start}`);
+    assert.deepEqual(r.line, [1, -1], 'on the diagonal that runs along the screen');
+    assert.ok(r.lineAt && r.lineAt.every(Number.isInteger) && r.lineAt.every((v, i) => Math.abs(v - r.start[i]) <= 0.5 + 1e-9), `the line through the start rounded to the grid: ${r.lineAt} from ${r.start}`);
+    assert.equal(r.dot, true, 'drawn dotted');
+    const off = r.steps.filter(([x, y]) => Math.abs((x - r.lineAt![0]) + (y - r.lineAt![1])) > 1e-9);
+    assert.ok(r.steps.length >= 8, `${r.steps.length} steps`);
+    assert.deepEqual(off, [], `every place on the line x + y = ${r.lineAt![0] + r.lineAt![1]}: ${JSON.stringify(r.steps)}`);
+    assert.ok(r.steps.some(([x]) => x >= 2), `it went along it: ${JSON.stringify(r.steps)}`);
+  });
+});

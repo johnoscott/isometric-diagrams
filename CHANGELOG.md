@@ -2,6 +2,20 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.32.0 — sandbox and place sizes in the space editor
+
+- **Sandboxes and places have resize handles** in the space editor (the owner's answer, 27 Nov: drawing only): a drag writes the
+  box's size beside its pin, `x-editor.layout.NAME.size` ([w, d] in cells), an `x-` key the runner never reads; a double click on a handle,
+  or Fit to contents, takes it away, with the entry (and the layout block) when that was all it held. A place is sized the same way
+  whether it is written under `realms:` (3.2) or as 3.1 writes places; a fenced place on the Mac is drawn as no box and has none.
+  A size on anything else, one that isn't [w, d], or one smaller than what it holds (drawn as written) is said.
+- **The move handle only where it leads somewhere**: in 0.31.0 a selected sandbox or folder showed it too, though nothing could take
+  it (the drag stayed where it was); now a thing shows it only when the format's `moveInto` takes it somewhere.
+- **⇧ keeps a move exactly on one line**, also from a place the layout put between cells: 0.31.0 rounded each step to the grid on
+  its own, so the move could zigzag between two lines half a cell apart, and the dotted line was drawn through the start as it was. It
+  now moves from the start rounded to the grid, by whole steps along the line, and the dotted line goes through that same start.
+  (Found by the agent editor's keys test.)
+
 ## 0.31.0 — the owner's drag keys; a move handle
 
 - **⌥ at the start of a drag drags a copy** (the owner's answer to group drag's question 1): the original stays where it stands; the

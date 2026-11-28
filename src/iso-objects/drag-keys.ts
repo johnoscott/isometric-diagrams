@@ -6,7 +6,8 @@
 export const CONSTRAIN_LINES: readonly (readonly [number, number])[] = [[1, 0], [0, 1], [1, 1], [1, -1]];
 
 /** A grid move (dx, dy) from where a thing started, kept on the nearest of the eight lines: its projection on that line, and which
- *  line it is (for the dotted guide). On a diagonal the two parts are equal (or opposite), so snapping each to the grid keeps it there. */
+ *  line it is (for the dotted guide). On a diagonal the two parts are equal (or opposite); the canvas moves from the start on the grid
+ *  by whole steps along it, so each place it takes is on the line. */
 export function constrainMove(d: readonly [number, number]): { d: [number, number]; line: [number, number] } {
   let best: readonly [number, number] = CONSTRAIN_LINES[0]!, bestCos = -1;
   const len = Math.hypot(d[0], d[1]);
