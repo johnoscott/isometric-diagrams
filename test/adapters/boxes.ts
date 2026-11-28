@@ -159,6 +159,12 @@ export const boxesAdapter: DomainAdapter = {
     if (!isMap(t) || !HOLDERS.includes(String(t.kind))) return undefined;
     return { value: { ...(isMap(value) ? value : {}), in: target.name }, label: `in ${String(t.kind)} ${target.name}` };
   },
+  // (0.31.0) a box taken by its move handle: into the tray or zone it is dropped on, or out of any (dropped on nothing)
+  moveInto(_thing, value, target, data) {
+    if (!target) { const { in: _, ...rest } = value; return { value: rest, label: ' out of any tray' }; }
+    const boxes = isMap(data) && isMap(data.boxes) ? data.boxes : {}, t = boxes[target.name];
+    return isMap(t) && HOLDERS.includes(String(t.kind)) ? { value: { ...value, in: target.name }, label: ` into ${String(t.kind)} ${target.name}` } : undefined;
+  },
   // (0.10.0) the selected boxes into a new zone, in what they were all in (if one place), each now in the zone
   group(members, data) {
     const boxes = isMap(data) && isMap(data.boxes) ? data.boxes : {};

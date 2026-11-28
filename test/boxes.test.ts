@@ -1021,18 +1021,21 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
     const before = await ev<{ floor: number[]; c: number[] }>(where);
     // grow: a, dragged to the front past the shelf's edge (a shelf that fits what it holds; b stands beside it, to its right): no edge
     // holds it, the shelf grows, its old floor dashed
-    const grow = await ev<{ dashed: boolean; hint: string; steps: number; wrong: string[] }>(`${P} const c = I.canvas, at = c.pageXYOf(['boxes', 'a']); const el = document.elementFromPoint(at.x, at.y);
+    const grow = await ev<{ dashed: boolean; hint: string; steps: number; wrong: string[]; drop: unknown }>(`${P} const c = I.canvas, at = c.pageXYOf(['boxes', 'a']); const el = document.elementFromPoint(at.x, at.y);
       // at each step: the dashed floor and the words exactly while the shelf is bigger than when the drag began, never otherwise
       const wrong = []; let steps = 0;
       const check = () => { const g = c.drag, b = g?.parent?.box, b0 = g?.parent?.box0; if (!b || !b0 || !g.move || !g.shown || g.shown[0] !== g.move.at[0] || g.shown[1] !== g.move.at[1]) return;   // (the trial drawn for where it is)
         const grown = b.x1 - b.x0 > b0.x1 - b0.x0 + 1e-6 || b.y1 - b.y0 > b0.y1 - b0.y0 + 1e-6, dashed = !!document.querySelector('.iso-canvas .overlay .grow-was'), words = /which grows with it/.test(document.querySelector('#se-st-hint')?.textContent ?? '');
-        steps++; if (dashed !== grown || words !== grown) wrong.push(JSON.stringify({ at: g.move?.at, grown, dashed, words })); };
+        // (0.31.0) what it saw, for a run elsewhere (CI) to say: the group's box then and now, the trial's place against the drop's, the hint
+        const r1 = v => Math.round(v * 1000) / 1000, bx = o => o && [o.x0, o.y0, o.x1, o.y1].map(r1);
+        steps++; if (dashed !== grown || words !== grown) wrong.push(JSON.stringify({ at: g.move?.at, shown: g.shown, grown, dashed, words, box: bx(b), box0: bx(b0), pad: g.parent.pad, shift: g.shiftShown, hint: document.querySelector('#se-st-hint')?.textContent })); };
       P(el, 'pointerdown', at.x, at.y); let dashed = false, hint = '';
       for (let i = 1; i <= 14; i++) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(80); check(); dashed ||= !!document.querySelector('.iso-canvas .overlay .grow-was'); hint = document.querySelector('#se-st-hint')?.textContent || hint; }
       // pulled back in and out again: the same, at every step
       for (let i = 13; i >= 0; i--) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(80); check(); }
       for (let i = 1; i <= 14; i++) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(80); check(); }
-      P(c.stage, 'pointerup', at.x - 168, at.y + 98); return { dashed, hint, steps, wrong };`);
+      const g = c.drag, drop = g && { at: g.move?.at, shown: g.shown, keep: g.keep, pinSet: g.pinSet, shift: g.shiftShown, box: g.parent?.box && [g.parent.box.x0, g.parent.box.y0, g.parent.box.x1, g.parent.box.y1] };
+      P(c.stage, 'pointerup', at.x - 168, at.y + 98); return { dashed, hint, steps, wrong, drop };`);
     assert.equal(grow.dashed, true, "the shelf's floor as it was, dashed, while it grew");
     assert.match(grow.hint, /^Moving a within Shelf, which grows with it · /, 'the group named once, and what it does');
     assert.deepEqual(grow.wrong, [], 'the dashed floor and the words exactly while the shelf has grown, at every step');
@@ -1042,7 +1045,10 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
     // nothing else jumped: the floor zone and what is in it stand where they stood (pinned there by the same step if the shelf's
     // growing would have moved them)
     await ev(`await tick(300); return 0;`);
-    assert.deepEqual(await ev<{ floor: number[]; c: number[] }>(where), before, 'the shelf grew; the floor and c stayed where they were');
+    const after = await ev<{ floor: number[]; c: number[] }>(where);
+    // (0.31.0) and, if not, what it wrote and how the drawing stands (for a run elsewhere, CI, to say)
+    const saw = JSON.stringify(after) === JSON.stringify(before) ? '' : JSON.stringify({ pins: (await ev<string>(`return E.getText();`)).split('x-editor:')[1], boxes: await ev(`const L = I.canvas.doc.scene.layout.byId, b = id => { const x = L.get(id)?.box; return x && [x.x0, x.y0, x.x1, x.y1].map(v => Math.round(v * 1000) / 1000); }; return { shelf: b('shelf'), floor: b('floor'), a: b('a'), b: b('b'), c: b('c') };`), drop: grow.drop });
+    assert.deepEqual(after, before, `the shelf grew; the floor and c stayed where they were ${saw}`);
     assert.match(await ev<string>(`return E.getText();`), /floor: \{ at: \[/, 'the floor pinned where it stood (the shelf grew towards it)');
     await ev(`I.doc.undo(); await tick(100); return 0;`);
     await until(`!/x-editor/.test(E.getText())`, 'one undo step');
@@ -1167,3 +1173,149 @@ test('boxes/1 in Chrome (0.29.0, off until the owner answers): the left and back
     await ev(`B.growSides({ left: true, back: true }); return 0;`);
   });
 });
+
+test('boxes/1 in Chrome (0.31.0): the owner\'s drag keys: ⇧ keeps the move on a line (dotted), Ctrl half cells, both taken with the pointer still', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    // c, in the floor zone (room around it): dragged off at a slant, with ⇧ and without; then Ctrl pressed and let go, the pointer still
+    const r = await ev<{ free: number[]; line: number[]; on: boolean; dotted: boolean; hintLine: boolean; half: number; halfAt: number[]; whole: number; wholeAt: number[]; unSt: boolean; dottedOff: boolean }>(`
+      const c = I.canvas, at = c.pageXYOf(['boxes', 'c']), el = document.elementFromPoint(at.x, at.y);
+      const P = (t, x, y, m = {}) => (t === 'pointerdown' ? el : c.stage).dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 7, ...m }));
+      const K = (type, key, m) => window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, ...m }));
+      // a slant on screen: mostly along one grid axis, a little along the other
+      const to = { x: at.x + 46, y: at.y + 6 };
+      P('pointerdown', at.x, at.y);
+      for (let i = 1; i <= 6; i++) { P('pointermove', at.x + (to.x - at.x) * i / 6, at.y + (to.y - at.y) * i / 6); await tick(60); }
+      const g = c.drag, free = [g.move.at[0] - g.start[0], g.move.at[1] - g.start[1]];
+      // ⇧ pressed, the pointer still
+      K('keydown', 'Shift', { shiftKey: true }); await tick(120);
+      const d = [g.move.at[0] - g.start[0], g.move.at[1] - g.start[1]], line = g.line ?? [];
+      const on = !!g.line && Math.abs(d[0] * g.line[1] - d[1] * g.line[0]) < 1e-6;
+      const dotted = !!document.querySelector('.iso-canvas .overlay .straight'), hintLine = /in a straight line/.test(document.querySelector('#se-st-hint')?.textContent ?? '');
+      // ⇧ let go, Ctrl pressed: half cells, the pointer still
+      K('keyup', 'Shift', {}); await tick(120);
+      const unSt = !g.line, dottedOff = !document.querySelector('.iso-canvas .overlay .straight');
+      K('keydown', 'Control', { ctrlKey: true }); await tick(120);
+      const half = g.step, halfAt = [...g.move.at];
+      K('keyup', 'Control', {}); await tick(120);
+      const whole = g.step, wholeAt = [...g.move.at];
+      c.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); P('pointerup', to.x, to.y); await tick(100);
+      return { free, line, on, dotted, hintLine, half, halfAt, whole, wholeAt, unSt, dottedOff };`);
+    assert.ok(r.free[0] !== 0 && r.free[1] !== 0, `off at a slant without ⇧: ${r.free}`);
+    assert.equal(r.on, true, `with ⇧, on its line: ${JSON.stringify(r)}`);
+    assert.deepEqual([r.dotted, r.hintLine], [true, true], 'the line dotted, and the status bar says so');
+    assert.deepEqual([r.unSt, r.dottedOff], [true, true], '⇧ let go: free again, no line');
+    assert.equal(r.half, 0.5, 'Ctrl, the pointer still: half cells');
+    assert.equal(r.whole, 1, 'Ctrl let go: whole cells');
+    assert.equal(await ev<string>(`return E.getText();`), TEXT, 'Esc: nothing written');
+  });
+});
+
+test('boxes/1 in Chrome (0.31.0): ⌥ at the start of a drag drags a copy: the original stays, the copy pinned where dropped, one undo step', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    const r = await ev<{ during: { fresh: boolean; name: string; orig: boolean }; at: number[]; start: number[]; bad: boolean }>(`
+      const c = I.canvas, at = c.pageXYOf(['boxes', 'c']), el = document.elementFromPoint(at.x, at.y);
+      const P = (t, x, y, m = {}) => (t === 'pointerdown' ? el : c.stage).dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 8, ...m }));
+      const c0 = c.pageXYOf(['boxes', 'c']);
+      P('pointerdown', at.x, at.y, { altKey: true });
+      // three cells along the grid's x (screen right and down): clear of c, two cells wide
+      const k = c.scale() * 34, ux = Math.cos(Math.PI / 6) * k, uy = 0.5 * k;
+      for (let i = 1; i <= 6; i++) { P('pointermove', at.x + i * ux / 2, at.y + i * uy / 2); await tick(60); }
+      const g = c.drag, during = { fresh: !!g?.fresh?.copy, name: g?.name, orig: Math.abs(c.pageXYOf(['boxes', 'c']).x - c0.x) < 1 };
+      const res = { during, at: [...g.move.at], start: [...g.start], bad: !!g.invalid };
+      P('pointerup', at.x + 3 * ux, at.y + 3 * uy); await tick(300);
+      return res;`);
+    assert.deepEqual(r.during, { fresh: true, name: 'c-2', orig: true }, 'the copy, c-2, is what moves; c stands where it stood');
+    assert.notDeepEqual(r.at, r.start, 'moved off the original'); assert.equal(r.bad, false, `clear of c: ${r.at}`);
+    await until(`/\\n  c-2:/.test(E.getText())`, 'the copy written');
+    const t = await ev<string>(`return E.getText();`);
+    const data = readBoxes(t).read!.data as { boxes: Record<string, Record<string, unknown>> };
+    assert.deepEqual(data.boxes['c-2'], data.boxes.c, 'a copy of c: the same values (in the floor too)');
+    assert.match(t, new RegExp(`c-2: \\{ at: \\[${r.at.join(', ')}\\] \\}`), 'pinned where it was dropped');
+    assert.doesNotMatch(t, /\n {4}c: \{ at:/, 'the original not pinned: it stayed');
+    assert.equal(await ev<boolean>(`return !document.querySelector('.rename-field input');`), true, 'a copy has its name: none asked');
+    await ev(`I.doc.undo(); await tick(100); return 0;`);
+    await until(`E.getText() === ${JSON.stringify(TEXT)}`, 'one undo step');
+  });
+});
+
+test('boxes/1 in Chrome (0.31.0): the move handle takes a box anywhere: into another zone (one undo step), out of any, Esc puts it back', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    // press on a's move handle, go to a point in steps, then up (or Esc); what the drag says at the end
+    const go = (to: string, end: 'up' | 'esc') => ev<{ handle: boolean; free: boolean; label: string; into: string | null; bad: boolean; at: number[]; start: number[]; parent: string }>(`
+      const c = I.canvas;
+      I.doc.select([['boxes', 'a']], 'canvas'); await tick(80);
+      const h = document.querySelector('.iso-canvas .move-handle');
+      if (!h) return { handle: false, free: false, label: '', into: null };
+      const hr = h.getBoundingClientRect(), x0 = hr.x + hr.width / 2, y0 = hr.y + hr.height / 2, to = ${to};
+      const P = (t, x, y, m = {}) => (t === 'pointerdown' ? h : c.stage).dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 9, ...m }));
+      P('pointerdown', x0, y0);
+      // a few pixels, then straight there: the box goes where the layout gives it room in what is under the pointer
+      P('pointermove', x0 + 6, y0); await tick(60); P('pointermove', to.x, to.y); await tick(120);
+      // (into a container) then onto where the trial drawing has it, the room the layout gives it there, in half cells (Ctrl: the
+      // layout's place is on the half-cell grid)
+      const m = to.own ? { ctrlKey: true } : {};
+      const k = c.scale() * 34, cx = Math.cos(Math.PI / 6) * k;
+      for (let i = 0; to.own && i < 3; i++) {
+        const g = c.drag, dx = g.start[0] - g.move.at[0], dy = g.start[1] - g.move.at[1];
+        to.x += (dx - dy) * cx; to.y += (dx + dy) * 0.5 * k; P('pointermove', to.x, to.y, m); await tick(120);
+      }
+      const g = c.drag, r = { handle: true, free: !!g?.fresh?.free, label: g?.fresh?.plan.label ?? '', into: g?.fresh?.plan.into ?? null, bad: !!g?.invalid, at: g?.move?.at, start: g?.start, parent: g?.parent?.id };
+      if (${JSON.stringify(end)} === 'esc') { c.stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await tick(200); }
+      else { P('pointerup', to.x, to.y, m); await tick(300); }
+      return r;`);
+    // into the floor (a point on it clear of c): a leaves the shelf
+    const floor = `(() => { const f = c.pageXYOf(['boxes', 'floor']), k = c.scale() * 34; return { x: f.x - k, y: f.y + k * 0.3, own: true }; })()`;
+    const r = await go(floor, 'up');
+    assert.equal(r.handle, true, 'a selected box has a move handle');
+    assert.equal(r.bad, false, `a free spot in the floor: ${JSON.stringify(r)}`);
+    assert.equal(r.free, true, 'the handle drags it as a move'); assert.match(r.label, /^Move box a into zone floor/, r.label);
+    await until(`/\\n  a: \\{ in: floor/.test(E.getText())`, 'a written into the floor');
+    const t = await ev<string>(`return E.getText();`);
+    assert.match(t, /\n {4}a: \{ at: \[/, `pinned where it was dropped, in the floor: ${t}`);
+    assert.deepEqual(readBoxes(t).diags, [], 'the file reads cleanly');
+    await ev(`I.doc.undo(); await tick(150); return 0;`);
+    await until(`E.getText() === ${JSON.stringify(TEXT)}`, 'one undo step');
+    // Esc: nothing changes
+    await go(floor, 'esc');
+    assert.equal(await ev<string>(`return E.getText();`), TEXT, 'Esc puts all back');
+    assert.equal(await ev<boolean>(`return !I.canvas.drag;`), true, 'and ends the drag');
+    // out of any: dropped on nothing (well away from what is drawn)
+    const away = `(() => { const s = c.pageXYOf(['boxes', 'shelf']), f = c.pageXYOf(['boxes', 'floor']); return { x: s.x + (s.x - f.x) * 1.5, y: s.y + (s.y - f.y) * 1.5 }; })()`;
+    const o = await go(away, 'up');
+    assert.match(o.label, /out of any tray/, o.label);
+    await until(`/\\n  a: \\{ label: A \\}/.test(E.getText())`, 'a written out of the shelf');
+  });
+});
+
+test('boxes/1 in Chrome (0.31.0): a slow machine\'s grow drag (the trial laid out late): the hint and the dashed floor agree once it lands, and nothing else jumps at the drop', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
+    const where = `const q = id => { const p = I.canvas.pageXYOf(['boxes', id]); return [Math.round(p.x), Math.round(p.y)]; }; return { floor: q('floor'), c: q('c') };`;
+    const before = await ev<{ floor: number[]; c: number[] }>(where);
+    // a's grow drag of the 0.28.0 test, each trial held back past the next move (I.canvas.trialDelay), so the pointer is always on
+    // ahead of what is drawn; at the turns it rests until the trial lands; the drop comes at once after the last move (a stale trial)
+    const r = await ev<{ wrong: string[]; rests: number }>(`
+      const c = I.canvas, at = c.pageXYOf(['boxes', 'a']), el = document.elementFromPoint(at.x, at.y); c.trialDelay = 150;
+      const P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 6 }));
+      const wrong = []; let rests = 0;
+      const rest = async () => { await tick(400); const g = c.drag; if (!g?.move) return; rests++;
+        const dashed = !!document.querySelector('.iso-canvas .overlay .grow-was'), words = /which grows with it/.test(document.querySelector('#se-st-hint')?.textContent ?? '');
+        if (dashed !== words) wrong.push(JSON.stringify({ at: g.move.at, shown: g.shown, dashed, words })); };
+      P(el, 'pointerdown', at.x, at.y);
+      for (let i = 1; i <= 14; i++) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(60); if (i % 5 === 0) await rest(); }
+      await rest();
+      for (let i = 13; i >= 0; i--) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(60); if (i % 5 === 0) await rest(); }
+      for (let i = 1; i <= 14; i++) { P(c.stage, 'pointermove', at.x - i * 12, at.y + i * 7); await tick(60); if (i % 5 === 0) await rest(); }
+      P(c.stage, 'pointermove', at.x - 168, at.y + 98); P(c.stage, 'pointerup', at.x - 168, at.y + 98); c.trialDelay = 0;
+      return { wrong, rests };`);
+    assert.ok(r.rests >= 6, `${r.rests} rests checked`);
+    assert.deepEqual(r.wrong, [], 'the hint says the shelf grows exactly while its old floor is dashed, once the trial has landed');
+    await until(`/a: \\{ at: \\[/.test(E.getText())`, 'a pinned where it was dropped');
+    await ev(`await tick(300); return 0;`);
+    assert.deepEqual(await ev<{ floor: number[]; c: number[] }>(where), before, 'the shelf grew; the floor and c stayed where they were');
+  });
+});
+

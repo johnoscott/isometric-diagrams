@@ -128,6 +128,10 @@ export interface DomainAdapter {
    *  target, and the words for it ("in subnet app"), or undefined (the target doesn't hold it). The canvas asks what is
    *  under the drop, innermost first; none: a drop is pinned where it lands */
   dropInto?(target: ObjectRef, value: unknown, kind: string, data: unknown): { value: unknown; label?: string } | undefined;
+  /** (0.31.0) a thing dragged by its move handle (anywhere, past any group's edges) and dropped onto `target` (innermost first) or
+   *  onto nothing (undefined): its value there, and the words ("in group app"), or undefined (it can't go there). The canvas writes
+   *  the keys that change and its pin where it drops, as one undo step. None: no move handle */
+  moveInto?(thing: ObjectRef, value: Record<string, unknown>, target: ObjectRef | undefined, data: unknown): { value: Record<string, unknown>; label?: string } | undefined;
   /** (0.28.0) where a group's size is written (its value [w, d]), or undefined (that one isn't resized on the canvas). None: no
    *  resize handles. The canvas writes it, and takes it away for "Fit to contents" */
   sizeAt?(group: Path): Path | undefined;

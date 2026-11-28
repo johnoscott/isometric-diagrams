@@ -2,6 +2,30 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.31.0 — the owner's drag keys; a move handle
+
+- **⌥ at the start of a drag drags a copy** (the owner's answer to group drag's question 1): the original stays where it stands; the
+  copy, its name the next free one, is pinned where it is dropped, one undo step (no name asked).
+- **⇧ keeps a drag in a straight line** from where it started: along the grid's axes and at 45°, the line shown dotted.
+- **Ctrl while dragging gives half cells** (⌥ did, before 0.31.0; ⌥ now starts a copy). A resize takes Ctrl the same way.
+- **A move handle**: the selected thing shows a diamond at its left, beside the connect circle. A drag from it takes the thing
+  anywhere, past any group's edges; what is under the drop takes it, innermost first, as a palette drop does, or nothing (in the space
+  editor: an agent into the sandbox it is dropped on, or onto the Mac). One undo step, the layout making room; Esc cancels. A host
+  gives it with `adapter.moveInto(thing, value, target, data)`; without it there is no handle.
+- **A drop is checked against what the drawing shows**: a palette add, a copy or a move is "taken" only where something stands in
+  the trial drawing (what made way for it, where it went), not where things stood before it came. Seen with the move handle, at the
+  layout's own place in another group; in the files tried, a palette add was never caught by it.
+- **The hint and the dashed floor agree on a slow machine**: when a trial drawing lands late and moves the group under the drag,
+  both are drawn again ("which grows with it" said while the old floor wasn't dashed). This is our reading of v0.30.0's tag CI run,
+  where the 0.28.0 grow test failed twice (once on this, once on the floor and c standing a few pixels off after the drop) while
+  main's passed on the same code. Neither failure was reproduced here (Chrome slowed 2 to 12 times, or with every trial held back:
+  a new test, `canvas.trialDelay`); the test now says what it saw when it fails, for the next run to tell us.
+- **Every test file runs**: 0.30.0 shipped three Node tests that `npm test` didn't name, so neither CI nor a release's verification
+  ran them (settle-pins, which holds what is kept in place exactly; and 0.31.0's drag-keys and move-into). They are in it now, and a
+  test (test-list) fails when a test file is neither in `npm test` nor left out with its reason.
+- **Two size records moved, on review**: space-editor.js and space-canvas.js re-recorded at 0.31.0 for these features (+3.7% and
+  +3.5% gzipped over their records; test/baseline/sizes.json says what for).
+
 ## 0.30.0 — groups grow left and back; nothing else jumps
 
 - **Groups grow to the left and back too** (the owner's answer to group drag's question 2): a thing dragged past a group's left or

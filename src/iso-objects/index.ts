@@ -50,6 +50,7 @@ export { noSource, compileRaw } from './compile.ts';
 export { screenToGrid, localAt, boxSilhouette, floorOf, paddingOf, snapMove, overlaps, GROW_REACH } from './geometry.ts';
 export { minSizeFor, resizeTo, growLeftBack, resizeSides, minSizeFrom, type ResizeHandle, type GrowLeftBack, type ResizeSides } from './resize.ts';
 export { settlePins, prunePins, type Pin } from './settle.ts';
+export { constrainMove, CONSTRAIN_LINES, dragStep } from './drag-keys.ts';
 export type { Move } from './geometry.ts';
 export type { CompiledScene, Compiled } from './compile.ts';
 export { FLAT_DEFAULTS, FLAT_FONTS, metricsMeasure, boardErrors, placeBoard, layoutFlat, flatHit } from './flat.ts';

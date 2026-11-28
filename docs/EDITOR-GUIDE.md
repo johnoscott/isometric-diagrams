@@ -224,20 +224,24 @@ Three optional pieces. Give one and the editor offers it; leave it out and nothi
   innermost first, and the first that holds it takes it; with none, the drop is pinned where it lands. In 3D the palette
   drags the thing itself (0.14.0), in a trial drawing of the file with it, so the grid, the target and what it lands in are
   seen before the drop; in a container it is pinned where it is dropped, unless that is the layout's own place for it.
+- **Move anywhere** (0.31.0), on the adapter: `moveInto(thing, value, target, data)` returns the thing's value once it is in
+  `target` (or, with `target` undefined, dropped on nothing), and words for it, or `undefined` when it can't go there. Given it, the
+  one selected thing shows a move handle (a diamond, at its left) beside the connect circle: a drag from it takes the thing anywhere,
+  past any group's edges, and what is under the drop takes it, innermost first, as a palette drop (the thing itself is never asked,
+  nor what it holds). The drawing is a trial of the file with it there; the drop writes the keys of its value that changed and its
+  pin where it lands, one undo step; the layout makes room. Esc cancels. The space editor moves agents between sandboxes and the Mac.
 - **Growing a group** (0.28.0): a thing dragged past the right or front edge of a group that fits what it holds (no `size`) isn't
   held there: the group grows under it, cell by cell, its floor as it was drawn dashed, within 2 cells of the furthest the pointer
   has been (`GROW_REACH`). The drop is the pin, one undo step; no `size` is written, so the group keeps fitting. A group with a size
-  holds it at its edges, as before ("fixed size: resize it to fit more"). Left and back wait for a decision: `GROW_SIDES` in
-  `src/iso-editor/ui/canvas.ts` says which sides grow, and which handles a resize has. Both ways of growing left and back are built
-  and off (0.29.0), chosen by `GROW_SIDES.leftBack`: `'pins'`, the group's other contents move the other way, so nothing but the
-  dragged thing and the edge moves on screen; or `'shift'`, the whole group moves with the edge, what it holds with it. Either way
-  the group is pinned where it stood, less the shift (`growLeftBack`), so only a group that can be pinned grows that way. Turned on,
-  the resize handles gain the left and back sides and the other three corners; a left or back handle keeps the far edge, and what the
-  group holds, where they are on screen (its size, its pin and its contents' pins, one step).
+  holds it at its edges, as before ("fixed size: resize it to fit more"). (0.30.0) Left and back grow too: the group's other
+  contents move the other way, so nothing but the dragged thing and the edge moves on screen; the group is pinned where it stood,
+  less the shift (`growLeftBack`), so only a group that can be pinned grows that way. The resize handles are all eight; a left or
+  back handle keeps the far edge, and what the group holds, where they are on screen (its size, its pin and its contents' pins, one
+  step). `GROW_SIDES` in `src/iso-editor/ui/canvas.ts` says which sides grow.
 - **Resize handles** (0.28.0), on the adapter: `sizeAt(group)` returns the path a group's `size` ([w, d]) is written at, or
   `undefined` (that one isn't resized). Given it, the one selected group shows handles on its floor: the front-right corner (width
   and depth), and the middles of its right side (width) and front side (depth); 44 px targets on a touch screen. A drag snaps to
-  whole cells (⌥: half), never below what the group holds needs (it stops there: "no smaller"), and writes the size as one step
+  whole cells (Ctrl: half), never below what the group holds needs (it stops there: "no smaller"), and writes the size as one step
   ("Resize <group>"). A double click on a handle, or **Fit to contents** in the group's menu, takes the size away (it fits again).
   Esc cancels a resize.
 - **Making way** (0.14.0): a drag held still over a taken cell makes what is there step aside (after 700 ms; `dragMotion:
@@ -338,6 +342,7 @@ Its `index.html` gives the editor a sized element: `<div id="app" style="height:
 | connecting by drag, Connect to… (0.10.0) | `adapter.connect` |
 | Group, ⌘G (0.10.0) | `adapter.group` |
 | a palette drop that lands inside a container (0.10.1) | `adapter.dropInto` |
+| the move handle: a thing dragged anywhere, into what it is dropped on (0.31.0) | `adapter.moveInto` |
 | a selected group's resize handles, Fit to contents (0.28.0) | `adapter.sizeAt` |
 | palette sections under collapsible headers (0.11.0) | `view.palette[].section` |
 | the palette docked at the canvas's left, searchable (0.12.0) | `view.paletteLayout: 'docked'` |
