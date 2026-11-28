@@ -24,20 +24,23 @@ export function resizeTo(size0: [number, number], d: [number, number], handle: R
 }
 
 /** (0.29.0) how a group grows on its left or back side, when it does (canvas.ts GROW_SIDES): its other contents' pins move the other
- *  way, so nothing but the dragged thing and the edge moves on screen ('pins'); or they keep theirs, so the whole group moves with
- *  the edge ('shift'). The owner's question 2. */
-export type GrowLeftBack = 'pins' | 'shift';
+ *  way, so nothing but the dragged thing and the edge moves on screen ('pins', the owner's answer to question 2). (0.30.0) The
+ *  variant not chosen, 'shift' (the whole group moving with the edge), is removed: 0.29.0 has it. */
+export type GrowLeftBack = 'pins';
 /** (0.29.0) A thing dropped past a group's left or back margin `lo` (at: in the group's frame, less than lo), on the grid `step`: the
  *  pins that make the group grow that way. The thing comes in by s (to the margin), the group moves by -s in its parent's frame (its
  *  pin, `group.at`: where it stands now), and with 'pins' every other thing in it that can be pinned moves by +s. Undefined: not past
  *  the margin, or the group can't be pinned (then the side is held). */
 export function growLeftBack(o: { name: string; at: [number, number]; lo: number; step: number; group?: { name: string; at: [number, number] };
-  others: { name: string; at: [number, number] }[]; mode: GrowLeftBack }): { pins: [string, [number, number]][]; shift: [number, number] } | undefined {
-  const by = (v: number) => (v < o.lo - 1e-9 ? Math.ceil((o.lo - v) / o.step - 1e-9) * o.step : 0);
+  others: { name: string; at: [number, number] }[]; mode?: GrowLeftBack; pad?: number }): { pins: [string, [number, number]][]; shift: [number, number] } | undefined {
+  // (0.30.0) past the margin itself (pad), not the grid line it rounds up to (lo): a thing the layout put at the margin (a palette
+  // drop's start) doesn't grow its group; once past, the group grows to the grid
+  const edge = o.pad ?? o.lo;
+  const by = (v: number) => (v < edge - 1e-9 ? Math.ceil((o.lo - v) / o.step - 1e-9) * o.step : 0);
   const s: [number, number] = [by(o.at[0]), by(o.at[1])];
   if (!o.group || (!s[0] && !s[1])) return undefined;
   const r = (v: number) => Math.round(v * 1000) / 1000, add = (a: [number, number], k: number): [number, number] => [r(a[0] + k * s[0]), r(a[1] + k * s[1])];
-  return { pins: [[o.name, add(o.at, 1)], [o.group.name, add(o.group.at, -1)], ...(o.mode === 'pins' ? o.others.map(x => [x.name, add(x.at, 1)] as [string, [number, number]]) : [])], shift: s };
+  return { pins: [[o.name, add(o.at, 1)], [o.group.name, add(o.group.at, -1)], ...o.others.map(x => [x.name, add(x.at, 1)] as [string, [number, number]])], shift: s };
 }
 
 /** (0.29.0) the sides a resize handle moves (its corner, two; the middle of a side, one) */

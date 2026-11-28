@@ -248,6 +248,7 @@ export function place(scene: RawScene, scenePath: string, src: Located, theme: T
   function absolute(p: Placed, ox: number, oy: number, floor: number) {
     const L = local.get(p)!;
     const x0 = ox + L.x, y0 = oy + L.y;
+    p.at = [L.x, L.y];
     if (p.type === 'region') {
       const rk = regionKind(catalog, p.region!.kind)!, [dz0] = rk.z, onTop = rk.floor;
       // a slab standing on another slab sits on it: no skirt below its floor

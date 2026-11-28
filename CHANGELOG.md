@@ -2,6 +2,27 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.30.0 — groups grow left and back; nothing else jumps
+
+- **Groups grow to the left and back too** (the owner's answer to group drag's question 2): a thing dragged past a group's left or
+  back edge grows the group that way, and everything else in it stays where it is on screen (its pins move with the edge; the group
+  needs a pin of its own, else those sides hold, as before). A selected group shows all eight resize handles: its corners and sides.
+- **Adding from the palette lets the layout make room**, as before (the owner's answer): "nothing else jumps" is for drags and
+  resizes; a drop writes only the pins the drawing needs (each kept pin tried without it).
+- **The variant not chosen is removed**: growing left or back with the whole group moving with the edge ('shift'), built and
+  tested in 0.29.0 beside 'pins', is gone (0.29.0 has it); GROW_SIDES keeps its left and back switches.
+- **Nothing else jumps** (question 4): a drop that grows a group no longer lets the layout move what stands beside the group (or
+  anything else in the drawing): whatever the drop would have moved is pinned where it stood, in the same step ("kept in place").
+- **A group grows only once a thing is past its margin**, not when the layout put the thing on the margin itself (a palette drop
+  near a group's back edge grew it a cell in 0.29.0's left/back variant).
+- **A group grows only the way it is dragged**: a thing the layout put inside the margin (snapping to past it) dragged left grew its
+  group back too, moving what flows after it; it now grows a side only when the drag itself goes that way by half a cell.
+- **What is kept in place stands exactly where it stood**, also where a layout rounds boxes to the grid or shifts what a container
+  holds: the pins a drop writes are measured against the layout's own places (before rounding) and corrected until each thing
+  stands where it is meant to (in the space editor, a sandbox growing left no longer moved down with everything in it).
+- **restoreLog(model, log, { clean: false, cleanAt })** (for hosts that keep drafts): a restored history can open unsaved, clean
+  again where undo reaches the saved text (cleanAt, its textHash), or nowhere until a save.
+
 ## 0.29.1 — the morph keeps its hatching in black and white
 
 - **The 3D | 2D switch's morph keeps its black-and-white hatching** (M6.B4, known since 0.23.0). Its layer painted its clones with

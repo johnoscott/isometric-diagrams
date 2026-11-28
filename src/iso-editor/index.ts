@@ -15,7 +15,7 @@ export type { Where, At, CompletionContext } from './doc.ts';
 export { HISTORY_DEPTH, EditorModel } from './model.ts';
 export { readPins } from './pins.ts';
 export type { Origin, Command, Change, SelectionChange, StepMeta, HistoryEntry, ApplyOptions } from './model.ts';
-export { revisionLog, restoreLog, textHash, type LoggedStep, type RevisionLog } from './history-log.ts';
+export { revisionLog, restoreLog, textHash, type LoggedStep, type RevisionLog, type RestoreOptions } from './history-log.ts';
 export { SpliceError, applyStep, invertStep, scalarText, flowText, setValue, insertKey, deleteAt, insertItem, renameKey, moveKey, insertRawPair, pairText } from './splice.ts';
 export type { TextEdit, Step, Splice } from './splice.ts';
 export { SchemaNav } from './schema-nav.ts';

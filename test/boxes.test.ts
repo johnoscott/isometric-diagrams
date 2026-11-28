@@ -1016,6 +1016,9 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
   await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
     await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
     const P = `const P = (el, type, x, y, alt = false) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 5, altKey: alt }));`;
+    // (0.30.0, "nothing else jumps") where the floor zone (beside the shelf) and c in it stand on screen before the drag
+    const where = `const q = id => { const p = I.canvas.pageXYOf(['boxes', id]); return [Math.round(p.x), Math.round(p.y)]; }; return { floor: q('floor'), c: q('c') };`;
+    const before = await ev<{ floor: number[]; c: number[] }>(where);
     // grow: a, dragged to the front past the shelf's edge (a shelf that fits what it holds; b stands beside it, to its right): no edge
     // holds it, the shelf grows, its old floor dashed
     const grow = await ev<{ dashed: boolean; hint: string; steps: number; wrong: string[] }>(`${P} const c = I.canvas, at = c.pageXYOf(['boxes', 'a']); const el = document.elementFromPoint(at.x, at.y);
@@ -1036,6 +1039,11 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
     assert.ok(grow.steps >= 15, `${grow.steps} steps checked (the trial drawn for where it was)`);
     await until(`/a: \\{ at: \\[/.test(E.getText())`, 'a pinned where it was dropped');
     assert.doesNotMatch(await ev<string>(`return E.getText();`), /size:/, 'a group that fits what it holds keeps fitting: no size written');
+    // nothing else jumped: the floor zone and what is in it stand where they stood (pinned there by the same step if the shelf's
+    // growing would have moved them)
+    await ev(`await tick(300); return 0;`);
+    assert.deepEqual(await ev<{ floor: number[]; c: number[] }>(where), before, 'the shelf grew; the floor and c stayed where they were');
+    assert.match(await ev<string>(`return E.getText();`), /floor: \{ at: \[/, 'the floor pinned where it stood (the shelf grew towards it)');
     await ev(`I.doc.undo(); await tick(100); return 0;`);
     await until(`!/x-editor/.test(E.getText())`, 'one undo step');
     // a shelf with room inside it (b deeper than a): a short way to the front, nothing grows (no dashed floor, no words); further, it
@@ -1054,10 +1062,10 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
     assert.deepEqual(roomy.wrong, [], 'the dashed floor and the words exactly while it has grown');
     await ev(`E.setText(${JSON.stringify(TEXT)}, { fit: true }); await tick(300); return 0;`);
 
-    // the handles: the shelf selected, three handles (the front-right corner, the right side, the front side; left and back wait)
+    // the handles: the shelf selected, (0.30.0) eight (its four corners and four sides: left and back on, the shelf can be pinned)
     await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(100); return 0;`);
-    await until(`document.querySelectorAll('.iso-canvas .overlay .size-handle').length === 3`, 'three handles');
-    assert.deepEqual(await ev<string[]>(`return [...document.querySelectorAll('.iso-canvas .overlay .size-handle')].map(h => h.dataset.handle).sort();`), ['corner', 'front', 'right']);
+    await until(`document.querySelectorAll('.iso-canvas .overlay .size-handle').length === 8`, 'eight handles');
+    assert.deepEqual(await ev<string[]>(`return [...document.querySelectorAll('.iso-canvas .overlay .size-handle')].map(h => h.dataset.handle).sort();`), ['back', 'corner', 'corner-lb', 'corner-lf', 'corner-rb', 'front', 'left', 'right']);
     // the corner, dragged out: a size written, as one step
     await ev(`${P} const h = document.querySelector('.iso-canvas .overlay .size-handle[data-handle="corner"]').getBoundingClientRect(), x = h.x + h.width / 2, y = h.y + h.height / 2;
       P(document.querySelector('.iso-canvas .overlay .size-handle[data-handle="corner"]'), 'pointerdown', x, y);
@@ -1092,11 +1100,11 @@ test('boxes/1 in Chrome (0.28.0): a drag past a group\'s edge grows it, dashed w
   });
 });
 
-for (const mode of ['pins', 'shift'] as const) test(`boxes/1 in Chrome (0.29.0, off until the owner answers): growing left, "${mode}"`, { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+for (const mode of ['pins'] as const) test(`boxes/1 in Chrome (0.29.0; 0.30.0: on, the owner's choice): growing left, "${mode}"`, { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
   await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
     await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
     // the shelf pinned (a group needs a pin of its own to grow left: growing moves it), then the variant on
-    await ev(`E.setText(E.getText() + 'x-editor:\\n  layout:\\n    shelf: { at: [4, 2] }\\n', { fit: true }); await tick(400); B.growSides({ left: true, back: true, leftBack: '${mode}' }); return 0;`);
+    await ev(`E.setText(E.getText() + 'x-editor:\\n  layout:\\n    shelf: { at: [4, 2] }\\n', { fit: true }); await tick(400); B.growSides({ left: true, back: true }); return 0;`);
     await until(`/shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText()) && I.canvas.pageXYOf(['boxes', 'b'])`, 'the shelf pinned');
     const P = `const P = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 6 }));`;
     // a, dragged left (screen up and left: -x) past the shelf's left margin, and dropped: b's place on screen before and after
@@ -1123,14 +1131,14 @@ for (const mode of ['pins', 'shift'] as const) test(`boxes/1 in Chrome (0.29.0, 
     assert.match(await ev<string>(`return I.doc.undoLabel;`), mode === 'pins' ? /\(Shelf grows that way\)/ : /\(Shelf grows and moves\)/);
     await ev(`I.doc.undo(); await tick(200); return 0;`);
     await until(`!/    a: \\{ at:/.test(E.getText()) && /shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText())`, 'one undo step takes it all back');
-    await ev(`B.growSides({ left: false, back: false, leftBack: 'pins' }); return 0;`);
+    await ev(`B.growSides({ left: true, back: true }); return 0;`);
   });
 });
 
 test('boxes/1 in Chrome (0.29.0, off until the owner answers): the left and back resize handles keep the far edge and the contents still', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
   await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
     await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="a"]')`, 'it mounts and draws');
-    await ev(`E.setText(E.getText() + 'x-editor:\\n  layout:\\n    shelf: { at: [4, 2] }\\n', { fit: true }); await tick(400); B.growSides({ left: true, back: true, leftBack: 'pins' }); return 0;`);
+    await ev(`E.setText(E.getText() + 'x-editor:\\n  layout:\\n    shelf: { at: [4, 2] }\\n', { fit: true }); await tick(400); B.growSides({ left: true, back: true }); return 0;`);
     await until(`/shelf: \\{ at: \\[4, 2\\] \\}/.test(E.getText())`, 'the shelf pinned');
     await ev(`I.doc.select([['boxes', 'shelf']], 'canvas'); await tick(150); return 0;`);
     await until(`document.querySelectorAll('.iso-canvas .overlay .size-handle').length === 8`, 'eight handles');
@@ -1156,6 +1164,6 @@ test('boxes/1 in Chrome (0.29.0, off until the owner answers): the left and back
       P(el, 'pointerdown', x, y); for (let i = 1; i <= 6; i++) { P(c.stage, 'pointermove', x - i * 10, y - i * 5.8); await tick(50); } P(c.stage, 'pointerup', x - 60, y - 35); await tick(500); return 0;`);
     await until(`/    shelf: \\{ at: \\[/.test(E.getText()) && /size: \\[/.test(E.getText())`, 'the shelf pinned and sized, in one step');
     assert.equal(await ev<string>(`return I.doc.undoLabel;`), 'Resize Shelf');
-    await ev(`B.growSides({ left: false, back: false, leftBack: 'pins' }); return 0;`);
+    await ev(`B.growSides({ left: true, back: true }); return 0;`);
   });
 });

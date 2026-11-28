@@ -88,5 +88,8 @@ export interface Placed {
   node?: RawNode;
   /** set when another item (a walled region's gate) decides this item's box */
   placedBy?: string;
+  /** (0.30.0) where it was laid out in its parent's frame, before the grid's rounding: the place a pin { at } gives back exactly
+   *  (its box, rounded, can be half a cell off it) */
+  at?: [number, number];
 }
 

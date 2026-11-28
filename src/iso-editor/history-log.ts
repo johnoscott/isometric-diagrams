@@ -65,10 +65,16 @@ const walk = (t: string | undefined, steps: readonly Step[]): string | undefined
   return t;
 };
 
+/** How restoreLog marks the text: by default clean (a host restores what it has just read from its file). (0.30.0) `clean: false`
+ *  for a text that isn't what was saved (a draft kept in the browser): it opens unsaved; with `cleanAt`, the hash (textHash) of the
+ *  text that is saved, the text is clean again when undo or redo reaches that text, as if it had been saved there. */
+export interface RestoreOptions { readonly clean?: boolean; readonly cleanAt?: string }
+
 /** Give a kept history back to the model's text: only when the text's hash is the log's, and only when every step, undone and redone
  *  on a copy, gives the text back exactly; else nothing changes and it says why. The text is clean after it (a host restores what it
- *  has just read), steps beyond the model's depth are left out, oldest first, and new steps' ids follow the log's. */
-export function restoreLog(m: EditorModel, log: unknown): { ok: true; steps: number } | { ok: false; why: string } {
+ *  has just read) unless `clean: false` (RestoreOptions), steps beyond the model's depth are left out, oldest first, and new steps'
+ *  ids follow the log's. */
+export function restoreLog(m: EditorModel, log: unknown, opts: RestoreOptions = {}): { ok: true; steps: number } | { ok: false; why: string } {
   const no = (why: string) => ({ ok: false as const, why });
   const l = log as Partial<RevisionLog> | null;
   if (!l || typeof l !== 'object' || l.format !== 'iso-editor-history/1') return no('not a history this editor keeps (format iso-editor-history/1)');
@@ -81,7 +87,14 @@ export function restoreLog(m: EditorModel, log: unknown): { ok: true; steps: num
   // every undo, from the text now back to the first, then each redone; then every redo forward and back: each must give the text back
   let t: string | undefined = m.text;
   const texts: string[] = [];
-  for (const e of [...l.undo].reverse()) { texts.push(t!); t = walk(t, e.inverse); if (t === undefined) return no(`undoing "${e.label}" doesn't fit the text`); }
+  // (0.30.0) where the saved text is along undo: the id of the step that made it, 0 for the text before the first; -1 not found
+  const undo0 = l.undo, top = (i: number) => i > 0 ? undo0[i - 1]!.id : 0;
+  let cleanAt: number | undefined = opts.cleanAt !== undefined && opts.cleanAt === textHash(m.text) ? top(l.undo.length) : undefined;
+  for (let i = l.undo.length - 1; i >= 0; i--) {
+    const e = l.undo[i]!;
+    texts.push(t!); t = walk(t, e.inverse); if (t === undefined) return no(`undoing "${e.label}" doesn't fit the text`);
+    if (cleanAt === undefined && opts.cleanAt !== undefined && textHash(t) === opts.cleanAt) cleanAt = top(i);
+  }
   for (const e of l.undo) { t = walk(t, e.steps); if (t !== texts.pop()) return no(`"${e.label}" doesn't redo to the text it undid from`); }
   for (const e of [...l.redo].reverse()) {
     const fwd = walk(t, e.steps);
@@ -94,7 +107,7 @@ export function restoreLog(m: EditorModel, log: unknown): { ok: true; steps: num
     steps: copySteps(e.steps), inverse: copySteps(e.inverse), time: e.time, before: { paths: copyPaths(e.before) }, after: { paths: copyPaths(e.after) },
     fallback: false, open: false,
   });
-  m._put(l.undo.map(entry), l.redo.map(entry));
+  m._put(l.undo.map(entry), l.redo.map(entry), opts.clean === false ? cleanAt ?? -1 : undefined);
   const { undo, redo } = m._stacks();
   return { ok: true, steps: undo.length + redo.length };
 }

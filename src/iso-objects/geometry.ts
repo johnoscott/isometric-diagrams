@@ -16,6 +16,9 @@ export function screenToGrid(dx: number, dy: number): [number, number] {
 export function localAt(sc: CompiledScene, id: string): [number, number] | undefined {
   const p = sc.layout.byId.get(id);
   if (!p) return undefined;
+  // (0.30.0) where it was laid out, before the grid's rounding (the frame a pin is in, but for a container's shift to fit what it
+  // holds): its box, rounded, can be half a cell off it
+  if (p.at) return p.at.map(v => +v.toFixed(6)) as [number, number];
   const o = p.parent ? [p.parent.box.x0, p.parent.box.y0] : [0, 0];
   return [p.box.x0 - o[0], p.box.y0 - o[1]];
 }
@@ -77,7 +80,10 @@ export function snapMove(start: [number, number], d: [number, number], step: num
     const g = parent.grow;
     // (0.29.0) the left and back sides, when they grow: past the margin, within GROW_REACH of the furthest it has been that way
     const near = (r: number | undefined) => Math.ceil((Math.min(lo, r ?? lo) - GROW_REACH) / step - 1e-9) * step;
-    const minX = g?.left ? near(g.reachLo?.[0]) : lo, minY = g?.back ? near(g.reachLo?.[1]) : lo;
+    // (0.30.0) only when the drag itself goes that way, by half a step or more: a thing the layout put on a rounding boundary (half
+    // a cell in) dragged left with the pointer a hair up snapped back to 0, and its group grew back too
+    const goes = (dv: number) => dv <= -step / 2 + 1e-9;
+    const minX = g?.left && goes(d[0]) ? near(g.reachLo?.[0]) : lo, minY = g?.back && goes(d[1]) ? near(g.reachLo?.[1]) : lo;
     if (x < minX) { x = minX; clamped.left = !g?.left; }
     const far = (hi: number, reach: number | undefined) => Math.floor((Math.max(hi, reach ?? hi) + GROW_REACH) / step + 1e-9) * step;
     const maxX = g?.right ? far(hiX, g.reach?.[0]) : hiX, maxY = g?.front ? far(hiY, g.reach?.[1]) : hiY;

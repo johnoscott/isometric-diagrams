@@ -304,10 +304,15 @@ export class EditorModel {
   /** @internal the stacks as they are, for history-log.ts (read only there). (0.27.1) Reading them doesn't seal the typing group being
    *  added to: a host may take the log after every keystroke and typing still joins into one step */
   _stacks(): { undo: readonly Entry[]; redo: readonly Entry[] } { return { undo: this.undoStack, redo: this.redoStack }; }
-  /** @internal put a history in place (history-log.ts's restore, after it has proven it): the text is clean at its last step */
-  _put(undo: Entry[], redo: Entry[]) {
+  /** @internal put a history in place (history-log.ts's restore, after it has proven it): the text is clean at its last step, or
+   *  (0.30.0) at the step `clean` names (0: before the first; -1: nowhere undo reaches, so dirty until a save) */
+  _put(undo: Entry[], redo: Entry[], clean?: number) {
     this.undoStack = undo.slice(-this.depth); this.redoStack = redo.slice(-this.depth);
     this.nextId = Math.max(this.nextId, ...[...undo, ...redo].map(e => e.id + 1));
-    this.cleanId = this.undoStack[this.undoStack.length - 1]?.id ?? 0;
+    const top = this.undoStack[this.undoStack.length - 1]?.id ?? 0;
+    // a clean point that fell off the bottom (the depth) can't be reached by undo: dirty, as when one falls off while editing
+    const reach = clean === undefined ? top : clean === 0 ? (undo.length > this.undoStack.length ? -1 : 0)
+      : this.undoStack.some(e => e.id === clean) ? clean : -1;
+    this.cleanId = reach;
   }
 }

@@ -16,14 +16,15 @@ import { openMenu, type MenuItem } from './menu.ts';
 import { run, type Actions } from './actions.ts';
 import { connectionsOf, nearestOn } from '../connections.ts';
 import { screenToGrid, localAt, boxSilhouette, floorOf, snapMove, overlaps, paddingOf, type Move } from '../../iso-objects/geometry.ts';
-import { resizeSides, minSizeFrom, growLeftBack, type GrowLeftBack, type ResizeSides } from '../../iso-objects/resize.ts';
+import { resizeSides, minSizeFrom, growLeftBack, type ResizeSides } from '../../iso-objects/resize.ts';
+import { settlePins, prunePins } from '../../iso-objects/settle.ts';
 
 /** (0.28.0) which sides of a group that fits what it holds grow when a thing is dragged past them, and which corners of a selected
- *  group have a resize handle. Left and back wait for the owner's answer (group drag, question 2: growing that way moves the others'
- *  pins so nothing else moves on screen, or the whole group shifts): turning them on needs that pin-moving work as well. */
-export const GROW_SIDES: { readonly right: boolean; readonly front: boolean; readonly left: boolean; readonly back: boolean; readonly leftBack: GrowLeftBack } =
-  { right: true, front: true, left: false, back: false, leftBack: 'pins' };
-/** (0.29.0) the same sides, as the tests set them (both left/back variants are built and tested, and off until the owner answers) */
+ *  group have a resize handle. (0.30.0) Left and back on, as the owner chose (group drag, question 2): growing that way moves the
+ *  others' pins so nothing else moves on screen ('pins'); the group needs a pin of its own (it moves), else those sides hold. */
+export const GROW_SIDES: { readonly right: boolean; readonly front: boolean; readonly left: boolean; readonly back: boolean } =
+  { right: true, front: true, left: true, back: true };
+/** (0.29.0) the same sides, as the tests set them */
 /** (0.29.0) a selected group's resize handles: the sides each moves, and where it stands on the floor (x0, y0, x1, y1: the floor) */
 const HANDLES: [string, ResizeSides, (f: { x0: number; y0: number; x1: number; y1: number }) => [number, number]][] = [
   ['corner', { right: true, front: true }, f => [f.x1, f.y1]], ['right', { right: true }, f => [f.x1, (f.y0 + f.y1) / 2]], ['front', { front: true }, f => [(f.x0 + f.x1) / 2, f.y1]],
@@ -681,7 +682,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       /** (0.29.0) the group's own pin (its name, and where it stands in its parent): what growing left or back moves */
       pin?: { name: string; at: [number, number] } };
     /** (0.29.0) growing left or back: the shift (in cells) of the trial drawn and of the one being made, and the pins the drop writes */
-    shiftShown?: [number, number]; shiftNext?: [number, number]; pinSet?: [string, [number, number]][];
+    shiftShown?: [number, number]; shiftNext?: [number, number]; pinSet?: [string, [number, number]][]; pinFix?: Map<string, [number, number]>;
     /** (0.14.0) how far the view was moved to keep the container still on screen (a trial may lay it out elsewhere) */
     shifted?: [number, number];
     move?: Move; invalid?: boolean; step?: number; origCd?: D; gridShown?: boolean;
@@ -971,10 +972,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     const now = g.parent && next.scene.layout.byId.get(g.parent.id)?.box;
     if (!g.parent || !now || !V.view) return;
     // (0.29.0) growing left or back moves the group by the shift on purpose: only the rest is drift, which the view takes up so the
-    // container stands still on screen (with 'shift', its other contents go with it; with 'pins', they stand where they were)
+    // container stands still on screen, its other contents where they were
     const prev = g.shiftShown ?? [0, 0], nxt = g.shiftNext ?? prev, ds = [nxt[0] - prev[0], nxt[1] - prev[1]];
-    const was = g.parent.box, rx = now.x0 - was.x0, ry = now.y0 - was.y0, dx = rx + ds[0], dy = ry + ds[1];
-    const bx = GROW_SIDES.leftBack === 'shift' ? rx : dx, by = GROW_SIDES.leftBack === 'shift' ? ry : dy;
+    const was = g.parent.box, dx = now.x0 - was.x0 + ds[0], dy = now.y0 - was.y0 + ds[1], bx = dx, by = dy;
     const b0 = g.parent.box0;
     g.shiftShown = nxt;
     g.parent = { ...g.parent, box: now, w: Math.max(g.parent.w, now.x1 - now.x0), d: Math.max(g.parent.d, now.y1 - now.y0), ...(b0 ? { box0: { x0: b0.x0 + dx, y0: b0.y0 + dy, x1: b0.x1 + dx, y1: b0.y1 + dy } } : {}) };
@@ -1074,7 +1074,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     for (const [id, [dx, dy]] of g.given ?? []) { const was = localAt(orig.scene, id)!; gave.push([nameOf.get(id)!, [was[0] + dx, was[1] + dy]]); }
     // (0.29.0) past the left or back margin of a group that grows that way: the pins that make it (growLeftBack)
     const p = g.parent, lo = p ? Math.ceil(p.pad / (g.step ?? 1) - 1e-9) * (g.step ?? 1) : 0;
-    const lb = p?.grow && (p.grow.left || p.grow.back) ? growLeftBack({ name: g.name!, at: [p.grow.left ? at[0] : Math.max(at[0], lo), p.grow.back ? at[1] : Math.max(at[1], lo)], lo, step: g.step ?? 1, group: p.pin, mode: GROW_SIDES.leftBack,
+    const lb = p?.grow && (p.grow.left || p.grow.back) ? growLeftBack({ name: g.name!, at: [p.grow.left ? at[0] : Math.max(at[0], lo), p.grow.back ? at[1] : Math.max(at[1], lo)], lo, pad: p.pad, step: g.step ?? 1, group: p.pin,
       others: g.beside!.flatMap(b => { const n = nameOf.get(b.id), w = localAt(orig.scene, b.id); return n && w && n !== p.pin?.name ? [{ name: n, at: w }] : []; }) }) : undefined;
     g.shiftNext = lb?.shift ?? [0, 0]; g.pinSet = lb?.pins;
     const set: [string, [number, number]][] = [...(lb?.pins ?? [[g.name!, at]]), ...gave];
@@ -1082,13 +1082,33 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     let next = lay(set);
     const have = new Set([...Object.keys(K.pins.of(lastData) ?? {}), ...set.map(([n]) => n)]);
     const keep: [string, [number, number]][] = [];
-    for (const b of g.beside!) {
-      const n = nameOf.get(b.id), was = localAt(orig.scene, b.id), now = localAt(next.scene, b.id);
-      if (!n || !was || !now || have.has(n)) continue;
-      if (Math.abs(now[0] - was[0]) > 1e-6 || Math.abs(now[1] - was[1]) > 1e-6) keep.push([n, was]);
+    // (0.30.0, the owner's "nothing else jumps") not only what stands beside it: anything the drop would move in its own container
+    // (a group it grows, pushing what stands beside the group, or a compact grid re-tidying) is kept where it stood, outermost first
+    // (one that is kept carries what is in it), until nothing else moves
+    // the containers it is in (as drawn now, or as the trial has it) are not "else": they grow with it, and the view keeps them still
+    for (let q = next.scene.layout.byId.get(g.id!)?.parent; q; q = q.parent) have.add(nameOf.get(q.id)!);
+    const moved = (d: D) => [...nameOf].filter(([id, n]) => {
+      if (have.has(n)) return false;
+      const was = localAt(orig.scene, id), now = localAt(d.scene, id);
+      return !!was && !!now && Math.hypot(now[0] - was[0], now[1] - was[1]) > 1e-6;
+    });
+    // (0.30.0) a pin is where a thing is laid out from, which needn't be where it then stands (a container that shifts what it holds
+    // to fit it, a box rounded to the grid): each pin corrected (settlePins) until its thing stands where it is meant to; then what
+    // those pins moved in turn is kept too, and all corrected again (the drop writes the corrected ones, g.pinFix)
+    const fix = new Map<string, [number, number]>();
+    const standAt = (d: D, n: string) => { const id = pinIds(d).get(n); return id ? localAt(d.scene, id) : undefined; };
+    for (let round = 0; round < 5; round++) {
+      const st = settlePins([...set, ...keep], lay, standAt, round ? undefined : next);
+      next = st.drawn;
+      for (const [n, c] of st.pins) fix.set(n, c);
+      // what moved, kept (the drop then keeps only those it needs: prunePins); a new thing from the palette: the layout gives it a
+      // place, others shifting along, as before (the owner's answer, 28 Nov)
+      const more = moved(next);
+      if (!more.length || g.fresh) break;
+      for (const [id, n] of more) keep.push([n, localAt(orig.scene, id)!]), have.add(n);
     }
-    if (keep.length) next = lay([...set, ...keep]);
-    return { next, keep: [...gave, ...keep] };
+    g.pinFix = fix;
+    return { next, keep: [...gave, ...keep].map(([n, a]) => [n, fix.get(n) ?? a]) };
   }
   /** the drawing with these pins: of the file's data, or (a new thing) of the text it would make */
   function layWith(g: NonNullable<typeof drag>): (pins: [string, [number, number]][]) => D {
@@ -1213,9 +1233,11 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
       let keep = g.keep ?? [];
       if (stale || !g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1]) try { keep = trialLayout(g).keep; } catch { /* drop it as it is */ }
       // (0.29.0) grown left or back: the trial's pins (the thing, its group, and with 'pins' the rest), with the thing's own as its words
-      const pins = g.pinSet ?? [[g.name!, m.at] as [string, [number, number]]];
-      const label = `Pin ${g.label ?? describe(fromPointer(g.ptr!))} at [${pins[0][1].join(', ')}]${g.pinSet ? ` (${g.parent?.label} grows ${GROW_SIDES.leftBack === 'shift' ? 'and moves' : 'that way'})` : ''}`;
-      run(doc, keep.length || g.pinSet ? pinsCmd([...pins, ...keep], `${label}${wayWords(g, keep)}`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: m.at }, label)), 'canvas', opts.note);
+      const pins = (g.pinSet ?? [[g.name!, m.at] as [string, [number, number]]]).map(([n, a]) => [n, g.pinFix?.get(n) ?? a] as [string, [number, number]]);
+      // (0.30.0) only the kept pins the drawing needs: each tried without (one layout each, at the drop only)
+      try { keep = prunePins(pins, keep, layWith(g), d => [...pinIds(d).values()].map(id => localAt(d.scene, id)) + ''); } catch { /* as it is */ }
+      const label = `Pin ${g.label ?? describe(fromPointer(g.ptr!))} at [${pins[0][1].join(', ')}]${g.pinSet ? ` (${g.parent?.label} grows that way)` : ''}`;
+      run(doc, keep.length || g.pinSet ? pinsCmd([...pins, ...keep], `${label}${wayWords(g, keep)}`) : withPinsMoved(setCmd([PINS_KEY, 'layout', g.name!], { at: pins[0][1] }, label)), 'canvas', opts.note);
       pendingAfterDrag = false;                            // the drop's own reading draws what came meanwhile too
       return;
     }
@@ -1332,7 +1354,7 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     if (!g.invalid && (stale || !g.shown || g.shown[0] !== m.at[0] || g.shown[1] !== m.at[1] || g.keep === undefined)) try { keep = trialLayout(g).keep; } catch { keep = []; }
     // (the layout's own place needn't be on the grid: the same cell is the same place)
     const own = snapMove(g.start!, [0, 0], g.step ?? 1, g.size!, g.parent).at, its = m.at[0] !== own[0] || m.at[1] !== own[1];
-    const pins: [string, [number, number]][] = g.invalid ? [] : [...(its || keep.length ? [[f.name, m.at] as [string, [number, number]]] : []), ...keep];
+    const pins: [string, [number, number]][] = g.invalid ? [] : [...(its || keep.length ? [[f.name, g.pinFix?.get(f.name) ?? m.at] as [string, [number, number]]] : []), ...keep];
     const cmd = pins.length ? seqCmd(`${f.plan.label} at [${m.at.join(', ')}]${wayWords(g, keep)}`, [f.plan.add, pinsCmd(pins, '')]) : f.plan.add;
     if (g.invalid) unshift(g);
     if (!run(doc, { ...cmd, select: [f.path] }, 'canvas', opts.note)) { lastKey = ''; unshift(g); await draw(g.origCd!); return; }
