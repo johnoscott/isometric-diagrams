@@ -42,7 +42,8 @@ export interface ApplyOptions {
 
 /** What a view needs to know about a change. */
 export interface Change {
-  kind: 'do' | 'undo' | 'redo' | 'load';
+  /** (0.33.0) 'history': the undo and redo history was put in place (restoreLog); the text is as it was, so no steps */
+  kind: 'do' | 'undo' | 'redo' | 'load' | 'history';
   origin: Origin;
   label: string;
   /** the steps, in order, each against the text the one before produced */
@@ -314,5 +315,7 @@ export class EditorModel {
     const reach = clean === undefined ? top : clean === 0 ? (undo.length > this.undoStack.length ? -1 : 0)
       : this.undoStack.some(e => e.id === clean) ? clean : -1;
     this.cleanId = reach;
+    // (0.33.0) said, so what shows the history or whether the text is saved (a title's mark, Undo) shows it now: no text changed
+    this.emit({ kind: 'history', origin: 'history', label: 'History', steps: [], version: this._version }, this.text.length);
   }
 }

@@ -2,6 +2,14 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.33.0 — a restored history is shown
+
+- **A draft restored unsaved shows as unsaved**: `restoreLog(model, log, { clean: false, cleanAt })` put the history in place but told
+  no one, so the editor's title mark, its Save and Undo buttons and the host's `onDirtyChange` stayed as they were (a reopened
+  draft looked saved, and leaving it asked nothing). A restore is now said to the model's listeners as a change of its own,
+  `kind: 'history'` (no steps: the text is as it was), so all of them show it. A refused restore says nothing. (Found by the agent
+  editor's drafts test in Chrome.) Hosts with a listener that handles each kind should take `'history'` as no edit.
+
 ## 0.32.0 — sandbox and place sizes in the space editor
 
 - **Sandboxes and places have resize handles** in the space editor (the owner's answer, 27 Nov: drawing only): a drag writes the

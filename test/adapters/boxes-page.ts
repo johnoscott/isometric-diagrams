@@ -7,6 +7,7 @@ import { drawingCss, MARKS_CSS, GRID_CSS } from '../../src/iso-objects/css.ts';
 import { isoVars, scope } from '../../src/iso-viewer/view-css.ts';
 import { flatCss } from '../../src/iso-viewer/flat-view.ts';
 import { mountEditor } from '../../src/iso-editor/ui/mount.ts';
+import { revisionLog, restoreLog, textHash } from '../../src/iso-editor/history-log.ts';
 import { growSidesForTest } from '../../src/iso-editor/ui/canvas.ts';
 import { setupFor, PLAIN_WORDS } from '../../src/iso-editor/ui/setup.ts';
 import { scopeCss } from '../../src/iso-editor/ui/scope-css.ts';
@@ -59,7 +60,9 @@ const SECTION: Record<string, string> = { Box: 'Things', Tray: 'Holders', Zone: 
 // <body data-docked>: (0.12.0) the palette docked, a pane of its own at the canvas's left
 const sectionedView = { ...view, palette: view.palette!.map(e => ({ ...e, section: SECTION[e.label] })), ...(document.body.hasAttribute('data-docked') ? { paletteLayout: 'docked' as const } : {}) };
 const storage = { get: (k: string) => stored[k] ?? null, set: (k: string, v: string | null) => { if (v === null) delete stored[k]; else stored[k] = v; } };
-const editor = mountEditor(el, { text: String(TEXT), onSave: async t => { saved.push(t); return { ok: true }; }, ...(sectioned ? { storage } : {}) },
+// (0.33.0) what the host is told of the text being saved or not (onDirtyChange), in order
+const dirtyChanges: boolean[] = [];
+const editor = mountEditor(el, { text: String(TEXT), onSave: async t => { saved.push(t); return { ok: true }; }, onDirtyChange: d => { dirtyChanges.push(d); }, ...(sectioned ? { storage } : {}) },
   bare ? setupFor(plain, plainView) : setupFor(boxesAdapter, sectioned ? sectionedView : view));
-(window as unknown as { __boxes: unknown }).__boxes = { editor, saved, css: css.length, violations, errors, stored, growSides: growSidesForTest };   // (0.29.0) the left/back variants, for the test
+(window as unknown as { __boxes: unknown }).__boxes = { editor, saved, css: css.length, violations, errors, stored, growSides: growSidesForTest, dirtyChanges, history: { revisionLog, restoreLog, textHash } };   // (0.29.0) the left/back variants, for the test
 document.title = 'ready';

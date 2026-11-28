@@ -1345,3 +1345,25 @@ test('boxes/1 in Chrome (0.32.0): ⇧ from a start between cells: every place on
     assert.ok(r.steps.some(([x]) => x >= 2), `it went along it: ${JSON.stringify(r.steps)}`);
   });
 });
+
+test('boxes/1 in Chrome (0.33.0): a draft restored unsaved is shown so: the host hears onDirtyChange(true), Save is on, Undo too; undone to the saved text, clean', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    // an edit, its history kept; the page opened again on the edited text (as a host reopens a draft), the history given back
+    const r = await ev<{ before: boolean[]; after: boolean[]; save: boolean; undo: boolean; dirty: boolean; back: boolean[]; clean: boolean }>(`
+      const H = B.history, t0 = E.getText();
+      I.doc.typed([{ start: t0.indexOf('Two trays'), end: t0.indexOf('Two trays') + 3, text: 'Six' }]); await tick(100);
+      const log = JSON.parse(JSON.stringify(H.revisionLog(I.doc))), draft = E.getText();
+      E.setText(draft); await tick(200);
+      const before = [...B.dirtyChanges];
+      H.restoreLog(I.doc, log, { clean: false, cleanAt: H.textHash(t0) }); await tick(100);
+      const after = B.dirtyChanges.slice(before.length);
+      const save = !document.querySelector('#se-save')?.disabled, undo = !document.querySelector('#se-undo')?.disabled, dirty = I.doc.dirty;
+      I.doc.undo(); await tick(100);
+      return { before, after, save, undo, dirty, back: B.dirtyChanges.slice(before.length + after.length), clean: !I.doc.dirty && E.getText() === t0 };`);
+    assert.equal(r.dirty, true, 'the model has it unsaved');
+    assert.deepEqual(r.after, [true], `the host is told, once: ${JSON.stringify(r)}`);
+    assert.deepEqual([r.save, r.undo], [true, true], 'Save and Undo on');
+    assert.deepEqual([r.back, r.clean], [[false], true], 'undone to the saved text: clean, and the host told');
+  });
+});
