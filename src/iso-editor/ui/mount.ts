@@ -244,6 +244,9 @@ export interface EditorCanvas {
   /** everything, or that box, fitted */
   fit(box?: DrawnBox): void;
   focus(): void;
+  /** (0.34.0) what the person sees: the drawing's rectangle in view (the scene's viewBox, in the drawing's units, as boxOf's), or
+   *  undefined before the first drawing; a copy. The element's size over its w is the screen px per unit */
+  visible(): DrawnBox | undefined;
 }
 
 /** P3: the editor with the features given (the core alone: the shell, the model, the reader and the tree; read-only
@@ -699,7 +702,7 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
   }
 
   // ---------- (0.22.0) what the person is in the middle of, for a host ----------
-  const C = canvas as unknown as { busy?: 'drag' | 'link'; drawnNow?(): Promise<boolean>; setMode?(m: '3d' | '2d', remember?: boolean): void; mode?: '3d' | '2d'; flat?: unknown; zoom?: number; stage?: HTMLElement; boxFor?(p: Path): DrawnBox | undefined; elementsOf?(p: Path): Element[]; fitAll?(b?: DrawnBox): void; };
+  const C = canvas as unknown as { busy?: 'drag' | 'link'; drawnNow?(): Promise<boolean>; setMode?(m: '3d' | '2d', remember?: boolean): void; mode?: '3d' | '2d'; flat?: unknown; zoom?: number; visible?: DrawnBox; stage?: HTMLElement; boxFor?(p: Path): DrawnBox | undefined; elementsOf?(p: Path): Element[]; fitAll?(b?: DrawnBox): void; };
   function busyNow(): EditorBusy {
     if (disposed) return false;
     const c = C.busy;
@@ -742,6 +745,7 @@ export function mountEditor<R, X, A extends object = object>(el: HTMLElement, op
     drawing() { const all = C.stage!.querySelectorAll<SVGSVGElement>(':scope > svg.scene'); return all[all.length - 1]; },
     elementsOf(path) { return disposed ? [] : [...(C.elementsOf?.(path as Path) ?? [])]; },
     boxOf(path) { return sameBox(C.boxFor?.(path as Path)); },
+    visible() { return disposed ? undefined : C.visible; },
     fit(box) { if (disposed) return; if (box) C.fitAll?.(box); else canvas.fit(); },
     focus() { canvas.focus(); },
   } : undefined;

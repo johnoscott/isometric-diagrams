@@ -1367,3 +1367,24 @@ test('boxes/1 in Chrome (0.33.0): a draft restored unsaved is shown so: the host
     assert.deepEqual([r.back, r.clean], [[false], true], 'undone to the saved text: clean, and the host told');
   });
 });
+
+test('boxes/1 in Chrome (0.34.0): canvas.visible() is what the person sees: the scene\'s viewBox, a copy, following a zoom; boxOf in the same units', { skip: chrome ? false : 'no Chrome', timeout: 120000 }, async () => {
+  await drivePage(chrome!, (await bundled()).outputFiles![0].contents, '__boxes', async ({ ev, until }) => {
+    await until(`document.title === 'ready' && document.querySelector('.iso-canvas svg.scene [data-id="c"]')`, 'it mounts and draws');
+    const r = await ev<{ v: number[]; vb: number[]; copy: boolean; zoomed: number[]; vb2: number[]; inside: boolean }>(`
+      const C = E.canvas, nums = s => s.split(/[ ,]+/).map(Number), r4 = b => [b.x, b.y, b.w, b.h].map(n => Math.round(n * 100) / 100);
+      await C.drawn();
+      const v = C.visible(), vb = nums(C.drawing().getAttribute('viewBox'));
+      v.x += 999; const copy = C.visible().x !== v.x;
+      // zoomed in on c: the view gets smaller, and c's box (the same units) is inside it
+      C.fit(C.boxOf(['boxes', 'c'])); await C.drawn(); await tick(300);
+      const z = C.visible(), b = C.boxOf(['boxes', 'c']);
+      return { v: r4({ ...v, x: v.x - 999 }), vb: vb.map(n => Math.round(n * 100) / 100), copy, zoomed: r4(z), vb2: nums(C.drawing().getAttribute('viewBox')).map(n => Math.round(n * 100) / 100),
+        inside: b.x >= z.x - 1e-6 && b.y >= z.y - 1e-6 && b.x + b.w <= z.x + z.w + 1e-6 && b.y + b.h <= z.y + z.h + 1e-6 };`);
+    assert.deepEqual(r.v, r.vb, 'the scene\'s viewBox');
+    assert.equal(r.copy, true, 'a copy: changing it changes nothing');
+    assert.deepEqual(r.zoomed, r.vb2, 'after a zoom, the new viewBox');
+    assert.ok(r.zoomed[2] < r.v[2], `smaller when zoomed in: ${r.zoomed} from ${r.v}`);
+    assert.equal(r.inside, true, 'boxOf in the same units: c is inside what is seen');
+  });
+});

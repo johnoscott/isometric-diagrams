@@ -1997,6 +1997,9 @@ export function canvasView<M, D extends CanvasDrawing, A extends object = object
     },
     /** for the tests */
     get view() { return V.view; },
+    /** (0.34.0) what the canvas shows: the drawing's rectangle in view (x, y, w, h in the drawing's units: the scene's viewBox), a copy
+     *  the canvas never changes; with scale() (screen px per unit) it is the screen's. Undefined while nothing is drawn */
+    get visible(): { x: number; y: number; w: number; h: number } | undefined { const v = V.view; return v ? { x: v.x, y: v.y, w: v.w, h: v.h } : undefined; },
     get doc() { return cd; },
     /** the view (3D or 2D), and the 2D layout while it shows */
     get mode() { return mode; }, setMode, get flat() { return flat?.layout; },

@@ -2,6 +2,12 @@
 
 The engine's releases, as published to npm as `@johnoscott/isometric-engine` (0.9.0 on) or kept locally before.
 
+## 0.34.0 — what the canvas shows, for a host
+
+- **`editor.canvas.visible()`**: the drawing's rectangle the person sees (x, y, w, h in the drawing's units: the scene's viewBox, as
+  `boxOf` gives a thing's), a copy, or undefined before the first drawing. For a host that shows its agent what the person sees: the
+  agent editor read the canvas's internal view, which was for the engine's own tests.
+
 ## 0.33.0 — a restored history is shown
 
 - **A draft restored unsaved shows as unsaved**: `restoreLog(model, log, { clean: false, cleanAt })` put the history in place but told
